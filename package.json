@@ -1,0 +1,47 @@
+{
+  "name": "kinann",
+  "version": "0.1.0",
+  "description": "Kinematic artificial neural network Javascript library",
+  "main": "index.js",
+  "directories": {
+    "doc": "doc"
+  },
+  "dependencies": {
+    "mathjs": "^3.9.2"
+  },
+  "devDependencies": {
+    "mocha": "^3.2.0",
+    "grunt": "^1.0.1",
+    "grunt-cli": "^0.1.13",
+    "grunt-contrib-jshint": "0.11.3",
+    "grunt-contrib-uglify": "0.2.4",
+    "grunt-contrib-watch": "1.0.0",
+    "grunt-jsbeautifier": "^0.2.13",
+    "grunt-mocha-test": "~0.12.7",
+    "grunt-npm-install": "^0.2.0",
+    "grunt-simple-mocha": "0.4.0",
+    "should": "^11.2.0"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firepick/kinann.git"
+  },
+  "keywords": [
+    "kinematics",
+    "robot",
+    "artifical",
+    "neural",
+    "networks",
+    "FirePick",
+    "firenodejs"
+  ],
+  "author": "Karl Lew",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/firepick/kinann/issues"
+  },
+  "homepage": "https://github.com/firepick/kinann#readme"
+}
