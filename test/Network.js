@@ -337,59 +337,42 @@ var Sequential = require("../src/ann/Sequential");
         var nInputs = 3;
         var nOutputs = nInputs;
         var boundaries = [{
-                input: [0, 0, 0]
-            }, // cube vertex
-            {
-                input: [200, 200, 10]
-            }, // cube vertex
+                input: [0, 0, 0] // cube vertex
+            }, {
+                input: [200, 200, 10] // cube vertex
+            }, 
         ];
         var examples = boundaries.concat([{
-                input: [0, 0, 10]
-            }, // cube vertex
-            {
-                input: [0, 200, 10]
-            }, // cube vertex
-            {
-                input: [200, 200, 0]
-            }, // cube vertex
-            {
-                input: [0, 200, 0]
-            }, // cube vertex
-            //{ input:[200,0,10] }, // cube vertex
-            //{ input: [200,0,0] }, // cube vertex
-            //{ input:[100,100,5] }, // center
-            {
-                input: [100, 100, 0]
-            }, // midpoint bottom
-            {
-                input: [100, 100, 10]
-            }, // midpoint top
-            {
-                input: [100, 200, 5]
-            }, // midpoint side
-            {
-                input: [100, 0, 5]
-            }, // midpoint side
-            {
-                input: [200, 100, 5]
-            }, // midpoint side
-            {
-                input: [0, 100, 5]
-            }, // midpoint side
+                input: [0, 0, 10] // cube vertex
+            }, {
+                input: [0, 200, 10] // cube vertex
+            }, {
+                input: [200, 200, 0] // cube vertex
+            }, {
+                input: [0, 200, 0] // cube vertex
+            }, {
+                input: [100, 100, 0] // bottom 
+            }, {
+                input: [100, 100, 10] // top
+            }, {
+                input: [100, 200, 5] // side
+            }, {
+                input: [100, 0, 5] // side
+            }, {
+                input: [200, 100, 5] // side
+            }, {
+                input: [0, 100, 5] // side
+            }, 
         ]);
         var tests = [{
                 input: [190, 180, 3.5]
-            },
-            {
+            }, {
                 input: [200, 0, 4]
-            },
-            {
+            }, {
                 input: [100, 0, 0]
-            },
-            {
+            }, {
                 input: [1, 1, 2]
-            },
-            {
+            }, {
                 input: [200, 0, 0]
             },
         ];
