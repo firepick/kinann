@@ -12,14 +12,14 @@
   "devDependencies": {
     "mocha": "^3.2.0",
     "grunt": "^1.0.1",
-    "grunt-cli": "^0.1.13",
-    "grunt-contrib-jshint": "0.11.3",
-    "grunt-contrib-uglify": "0.2.4",
+    "grunt-cli": "^1.2.0",
+    "grunt-contrib-jshint": "1.1.0",
+    "grunt-contrib-uglify": "2.1.0",
     "grunt-contrib-watch": "1.0.0",
     "grunt-jsbeautifier": "^0.2.13",
-    "grunt-mocha-test": "~0.12.7",
-    "grunt-npm-install": "^0.2.0",
-    "grunt-simple-mocha": "0.4.0",
+    "grunt-mocha-test": "~0.13.2",
+    "grunt-npm-install": "^0.3.1",
+    "grunt-simple-mocha": "0.4.1",
     "should": "^11.2.0"
   },
   "scripts": {

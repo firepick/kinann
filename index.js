@@ -1,17 +1,22 @@
-var EagleBRD = require("./lib/eaglebrd");
-var Trans2D = require("./lib/trans2d");
-var Gerber = require("./lib/gerber");
-var LogFile = require("./lib/logfile");
-var LogString = require("./lib/logstring");
-var PcbSvg = require("./lib/pcbsvg");
-var PcbTransform = require("./lib/pcbtransform");
+(function(exports) {
+    ////////////////// constructor
+    function Kinann() {
+        var that = this;
+        return that;
+    }
 
-if (typeof require === 'function') {
-    exports.EagleBRD = EagleBRD;
-    exports.Trans2D = Trans2D;
-    exports.Gerber = Gerber;
-    exports.LogFile = LogFile;
-    exports.LogString = LogString;
-    exports.PcbSvg = PcbSvg;
-    exports.PcbTransform = PcbTransform;
-}
+    ///////////////// class ////////////////////
+    Kinann.Optimizer = require("./src/ann/Optimizer");
+    Kinann.Layer = require("./src/ann/Layer");
+    Kinann.MapLayer = require("./src/ann/MapLayer");
+    Kinann.Network = require("./src/ann/Network");
+    Kinann.Sequential = require("./src/ann/Sequential");
+
+    module.exports = exports.Kinann = Kinann;
+})(typeof exports === "object" ? exports : (exports = {}));
+
+// mocha -R min --inline-diffs *.js
+(typeof describe === 'function') && describe("Kinann", function() {
+    var Kinann = exports.Kinann; // require("./Kinann");
+
+})
