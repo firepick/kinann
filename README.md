@@ -1,6 +1,6 @@
 ## Whatizit?
 **Kinann** is a Javascript library for building, training and using 
-artificial neural networks that model real world kinematic errors.
+artificial neural networks (ANNs) that model real world kinematic errors.
 
 ### Overview
 Kinematic models for robots rarely match their implementations--axes may
