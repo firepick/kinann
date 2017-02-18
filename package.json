@@ -1,16 +1,16 @@
 {
   "name": "kinann",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Kinematic artificial neural network Javascript library",
   "main": "index.js",
   "directories": {
+    "test": "test",
     "doc": "doc"
   },
   "dependencies": {
     "mathjs": "^3.9.2"
   },
   "devDependencies": {
-    "mocha": "^3.2.0",
     "grunt": "^1.0.1",
     "grunt-cli": "^1.2.0",
     "grunt-contrib-jshint": "1.1.0",
@@ -19,11 +19,13 @@
     "grunt-jsbeautifier": "^0.2.13",
     "grunt-mocha-test": "~0.13.2",
     "grunt-npm-install": "^0.3.1",
+    "grunt-release": "^0.14.0",
     "grunt-simple-mocha": "0.4.1",
+    "mocha": "^3.2.0",
     "should": "^11.2.0"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha -w -R min --inline-diffs"
   },
   "repository": {
     "type": "git",
