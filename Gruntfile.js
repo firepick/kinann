@@ -36,7 +36,7 @@ module.exports = function(grunt) {
             all: ['Gruntfile.js', '**/*.js']
         },
         jsbeautifier: {
-            files: ["Gruntfile.js", "src/**/*.js"],
+            files: ["Gruntfile.js", "src/**/*.js", "test/**/*.js"],
             options: {
                 wrap_line_length: 50,
                 keep_array_indentation: true
@@ -51,6 +51,7 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-watch');
     grunt.loadNpmTasks('grunt-jsbeautifier');
     grunt.loadNpmTasks('grunt-npm-install');
+    grunt.loadNpmTasks('grunt-release');
 
     // Default task(s).
     grunt.registerTask('default', ['uglify']);
