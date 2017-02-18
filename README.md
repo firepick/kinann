@@ -29,8 +29,8 @@ Kinann is designed for building kinematic neural networks for Javascript robot a
 Although there are many neural network frameworks 
 (e.g., [synaptic.js](http://caza.la/synaptic/#/), 
 [Tensorflow](https://www.tensorflow.org/), etc.) that can be used to solve
-the kinematic error challenge, Kinann is optimized for kinematic modeling and
-should not be used to...recognize cat pictures on YouTube.
+the kinematic error challenge, Kinann is optimized for kinematic modeling.
+Kinann should not be used to recognize cat pictures on YouTube.
 
 ### Installation
 Use `npm` to install kinann.
