@@ -1,4 +1,4 @@
-Kinann is a Javascript library for building, training and using 
+**Kinann** is a Javascript library for building, training and using 
 artificial neural networks for kinematic error modeling.
 
 ### Overview
