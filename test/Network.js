@@ -437,7 +437,7 @@ var Sequential = require("../src/ann/Sequential");
                 "target:" + JSON.stringify(test.target),
                 "input:" + test.input
             );
-            error.should.below(0.02);
+            error.should.below(0.01);
         }
         //verbose && console.log("activate:", network.memoizeActivate.toString());
         verbose && console.log("elapsed:", new Date() - msStart);

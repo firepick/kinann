@@ -1,3 +1,5 @@
+*.wiki
+
 # Logs
 logs
 *.log
