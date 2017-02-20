@@ -37,3 +37,7 @@ Use `npm` to install kinann.
 
 `npm install kinann`
 
+
+### See Also
+
+[Kinann wiki...](https://github.com/firepick/kinann/wiki)
