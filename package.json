@@ -5,6 +5,7 @@
   "main": "index.js",
   "directories": {
     "test": "test",
+    "src": "src",
     "doc": "doc"
   },
   "dependencies": {
@@ -25,7 +26,8 @@
     "should": "^11.2.0"
   },
   "scripts": {
-    "test": "mocha -w -R min --inline-diffs"
+    "testx": "mocha -w -R min --inline-diffs",
+    "test": "mocha -w --inline-diffs"
   },
   "repository": {
     "type": "git",

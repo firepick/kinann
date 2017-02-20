@@ -31,6 +31,7 @@ var MapLayer = require("./MapLayer");
             nOut: that.nOut,
         }
         obj.layers = that.layers.map((l) => l.toJSON());
+        that.inStats && (obj.inStats = that.inStats);
         that.fNormIn && (obj.fNormIn = that.fNormIn.map((f) => f.toString()));
         that.weights && (obj.weights = that.weights);
         that.gradExpr && (obj.gradExpr = that.gradExpr);
@@ -50,6 +51,7 @@ var MapLayer = require("./MapLayer");
             obj.gradExpr && (network.gradExpr = obj.gradExpr);
             obj.costFunExpr && (network.costFunExpr = obj.costFunExpr);
             obj.fNormIn && (network.fNormIn = obj.fNormIn.map((f) => (new Function("return " + f))()));
+            obj.inStats && (network.inStats = obj.inStats);
             if (obj.weights) {
                 network.weights = obj.weights;
                 network.compile();
@@ -132,6 +134,9 @@ var MapLayer = require("./MapLayer");
 
     Network.prototype.activate = function(input, target) { // see compile()
         var that = this;
+        if (input.length !== that.nIn) {
+            throw new Error("activation vector input length expected:"+that.nIn + " actual:"+input.length);
+        }
         if (!that.memoizeActivate) {
             throw new Error("compile() before activate()");
         }
@@ -221,8 +226,8 @@ var MapLayer = require("./MapLayer");
             min: -1
         };
         var normalizeInput = options.normalizeInput || "mapminmax";
-        var inStats = Network.exampleStats(examples, "input");
-        return that.fNormIn = MapLayer.mapFun(that.nIn, inStats, normStats, normalizeInput);
+        that.inStats = Network.exampleStats(examples, "input");
+        return that.fNormIn = MapLayer.mapFun(that.nIn, that.inStats, normStats, normalizeInput);
     }
     Network.prototype.train = function(examples, options = {}) {
         var that = this;

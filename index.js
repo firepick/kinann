@@ -11,6 +11,8 @@
     Kinann.MapLayer = require("./src/ann/MapLayer");
     Kinann.Network = require("./src/ann/Network");
     Kinann.Sequential = require("./src/ann/Sequential");
+    Kinann.Example = require("./src/ann/Example");
+    Kinann.Factory = require("./src/kin/Factory");
 
     module.exports = exports.Kinann = Kinann;
 })(typeof exports === "object" ? exports : (exports = {}));

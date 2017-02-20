@@ -104,6 +104,30 @@ var Sequential = require("../src/ann/Sequential");
             w0r1c1: '(2 * (x1 + 0) * (w0b1 - yt1 + w0r1c0 * x0 + w0r1c1 * x1) + 0) / 2',
         });
     })
+    it("Network.normalizeInput(examples, options) normalizes input", function() {
+        this.timeout(60 * 1000);
+        
+        // input normalization only requires boundary examples
+        var boundaries = [{
+                input: [3, 2, 1] // cube vertex
+            }, {
+                input: [300, 200, 10] // cube vertex
+            }, 
+        ];
+        var network = new Sequential(3, [
+            new Layer(3, {activation: Layer.ACT_IDENTITY}),
+        ]);
+        network.initialize();
+        network.compile(); // pre-compilation saves time
+        network.normalizeInput(boundaries, {
+            normalizeInput: "mapminmax", // (default) map minimum/maximum to [-1,1]
+        }); 
+
+        // normalization statistics are retained in the network
+        var inStats = network.inStats;
+        inStats.length.should.equal(network.nIn);
+        inStats.map((stats) => stats.should.properties(["max","min","mean","std"]));
+    })
     it("Network.activate(ipnuts, targets) computes activation outputs", function() {
         var network = new Sequential(2, [new Layer(2)]);
         var scope = {
@@ -400,7 +424,7 @@ var Sequential = require("../src/ann/Sequential");
         network0.initialize();
         network0.compile(); // pre-compilation saves time
         network0.normalizeInput(boundaries); // input normalization only requires boundary examples
-        var verbose = true;
+        var verbose = false;
         var result = {};
         var preTrain = true; // pre-training usually helps
         if (preTrain) {
