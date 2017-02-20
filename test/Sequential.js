@@ -1,7 +1,7 @@
 var should = require("should");
-var Network = require("../src/ann/Network");
-var Layer = require("../src/ann/Layer");
-var Sequential = require("../src/ann/Sequential");
+var Network = require("../src/Network");
+var Layer = require("../src/Layer");
+var Sequential = require("../src/Sequential");
 
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("Sequential", function() {

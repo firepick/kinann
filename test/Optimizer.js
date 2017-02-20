@@ -1,6 +1,6 @@
 var should = require("should");
 var mathjs = require("mathjs");
-var Optimizer = require("../src/ann/Optimizer");
+var Optimizer = require("../src/Optimizer");
 
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("Optimizer", function() {

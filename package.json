@@ -26,8 +26,8 @@
     "should": "^11.2.0"
   },
   "scripts": {
-    "testx": "mocha -w -R min --inline-diffs",
-    "test": "mocha -w --inline-diffs"
+    "test": "mocha -w -R min --inline-diffs",
+    "testx": "mocha -w --inline-diffs"
   },
   "repository": {
     "type": "git",

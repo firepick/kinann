@@ -1,7 +1,7 @@
 var should = require("should");
 var mathjs = require("mathjs");
-var Layer = require("../src/ann/Layer");
-var MapLayer = require("../src/ann/MapLayer");
+var Layer = require("../src/Layer");
+var MapLayer = require("../src/MapLayer");
 
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("Layer", function() {

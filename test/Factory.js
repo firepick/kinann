@@ -201,7 +201,7 @@ var Kinann = require("../index");
                 ]
             }
         });
-        vassertEqual(measuredNet.activate([0,0,0]), [0,0,0,0]);
+        vassertEqual(measuredNet.activate([0,0,0,0]), [0,0,0,0]);
         vassertEqual(measuredNet.activate([300,200,10,360]), [400,173.205,10,360]);
         vassertEqual(measuredNet.activate([10,10,10,10]), [15,8.66,10,10]);
 

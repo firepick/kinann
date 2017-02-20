@@ -1,10 +1,10 @@
 var mathjs = require("mathjs");
-var Optimizer = require("../src/ann/Optimizer");
-var Layer = require("../src/ann/Layer");
-var MapLayer = require("../src/ann/MapLayer");
+var Optimizer = require("../src/Optimizer");
+var Layer = require("../src/Layer");
+var MapLayer = require("../src/MapLayer");
 var should = require("should");
-var Network = require("../src/ann/Network");
-var Sequential = require("../src/ann/Sequential");
+var Network = require("../src/Network");
+var Sequential = require("../src/Sequential");
 
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("Network", function() {

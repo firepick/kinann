@@ -1,5 +1,4 @@
 var mathjs = require("mathjs");
-var Kinann = require("../../index");
 
 (function(exports) {
 

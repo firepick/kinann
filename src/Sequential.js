@@ -1,4 +1,3 @@
-var should = require("should");
 var Network = require("./Network");
 var Layer = require("./Layer");
 
@@ -27,29 +26,3 @@ var Layer = require("./Layer");
 
     module.exports = exports.Sequential = Sequential;
 })(typeof exports === "object" ? exports : (exports = {}));
-
-// mocha -R min --inline-diffs *.js
-(typeof describe === 'function') && describe("Sequential", function() {
-    var Sequential = exports.Sequential; // require("./Sequential");
-    var logistic_opts = {
-        activation: "logistic"
-    };
-    var identity_opts = {
-        activation: "identity",
-        id: 1,
-    };
-
-    it("Sequential(nIn, layers) creates a network aggregated as a sequence of layers", function() {
-        var network = new Sequential(2, [
-            new Layer(2, logistic_opts),
-            new Layer(2, identity_opts),
-        ]);
-
-        // expressions are aggregated
-        var exprs = network.expressions();
-        should.deepEqual(exprs, [
-            "w1b0+w1r0c0/(1+exp(-(w0b0+w0r0c0*x0+w0r0c1*x1)))+w1r0c1/(1+exp(-(w0b1+w0r1c0*x0+w0r1c1*x1)))",
-            "w1b1+w1r1c0/(1+exp(-(w0b0+w0r0c0*x0+w0r0c1*x1)))+w1r1c1/(1+exp(-(w0b1+w0r1c0*x0+w0r1c1*x1)))",
-        ]);
-    })
-})

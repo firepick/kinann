@@ -2,17 +2,6 @@ module.exports = function(grunt) {
 
     // Project configuration.
     grunt.initConfig({
-        mochaTest: {
-            test: {
-                options: {
-                    reporter: 'min',
-                    captureFile: 'results.txt',
-                    quiet: true,
-                    clearRequireCache: true
-                },
-                src: ['**/*.js']
-            }
-        },
         pkg: grunt.file.readJSON('package.json'),
         uglify: {
             options: {
@@ -26,7 +15,6 @@ module.exports = function(grunt) {
         watch: {
             scripts: {
                 files: ['**/*.js'],
-                tasks: ['mochaTest'],
                 options: {
                     spawn: true,
                 },
@@ -44,8 +32,6 @@ module.exports = function(grunt) {
         }
     });
 
-    //grunt.loadNpmTasks('grunt-simple-mocha');
-    grunt.loadNpmTasks('grunt-mocha-test');
     grunt.loadNpmTasks('grunt-contrib-jshint');
     grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.loadNpmTasks('grunt-contrib-watch');
@@ -55,7 +41,6 @@ module.exports = function(grunt) {
 
     // Default task(s).
     grunt.registerTask('default', ['uglify']);
-    grunt.registerTask('test', ['mochaTest']);
 
     var customizeJSON = function(original, custom) {
         for (var key in custom) {
