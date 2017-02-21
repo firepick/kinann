@@ -1,6 +1,6 @@
 {
   "name": "kinann",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Kinematic artificial neural network Javascript library",
   "main": "index.js",
   "directories": {
@@ -47,5 +47,5 @@
   "bugs": {
     "url": "https://github.com/firepick/kinann/issues"
   },
- "homepage": "https://github.com/firepick/kinann"
+  "homepage": "https://github.com/firepick/kinann"
 }
