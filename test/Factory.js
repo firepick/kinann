@@ -178,7 +178,7 @@ var Kinann = require("../index");
         vassertEqual(invNetwork.activate([43,27,9]), [42,26,8]);
         vassertEqual(invNetwork.activate([275,17,2]), [274,16,1]);
     })
-    it("Train Kinann network to correct XY skew", function() {
+    it("Train Kinann network to correct Y-axis skew", function() {
         this.timeout(60*1000);
 
         var xyza = [
