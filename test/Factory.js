@@ -211,5 +211,6 @@ var Kinann = require("../index");
         vassertEqual(calibratedNet.activate([10,10,10,10]), [4.227,11.547,10,10]);
         vassertEqual(measuredNet.activate(calibratedNet.activate([0,0,0,0])), [0,0,0,0]);
         vassertEqual(measuredNet.activate(calibratedNet.activate([300,200,10,0])), [300,200,10,0]);
+        //console.log("mathjs", JSON.stringify(measuredNet.gradExpr, null, "  "))
     })
 })

@@ -40,4 +40,6 @@ Use `npm` to install kinann.
 
 ### See Also
 
-[Kinann wiki...](https://github.com/firepick/kinann/wiki)
+* [Kinann wiki...](https://github.com/firepick/kinann/wiki)
+* [mathjs](http://mathjs.org) many thanks to MathJS for expression parsing and derivatives!
+
