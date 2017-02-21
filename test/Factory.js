@@ -6,7 +6,7 @@ var Kinann = require("../index");
     var should = require("should");
     var Factory = Kinann.Factory;
     var Example = Kinann.Example;
-    var testAxes = [
+    var testVars = [
         {minPos: 3, maxPos: 300},
         {minPos: 2, maxPos: 200},
         {minPos: 1, maxPos: 10},
@@ -15,12 +15,12 @@ var Kinann = require("../index");
         vactual.map((xa,i) => xa.should.approximately(vexpected[i], tol));
     }
     
-    it("Factory(axes, options) creates Factory kinmatic model", function() {
-        var factory = new Factory(testAxes);
-        should.deepEqual(factory.axes, testAxes);
+    it("Factory(vars, options) creates Factory kinmatic model", function() {
+        var factory = new Factory(testVars);
+        should.deepEqual(factory.vars, testVars);
     })
     it("examples returns pre-training examples", function() {
-        var factory = new Factory(testAxes);
+        var factory = new Factory(testVars);
         should.deepEqual(factory.createExamples(), [
             new Example([3,2,1], [3,2,1]), // minPos
             new Example([300,200,10], [300,200,10]), // maxPos
@@ -33,8 +33,8 @@ var Kinann = require("../index");
             new Example([3,2,10], [3,2,10]), // minPos neighbor
         ]);
     });
-    it("TESTTESTcreateExamples(options?) creates training examples", function() {
-        var factory = new Factory(testAxes);
+    it("createExamples(options?) creates training examples", function() {
+        var factory = new Factory(testVars);
         function testExamples(examples, f, tol=.001) {
             examples.map((ex) => {
                 ex.target.map((x,i) => x.should.approximately(f(ex.input[i]), tol));
@@ -46,9 +46,9 @@ var Kinann = require("../index");
         testExamples(factory.createExamples({transform:(data)=>data.map((x) => 2*x)}), (x) => 2*x); // transform is scale by 2
         testExamples(factory.createExamples({transform:(data)=>data.map((x) => -x)}), (x) => -x); // transform is negative
     })
-    it("TESTTESTcreateNetwork() can create a linear Kinann neural network for identity transform", function() {
+    it("createNetwork() can create a linear Kinann neural network for identity transform", function() {
         this.timeout(60*1000);
-        var factory = new Factory(testAxes);
+        var factory = new Factory(testVars);
         var network = factory.createNetwork({ degree: 1 });
 
         network.nIn.should.equal(3);
@@ -69,9 +69,9 @@ var Kinann = require("../index");
         vassertEqual(network.activate([300,200,10]), [300,200,10]);
         vassertEqual(network.activate([3,2,1]), [3,2,1]);
     })
-    it("TESTTESTcreateNetwork() can create a linear Kinann neural network for negative transform", function() {
+    it("createNetwork() can create a linear Kinann neural network for negative transform", function() {
         this.timeout(60*1000);
-        var factory = new Factory(testAxes);
+        var factory = new Factory(testVars);
         var network = factory.createNetwork({ 
             transform: (data) => data.map((x) => -x) 
         });
@@ -79,7 +79,7 @@ var Kinann = require("../index");
     })
     it("createNetwork() returns training results", function() {
         this.timeout(60*1000);
-        var factory = new Factory(testAxes);
+        var factory = new Factory(testVars);
         var result = {}
         var network = factory.createNetwork({
             onTrain: (r) => (result = r),
@@ -90,7 +90,7 @@ var Kinann = require("../index");
     })
     it("createNetwork(options) can create a polynomial Kinann neural network", function() {
         this.timeout(60*1000);
-        var factory = new Factory(testAxes);
+        var factory = new Factory(testVars);
         var network = factory.createNetwork({ 
             degree: 3, // cubic polynomial
             preTrain: false,
@@ -157,9 +157,9 @@ var Kinann = require("../index");
         testCoord([75,50,5,45]);
         testCoord([277,75,8,190]);
     })
-    it("TESTTESTinverseNetwork(network) returns inverse of network for invertible function", function() {
+    it("inverseNetwork(network) returns inverse of network for invertible function", function() {
         this.timeout(60*1000);
-        var factory = new Factory(testAxes);
+        var factory = new Factory(testVars);
         var network = factory.createNetwork({ // original network adds 1
             transform: (data) => data.map((x) => 1+x)  // output = input + 1
         });
@@ -178,7 +178,7 @@ var Kinann = require("../index");
         vassertEqual(invNetwork.activate([43,27,9]), [42,26,8]);
         vassertEqual(invNetwork.activate([275,17,2]), [274,16,1]);
     })
-    it("TESTTESTTrain Kinann network to correct XY skew", function() {
+    it("Train Kinann network to correct XY skew", function() {
         this.timeout(60*1000);
 
         var xyza = [

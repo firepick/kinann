@@ -7,9 +7,9 @@ var Sequential = require("./Sequential");
 (function(exports) {
 
     ////////////////// constructor
-    function Factory(axes,options={}) {
+    function Factory(vars,options={}) {
         var that = this;
-        that.axes = axes;
+        that.vars = vars;
         that.degree = options.degree || 1;
         that.tolerance = options.tolerance || 0.001;
         return that;
@@ -17,18 +17,18 @@ var Sequential = require("./Sequential");
 
     Factory.prototype.createNetwork = function(options={}) {
         var that = this;
-        var nAxes = that.axes.length;
-        var fmap = that.axes.map((axis,i) => (eIn) => eIn[i]);
+        var nvars = that.vars.length;
+        var fmap = that.vars.map((v,i) => (eIn) => eIn[i]);
         var degree = options.degree || that.degree;
         for (var i = 1; i < degree; i++) {
             let iDeg = i+1; // inner scope 
-            var fpoly = that.axes.map((axis,i) => (eIn) => "(" + eIn[i] + "^" + iDeg + ")");
+            var fpoly = that.vars.map((v,i) => (eIn) => "(" + eIn[i] + "^" + iDeg + ")");
             fmap = fmap.concat(fpoly);
         }
 
-        var network = new Sequential(nAxes, [
+        var network = new Sequential(nvars, [
             new MapLayer(fmap),
-            new Layer(nAxes, {
+            new Layer(nvars, {
                 activation: Layer.ACT_IDENTITY,
             }),
         ]);
@@ -63,14 +63,14 @@ var Sequential = require("./Sequential");
         var maxInput = inStats.map((stats) => stats.max);
         var maxOutput = network.activate(maxInput);
 
-        var axes = inStats.map((stats,i) => {
+        var vars = inStats.map((stats,i) => {
             return { 
                 minPos:mathjs.min(minOutput[i],maxOutput[i]),
                 maxPos:mathjs.max(minOutput[i],maxOutput[i]),
             }
         });
 
-        var invFactory = new Factory(axes, {
+        var invFactory = new Factory(vars, {
             degree: that.degree,
         });
         var invNetwork = invFactory.createNetwork({
@@ -108,18 +108,18 @@ var Sequential = require("./Sequential");
         function addExample (data) {
             examples.push( new Example(data, transform(data)) );
         };
-        addExample(that.axes.map((axis) => axis.minPos));
-        addExample(that.axes.map((axis) => axis.maxPos));
-        addExample(that.axes.map((axis) => (axis.maxPos+axis.minPos)/2));
-        function addAxis(thatAxis) {
-            addExample(that.axes.map((axis) => axis === thatAxis ? axis.minPos : axis.maxPos));
-            addExample(that.axes.map((axis) => axis === thatAxis ? axis.maxPos : axis.minPos));
+        addExample(that.vars.map((v) => v.minPos));
+        addExample(that.vars.map((v) => v.maxPos));
+        addExample(that.vars.map((v) => (v.maxPos+v.minPos)/2));
+        function addv(thatv) {
+            addExample(that.vars.map((v) => v === thatv ? v.minPos : v.maxPos));
+            addExample(that.vars.map((v) => v === thatv ? v.maxPos : v.minPos));
             if (degree > 1) {
-                addExample(that.axes.map((axis) => axis === thatAxis ? (axis.maxPos+axis.minPos)/2 : axis.minPos));
-                addExample(that.axes.map((axis) => axis === thatAxis ? (axis.maxPos+axis.minPos)/2 : axis.maxPos));
+                addExample(that.vars.map((v) => v === thatv ? (v.maxPos+v.minPos)/2 : v.minPos));
+                addExample(that.vars.map((v) => v === thatv ? (v.maxPos+v.minPos)/2 : v.maxPos));
             }
         };
-        that.axes.map((axis,i) => addAxis(axis));
+        that.vars.map((v,i) => addv(v));
         return examples;
     }
 
