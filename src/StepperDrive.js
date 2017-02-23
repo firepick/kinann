@@ -2,6 +2,7 @@
     //// SUPER 
     function StepperDrive(options={}) {
         var that = this;
+        that.type = "StepperDrive";
         that.minPos = options.minPos || 0; // minimum position
         that.maxPos = options.maxPos || 100; // maximum position
         that.mstepPulses = options.mstepPulses || 1;
@@ -9,20 +10,24 @@
         that.microsteps = options.microsteps || 16;
         that.gearIn = options.gearIn || 1;
         that.gearOut = options.gearOut || 1;
+        that.unitTravel = options.unitTravel;
 
         Object.defineProperty(that, "gearRatio", {
             get: () => that.gearOut / that.gearIn,
         });
-        Object.defineProperty(that, "toAxisPos", {
-            value: (motorPos) => checkAxisPos(that, motorPos == null ? NaN : that.unitTravel * motorPos),
-        });
-        Object.defineProperty(that, "toMotorPos", {
-            value: (axisPos) => isNaN(checkAxisPos(axisPos)) ? NaN : axisPos/that.unitTravel,
-        });
-        Object.defineProperty(that, "toJSON", {
-            value: () => JSON.stringify(Object.assign({},that)),
-        });
         return that;
+    }
+    StepperDrive.prototype.toJSON = function() {
+        var that = this;
+        return JSON.stringify(Object.assign({},that));
+    }
+    StepperDrive.prototype.toMotorPos = function(axisPos) {
+        var that = this;
+        return isNaN(checkAxisPos(that, axisPos)) ? NaN : axisPos/that.unitTravel;
+    }
+    StepperDrive.prototype.toAxisPos = function(motorPos) {
+        var that = this;
+        return checkAxisPos(that, motorPos == null ? NaN : that.unitTravel * motorPos);
     }
     StepperDrive.fromJSON = function(json) {
         var json = typeof json === "object" ? json : JSON.parse(json);
@@ -32,7 +37,7 @@
         if (json.type === "ScrewDrive") {
             return new StepperDrive.ScrewDrive(json);
         }
-        throw new Error("Unknown StepperDrive type:", json.type);
+        return new StepperDrive(json);
     }
 
     //// CLASS BeltDrive
@@ -180,12 +185,31 @@
             type: "ScrewDrive",
             lead: 0.8,
         });
+        JSON.parse(new StepperDrive({unitTravel:0.3}).toJSON()).should.properties({
+            minPos: 0,
+            maxPos: 100,
+            microsteps: 16,
+            mstepPulses: 1,
+            steps: 200,
+            gearIn: 1,
+            gearOut: 1,
+            type: "StepperDrive",
+            unitTravel: 0.3,
+        });
     })
     it("StepperDrive.fromJSON(json) createa StepperDrive", function() {
         var belt = new BeltDrive({pitch: 3});
         should.deepEqual(StepperDrive.fromJSON(belt.toJSON()), belt);
         var screw = new ScrewDrive({lead: 0.9});
         should.deepEqual(StepperDrive.fromJSON(screw.toJSON()), screw);
+        var sd = new StepperDrive({unitTravel: 0.9});
+        should.deepEqual(StepperDrive.fromJSON(sd.toJSON()), sd);
+    });
+    it("StepperDrive() createa StepperDrive", function() {
+        var drive = new StepperDrive({unitTravel: 0.1});
+        drive.toAxisPos(1).should.equal(0.1);
+        drive.toAxisPos(10).should.equal(1);
+        drive.toMotorPos(drive.toAxisPos(4)).should.equal(4);
     });
 })
 
