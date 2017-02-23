@@ -3,14 +3,14 @@
     function StepperDrive(options={}) {
         var that = this;
         that.type = "StepperDrive";
-        that.minPos = options.minPos || 0; // minimum position
-        that.maxPos = options.maxPos || 100; // maximum position
-        that.mstepPulses = options.mstepPulses || 1;
-        that.steps = options.steps || 200;
-        that.microsteps = options.microsteps || 16;
-        that.gearIn = options.gearIn || 1;
-        that.gearOut = options.gearOut || 1;
-        that.unitTravel = options.unitTravel;
+        Object.assign(that, options);
+        that.minPos = that.minPos == null ? 0 : that.minPos; // minimum position
+        that.maxPos = that.maxPos == null ? 100 : that.maxPos; // maximum position
+        that.mstepPulses = that.mstepPulses || 1;
+        that.steps = that.steps || 200;
+        that.microsteps = that.microsteps || 16;
+        that.gearIn = that.gearIn || 1;
+        that.gearOut = that.gearOut || 1;
 
         Object.defineProperty(that, "gearRatio", {
             get: () => that.gearOut / that.gearIn,
@@ -48,8 +48,8 @@
         });
         that.super.constructor.call(that, options);
         that.type = "BeltDrive";
-        that.pitch = options.pitch || 2;
-        that.teeth = options.teeth || 16;
+        that.pitch = that.pitch || 2;
+        that.teeth = that.teeth || 16;
         Object.defineProperty(that, "unitTravel", {
             get: () =>  (that.mstepPulses * that.teeth * that.pitch) / (that.steps * that.microsteps * that.gearRatio),
         });
@@ -65,7 +65,7 @@
         });
         that.super.constructor.call(that, options);
         that.type = "ScrewDrive";
-        that.lead = options.lead || 0.8; // M5 screw pitch
+        that.lead = that.lead || 0.8; // M5 screw pitch
         Object.defineProperty(that, "unitTravel", {
             get: () => 1 / (that.steps * (that.microsteps / that.mstepPulses) * that.lead * that.gearRatio),
         });
@@ -161,51 +161,29 @@
         belt.maxPos = 101;
         belt.toAxisPos(belt.toMotorPos(101)).should.equal(101);
     })
-    it("toJSON() serializes StepperDrive", function() {
-        JSON.parse(new BeltDrive().toJSON()).should.properties({
-            minPos: 0,
-            maxPos: 100,
-            microsteps: 16,
-            mstepPulses: 1,
-            steps: 200,
-            gearIn: 1,
-            gearOut: 1,
-            type: "BeltDrive",
-            pitch: 2,
-            teeth: 16,
+    it("StepperDrive.fromJSON(json).toJSON() (de-)serializes decorated StepperDrive", function() {
+        var belt = new BeltDrive({teeth: 20, color:"red"});
+        var belt2 = StepperDrive.fromJSON(belt.toJSON());
+        belt2.should.properties({
+            teeth: 20,
+            color: "red", // decoration
         });
-        JSON.parse(new ScrewDrive().toJSON()).should.properties({
-            minPos: 0,
-            maxPos: 100,
-            microsteps: 16,
-            mstepPulses: 1,
-            steps: 200,
-            gearIn: 1,
-            gearOut: 1,
-            type: "ScrewDrive",
-            lead: 0.8,
+        should.deepEqual(belt2, belt);
+        var screw = new ScrewDrive({lead:0.9, color:"red"});
+        var screw2 = StepperDrive.fromJSON(screw.toJSON());
+        screw2.should.properties({
+            lead: 0.9,
+            color: "red", // decoration
         });
-        JSON.parse(new StepperDrive({unitTravel:0.3}).toJSON()).should.properties({
-            minPos: 0,
-            maxPos: 100,
-            microsteps: 16,
-            mstepPulses: 1,
-            steps: 200,
-            gearIn: 1,
-            gearOut: 1,
-            type: "StepperDrive",
+        var sd = new StepperDrive({unitTravel:0.3, color:"red"});
+        var sd2 = StepperDrive.fromJSON(sd.toJSON());
+        sd2.should.properties({
             unitTravel: 0.3,
+            color: "red", // decoration
         });
-    })
-    it("StepperDrive.fromJSON(json) createa StepperDrive", function() {
-        var belt = new BeltDrive({pitch: 3});
-        should.deepEqual(StepperDrive.fromJSON(belt.toJSON()), belt);
-        var screw = new ScrewDrive({lead: 0.9});
-        should.deepEqual(StepperDrive.fromJSON(screw.toJSON()), screw);
-        var sd = new StepperDrive({unitTravel: 0.9});
-        should.deepEqual(StepperDrive.fromJSON(sd.toJSON()), sd);
+        should.deepEqual(sd, sd2);
     });
-    it("StepperDrive() createa StepperDrive", function() {
+    it("StepperDrive() create a StepperDrive", function() {
         var drive = new StepperDrive({unitTravel: 0.1});
         drive.toAxisPos(1).should.equal(0.1);
         drive.toAxisPos(10).should.equal(1);
