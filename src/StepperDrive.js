@@ -19,7 +19,7 @@
     }
     StepperDrive.prototype.toJSON = function() {
         var that = this;
-        return JSON.stringify(Object.assign({},that));
+        return that;
     }
     StepperDrive.prototype.toMotorPos = function(axisPos) {
         var that = this;
