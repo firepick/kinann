@@ -13,6 +13,9 @@
     Kinann.Sequential = require("./src/Sequential");
     Kinann.Example = require("./src/Example");
     Kinann.Factory = require("./src/Factory");
+    Kinann.Variable = require("./src/Variable");
+    Kinann.DriveFrame = require("./src/DriveFrame");
+    Kinann.StepperDrive = require("./src/StepperDrive");
 
     module.exports = exports.Kinann = Kinann;
 })(typeof exports === "object" ? exports : (exports = {}));

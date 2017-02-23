@@ -1,5 +1,3 @@
-var mathjs = require("mathjs");
-
 (function(exports) {
 
     ////////////////// constructor

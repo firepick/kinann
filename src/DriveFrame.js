@@ -1,4 +1,5 @@
 var StepperDrive = require("./StepperDrive");
+var Factory = require("./Factory");
 
 (function(exports) {
     //// CLASS
@@ -73,6 +74,14 @@ var StepperDrive = require("./StepperDrive");
             drives: that.drives.map((d) => d.toJSON()),
         }
         return obj;
+    }
+    DriveFrame.prototype.createFactory = function(options={}) {
+        var that = this;
+        var dirVar = new Variable(-1,1);
+        var vars = that.drives.map( (d) => new Variable(d.minPos, d.maxPos) )
+        vars = vars.concat(that.drives.map( (d) => dirVar ));
+        var opts = Object.assign({nOut:that.drives.length}, options);
+        return new Factory(vars, opts);
     }
 
     module.exports = exports.DriveFrame = DriveFrame;

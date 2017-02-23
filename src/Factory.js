@@ -3,6 +3,7 @@ var Example = require("./Example");
 var MapLayer = require("./MapLayer");
 var Layer = require("./Layer");
 var Sequential = require("./Sequential");
+var Variable = require("./Variable");
 
 (function(exports) {
 
@@ -63,12 +64,7 @@ var Sequential = require("./Sequential");
         var maxInput = inStats.map((stats) => stats.max);
         var maxOutput = network.activate(maxInput);
 
-        var vars = inStats.map((stats,i) => {
-            return { 
-                minPos:mathjs.min(minOutput[i],maxOutput[i]),
-                maxPos:mathjs.max(minOutput[i],maxOutput[i]),
-            }
-        });
+        var vars = inStats.map((stats,i) => new Variable(minOutput[i], maxOutput[i]) );
 
         var invFactory = new Factory(vars, {
             degree: that.degree,
@@ -108,16 +104,17 @@ var Sequential = require("./Sequential");
         function addExample (data) {
             examples.push( new Example(data, transform(data)) );
         };
-        addExample(that.vars.map((v) => v.minPos));
-        addExample(that.vars.map((v) => v.maxPos));
-        addExample(that.vars.map((v) => (v.maxPos+v.minPos)/2));
+        addExample(that.vars.map((v) => v.min));
+        addExample(that.vars.map((v) => v.max));
+        addExample(that.vars.map((v) => (v.max+v.min)/2));
         function addv(thatv) {
-            addExample(that.vars.map((v) => v === thatv ? v.minPos : v.maxPos));
-            addExample(that.vars.map((v) => v === thatv ? v.maxPos : v.minPos));
+            addExample(that.vars.map((v) => v === thatv ? v.min : v.max));
+            addExample(that.vars.map((v) => v === thatv ? v.max : v.min));
             if (degree > 1) {
-                addExample(that.vars.map((v) => v === thatv ? (v.maxPos+v.minPos)/2 : v.minPos));
-                addExample(that.vars.map((v) => v === thatv ? (v.maxPos+v.minPos)/2 : v.maxPos));
+                addExample(that.vars.map((v) => v === thatv ? (v.max+v.min)/2 : v.min));
+                addExample(that.vars.map((v) => v === thatv ? (v.max+v.min)/2 : v.max));
             }
+            
         };
         that.vars.map((v,i) => addv(v));
         return examples;

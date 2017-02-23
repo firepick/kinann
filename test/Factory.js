@@ -6,10 +6,11 @@ var Kinann = require("../index");
     var should = require("should");
     var Factory = Kinann.Factory;
     var Example = Kinann.Example;
+    var Variable = Kinann.Variable;
     var testVars = [
-        {minPos: 3, maxPos: 300},
-        {minPos: 2, maxPos: 200},
-        {minPos: 1, maxPos: 10},
+        new Variable(3, 300),
+        new Variable(2, 200),
+        new Variable(1, 10),
     ];
     function vassertEqual(vactual, vexpected, tol=.001) {
         vactual.map((xa,i) => xa.should.approximately(vexpected[i], tol));
@@ -115,10 +116,10 @@ var Kinann = require("../index");
         this.timeout(60*1000);
 
         var xyza = [
-            {minPos: 0, maxPos: 300}, // x-axis
-            {minPos: 0, maxPos: 200}, // y-axis
-            {minPos: 0, maxPos: 10}, // z-axis
-            {minPos: 0, maxPos: 360}, // a-axis
+            new Variable(0, 300), // x-axis
+            new Variable(0, 200), // y-axis
+            new Variable(0, 10), // z-axis
+            new Variable(0, 360), // a-axis
         ];
         var factory = new Factory(xyza, {degree: 2});
         var network = factory.createNetwork(); 
@@ -138,10 +139,10 @@ var Kinann = require("../index");
         this.timeout(60*1000);
 
         var xyza = [
-            {minPos: 0, maxPos: 300}, // x-axis
-            {minPos: 0, maxPos: 200}, // y-axis
-            {minPos: 0, maxPos: 10}, // z-axis
-            {minPos: 0, maxPos: 360}, // a-axis
+            new Variable(0, 300), // x-axis
+            new Variable(0, 200), // y-axis
+            new Variable(0, 10), // z-axis
+            new Variable(0, 360), // a-axis
         ];
         var factory = new Factory(xyza);
         var network = factory.createNetwork(); 
@@ -182,10 +183,10 @@ var Kinann = require("../index");
         this.timeout(60*1000);
 
         var xyza = [
-            {minPos: 0, maxPos: 300}, // x-axis
-            {minPos: 0, maxPos: 200}, // y-axis
-            {minPos: 0, maxPos: 10}, // z-axis
-            {minPos: 0, maxPos: 360}, // a-axis
+            new Variable(0, 300), // x-axis
+            new Variable(0, 200), // y-axis
+            new Variable(0, 10), // z-axis
+            new Variable(0, 360), // a-axis
         ];
         var factory = new Factory(xyza);
 
