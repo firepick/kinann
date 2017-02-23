@@ -172,7 +172,7 @@ var Kinann = require("../index");
         });
 
         result.epochs.should.below(100); // convergence
-        examples.length.should.equal(82);
+        examples.length.should.equal(92);
         vassertEqual(invNetwork.activate([4,3,2]), [3,2,1]);
         vassertEqual(invNetwork.activate([301,201,11]), [300,200,10]);
         vassertEqual(invNetwork.activate([43,27,9]), [42,26,8]);

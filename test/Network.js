@@ -349,11 +349,11 @@ var Sequential = require("../src/Sequential");
             },
         ];
         network.train(examples);
-        var json = network.toJSON();
+        var json = JSON.stringify(network);
 
         // de-serialized network should be trained
         var network2 = Network.fromJSON(json);
-        network2.toJSON().should.equal(json);
+        should.deepEqual(network.toJSON(), network2.toJSON());
         should.deepEqual(network.activate([2, 3]), network2.activate([2, 3]));
     })
     it("Network.train(examples, options) trains polynomial neural net", function() {

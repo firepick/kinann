@@ -4,6 +4,7 @@ var mathjs = require("mathjs");
     ////////////////// constructor
     Layer = function(nOut = 2, options = {}) {
         var that = this;
+        that.type = "Layer";
         that.id = options.id || 0;
         that.nOut = nOut;
         that.activation = options.activation || "identity";
@@ -11,19 +12,14 @@ var mathjs = require("mathjs");
     }
     Layer.prototype.toJSON = function() {
         var that = this;
-        return JSON.stringify({
-            type: "Layer",
-            id: that.id,
-            nOut: that.nOut,
-            activation: that.activation,
-        });
+        return that;
     }
     Layer.fromJSON = function(json) { // layer factory
-        var obj = JSON.parse(json);
-        if (obj.type === "Layer") {
-            return new Layer(obj.nOut, obj);
+        json = typeof json === 'string' ? JSON.parse(json) : json;
+        if (json.type === "Layer") {
+            return new Layer(json.nOut, json);
         }
-        if (obj.type === "MapLayer") {
+        if (json.type === "MapLayer") {
             var MapLayer = require("./MapLayer");
             return MapLayer.fromJSON(json);
         }

@@ -36,24 +36,24 @@ var MapLayer = require("./MapLayer");
         that.weights && (obj.weights = that.weights);
         that.gradExpr && (obj.gradExpr = that.gradExpr);
         that.costFunExpr && (obj.costFunExpr = that.costFunExpr);
-        return JSON.stringify(obj);
+        return obj;
     }
 
     Network.fromJSON = function(json) {
-        var obj = JSON.parse(json);
+        var json = typeof json === 'string' ? JSON.parse(json) : json;
         var network = null;
-        if (obj.type === "Sequential") {
+        if (json.type === "Sequential") {
             var Sequential = require("./Sequential");
-            var layers = obj.layers.map((l) => Layer.fromJSON(l));
-            network = new Sequential(obj.nIn, layers, obj);
+            var layers = json.layers.map((l) => Layer.fromJSON(l));
+            network = new Sequential(json.nIn, layers, json);
         }
         if (network) {
-            obj.gradExpr && (network.gradExpr = obj.gradExpr);
-            obj.costFunExpr && (network.costFunExpr = obj.costFunExpr);
-            obj.fNormIn && (network.fNormIn = obj.fNormIn.map((f) => (new Function("return " + f))()));
-            obj.inStats && (network.inStats = obj.inStats);
-            if (obj.weights) {
-                network.weights = obj.weights;
+            json.gradExpr && (network.gradExpr = json.gradExpr);
+            json.costFunExpr && (network.costFunExpr = json.costFunExpr);
+            json.fNormIn && (network.fNormIn = json.fNormIn.map((f) => (new Function("return " + f))()));
+            json.inStats && (network.inStats = json.inStats);
+            if (json.weights) {
+                network.weights = json.weights;
                 network.compile();
             }
         }

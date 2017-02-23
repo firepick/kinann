@@ -5,17 +5,17 @@ var Layer = require("./Layer");
     ////////////////// constructor
     function Sequential(nIn, layers = [], options = {}) {
         var that = this;
-        that.type = "Sequential";
         Object.defineProperty(that, "super", {
             value: Object.getPrototypeOf(Object.getPrototypeOf(that)), // TODO: use ECMAScript 2015 super 
         });
         that.super.constructor.call(that, nIn, options);
+        that.type = "Sequential";
         layers.map((layer) => that.add(layer));
 
         return that;
     }
-
     Sequential.prototype = Object.create(Network.prototype);
+
     Sequential.prototype.expressions = function(exprIn) {
         var that = this;
         var layers = that.layers;

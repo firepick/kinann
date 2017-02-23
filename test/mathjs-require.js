@@ -39,19 +39,11 @@ var Kinann = require("../index");
 var Factory = Kinann.Factory;
 var Example = Kinann.Example;
 
+/*
 (typeof describe === 'function') && describe("Factory", function() {
     function vassertEqual(vactual, vexpected, tol=.001) {
         vactual.map((xa,i) => xa.should.approximately(vexpected[i], tol));
     }
-    it("asdf", function() {
-        function testbundle() {
-            var root = mathjs.derivative("exp(-x)","x");
-            console.log(root.toString());
-        }
-
-        testbundle();
-        should(1).equal(1);
-    })
     it("Train Kinann network to correct Y-axis skew", function() {
         this.timeout(60*1000);
 
@@ -87,3 +79,4 @@ var Example = Kinann.Example;
         vassertEqual(measuredNet.activate(calibratedNet.activate([300,200,10,0])), [300,200,10,0]);
     })
 })
+*/

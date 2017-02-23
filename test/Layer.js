@@ -111,7 +111,7 @@ var MapLayer = require("../src/MapLayer");
             activation: "logistic",
         });
 
-        var json = layer.toJSON(); // serialize layer
+        var json = JSON.stringify(layer);
         var layer2 = Layer.fromJSON(json); // deserialize layer
 
         layer2.id.should.equal(5);

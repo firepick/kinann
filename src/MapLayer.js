@@ -4,6 +4,7 @@ var mathjs = require("mathjs");
     ////////////////// constructor
     function MapLayer(fmap, options = {}) {
         var that = this;
+        that.type = "MapLayer";
         that.id = options.id || 0;
         that.nOut = fmap.length;
         that.fmap = fmap;
@@ -12,23 +13,20 @@ var mathjs = require("mathjs");
 
     MapLayer.prototype.toJSON = function() {
         var that = this;
-        return JSON.stringify({
+        return {
             type: "MapLayer",
             id: that.id,
             fmap: that.fmap.map((f) => f.toString()),
-        });
+        };
     }
 
     MapLayer.fromJSON = function(json) {
-        var obj = JSON.parse(json);
-        if (obj.type !== "MapLayer") {
+        var json = typeof json === 'string' ? JSON.parse(json) : json;
+        if (json.type !== "MapLayer") {
             return null;
         }
-        var fmap = obj.fmap.map((f) => (new Function("return " + f))());
-        //var fun = JSON.parse(json).map((f) => (new Function("return " + f))());
-        return new MapLayer(fmap, {
-            id: obj.id,
-        });
+        var fmap = json.fmap.map((f) => (new Function("return " + f))());
+        return new MapLayer(fmap, json);
     }
 
     MapLayer.prototype.initialize = function(nIn, weights = {}, options = {}) {

@@ -85,7 +85,7 @@ var Sequential = require("./Sequential");
         invNetwork.normalizeInput(invExamples);
         
         // add enough training examples to ensure accuracy 
-        var nExamples = opts.nExamples || 80; 
+        var nExamples = opts.nExamples || 90; 
         for (var iEx = 0; iEx < nExamples; iEx++) {
             var target = inStats.map((stats) => 
                 mathjs.random( 
