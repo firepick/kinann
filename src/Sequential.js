@@ -6,7 +6,9 @@ var Layer = require("./Layer");
     function Sequential(nIn, layers = [], options = {}) {
         var that = this;
         that.type = "Sequential";
-        that.super = Object.getPrototypeOf(Object.getPrototypeOf(that)); // TODO: use ECMAScript 2015 super 
+        Object.defineProperty(that, "super", {
+            value: Object.getPrototypeOf(Object.getPrototypeOf(that)), // TODO: use ECMAScript 2015 super 
+        });
         that.super.constructor.call(that, nIn, options);
         layers.map((layer) => that.add(layer));
 
