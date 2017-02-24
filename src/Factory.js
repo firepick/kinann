@@ -11,6 +11,11 @@ var Variable = require("./Variable");
     function Factory(vars,options={}) {
         var that = this;
         that.vars = vars;
+        that.nIn = that.vars.length;
+        that.nOut = options.nOut || that.nIn;
+        if (that.nIn < that.nOut) {
+            throw new Error("Factory cannot generate networks with more outputs than inputs");
+        }
         that.degree = options.degree || 1;
         that.tolerance = options.tolerance || 0.001;
         return that;
@@ -29,7 +34,7 @@ var Variable = require("./Variable");
 
         var network = new Sequential(nvars, [
             new MapLayer(fmap),
-            new Layer(nvars, {
+            new Layer(that.nOut, {
                 activation: Layer.ACT_IDENTITY,
             }),
         ]);
@@ -64,7 +69,7 @@ var Variable = require("./Variable");
         var maxInput = inStats.map((stats) => stats.max);
         var maxOutput = network.activate(maxInput);
 
-        var vars = inStats.map((stats,i) => new Variable(minOutput[i], maxOutput[i]) );
+        var vars = inStats.map((stats,i) => new Variable([minOutput[i], maxOutput[i]]) );
 
         var invFactory = new Factory(vars, {
             degree: that.degree,
@@ -102,17 +107,17 @@ var Variable = require("./Variable");
         var transform = options.transform || ((data) => data);
         var examples = [];
         function addExample (data) {
-            examples.push( new Example(data, transform(data)) );
+            examples.push( new Example(data, transform(data).slice(0, that.nOut)) );
         };
         addExample(that.vars.map((v) => v.min));
         addExample(that.vars.map((v) => v.max));
-        addExample(that.vars.map((v) => (v.max+v.min)/2));
+        addExample(that.vars.map((v) => v.median));
         function addv(thatv) {
             addExample(that.vars.map((v) => v === thatv ? v.min : v.max));
             addExample(that.vars.map((v) => v === thatv ? v.max : v.min));
             if (degree > 1) {
-                addExample(that.vars.map((v) => v === thatv ? (v.max+v.min)/2 : v.min));
-                addExample(that.vars.map((v) => v === thatv ? (v.max+v.min)/2 : v.max));
+                addExample(that.vars.map((v) => v === thatv ? v.median : v.min));
+                addExample(that.vars.map((v) => v === thatv ? v.median : v.max));
             }
             
         };

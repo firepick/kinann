@@ -8,17 +8,23 @@ var Kinann = require("../index");
     var Example = Kinann.Example;
     var Variable = Kinann.Variable;
     var testVars = [
-        new Variable(3, 300),
-        new Variable(2, 200),
-        new Variable(1, 10),
+        new Variable([3, 300]),
+        new Variable([2, 200]),
+        new Variable([1, 10]),
     ];
     function vassertEqual(vactual, vexpected, tol=.001) {
         vactual.map((xa,i) => xa.should.approximately(vexpected[i], tol));
     }
     
     it("Factory(vars, options) creates Factory kinmatic model", function() {
-        var factory = new Factory(testVars);
+        var factory = new Factory(testVars, {
+            nOut: 2,
+        });
         should.deepEqual(factory.vars, testVars);
+        factory.should.properties({
+            nIn: 3,
+            nOut: 2,
+        })
     })
     it("examples returns pre-training examples", function() {
         var factory = new Factory(testVars);
@@ -32,6 +38,26 @@ var Kinann = require("../index");
             new Example([3,200,1], [3,200,1]), // minPos neighbor
             new Example([300,200,1], [300,200,1]), // maxPos neighbor
             new Example([3,2,10], [3,2,10]), // minPos neighbor
+        ]);
+
+        // factory can create networks with different number of outputs
+        var factory = new Factory(testVars, {
+            nOut: 2,
+        });
+        var examples = factory.createExamples();
+        should.deepEqual(examples[0], 
+            new Example([3,2,1], [3,2]) // minPos
+        );
+        should.deepEqual(factory.createExamples(), [
+            new Example([3,2,1], [3,2]), // minPos
+            new Example([300,200,10], [300,200]), // maxPos
+            new Example([303/2,202/2,11/2], [303/2,202/2]), // middle pos
+            new Example([3,200,10], [3,200]), // maxPos neighbor
+            new Example([300,2,1], [300,2]), // minPos neighbor
+            new Example([300,2,10], [300,2]), // maxPos neighbor
+            new Example([3,200,1], [3,200]), // minPos neighbor
+            new Example([300,200,1], [300,200]), // maxPos neighbor
+            new Example([3,2,10], [3,2]), // minPos neighbor
         ]);
     });
     it("createExamples(options?) creates training examples", function() {
@@ -116,10 +142,10 @@ var Kinann = require("../index");
         this.timeout(60*1000);
 
         var xyza = [
-            new Variable(0, 300), // x-axis
-            new Variable(0, 200), // y-axis
-            new Variable(0, 10), // z-axis
-            new Variable(0, 360), // a-axis
+            new Variable([0, 300]), // x-axis
+            new Variable([0, 200]), // y-axis
+            new Variable([0, 10]), // z-axis
+            new Variable([0, 360]), // a-axis
         ];
         var factory = new Factory(xyza, {degree: 2});
         var network = factory.createNetwork(); 
@@ -139,10 +165,10 @@ var Kinann = require("../index");
         this.timeout(60*1000);
 
         var xyza = [
-            new Variable(0, 300), // x-axis
-            new Variable(0, 200), // y-axis
-            new Variable(0, 10), // z-axis
-            new Variable(0, 360), // a-axis
+            new Variable([0, 300]), // x-axis
+            new Variable([0, 200]), // y-axis
+            new Variable([0, 10]), // z-axis
+            new Variable([0, 360]), // a-axis
         ];
         var factory = new Factory(xyza);
         var network = factory.createNetwork(); 
@@ -183,10 +209,10 @@ var Kinann = require("../index");
         this.timeout(60*1000);
 
         var xyza = [
-            new Variable(0, 300), // x-axis
-            new Variable(0, 200), // y-axis
-            new Variable(0, 10), // z-axis
-            new Variable(0, 360), // a-axis
+            new Variable([0, 300]), // x-axis
+            new Variable([0, 200]), // y-axis
+            new Variable([0, 10]), // z-axis
+            new Variable([0, 360]), // a-axis
         ];
         var factory = new Factory(xyza);
 

@@ -1,5 +1,6 @@
 var StepperDrive = require("./StepperDrive");
 var Factory = require("./Factory");
+var Variable = require("./Variable");
 
 (function(exports) {
     //// CLASS
@@ -77,8 +78,8 @@ var Factory = require("./Factory");
     }
     DriveFrame.prototype.createFactory = function(options={}) {
         var that = this;
-        var dirVar = new Variable(-1,1);
-        var vars = that.drives.map( (d) => new Variable(d.minPos, d.maxPos) )
+        var dirVar = new Variable([-1,1], Variable.DISCRETE);
+        var vars = that.drives.map( (d) => new Variable([d.minPos, d.maxPos]) )
         vars = vars.concat(that.drives.map( (d) => dirVar ));
         var opts = Object.assign({nOut:that.drives.length}, options);
         return new Factory(vars, opts);
@@ -168,6 +169,11 @@ var Factory = require("./Factory");
         should.deepEqual(frame2.state, frame.state);
         frame2.axisPos = [1000,1000,1000];
         should.deepEqual(frame2.state, [300,200,100,1,1,1]);
+    })
+    it("createFactory", function() {
+        var frame = new DriveFrame([belt300, belt200, screw]);
+        var factory = frame.createFactory();
+//        console.log(factory);
     })
 
 })
