@@ -169,12 +169,12 @@ var MapLayer = require("./MapLayer");
         return that.scope[that.fmemo_cost];
     }
 
-    Network.prototype.propagate = function(learningRate) { // see compile
+    Network.prototype.propagate = function(learningRate, gradC) { // see compile
         var that = this;
         if (!that.memoizeActivate) {
             throw new Error("compile() must be called before propagate()");
         }
-        var gradC = that.costGradient();
+        gradC = gradC || that.costGradient();
         that.keys.map((key) => that.weights[key] -= learningRate * gradC[key])
         return that;
     }
@@ -289,6 +289,10 @@ var MapLayer = require("./MapLayer");
             prevCost = cost;
         }
 
+        var batch = options.batch || 1;
+        var iBatch = 0;
+        var batchScale = 1/batch;
+        var batchGradC;
         var done = false;
         for (var iEpoch = 0; !done && iEpoch < nEpochs; iEpoch++) {
             done = true;
@@ -298,7 +302,23 @@ var MapLayer = require("./MapLayer");
                 that.activate(example.input, example.target);
                 var cost = that.cost();
                 (cost > minCost) && (done = false);
-                that.propagate(result.learningRate);
+                var gradC = that.costGradient();
+                if (iBatch === 0) {
+                    batchGradC = gradC;
+                } else {
+                    for (var ik = that.keys.length; ik-- > 0;) {
+                        var k = that.keys[ik];
+                        batchGradC[k] = batchGradC[k] + gradC[k];
+                    }
+                }
+                iBatch = (iBatch + 1) % batch;
+                if (iBatch === 0) {
+                    for (var ik = that.keys.length; ik-- > 0;) {
+                        var k = that.keys[ik];
+                        batchGradC[k] *= batchScale;
+                    }
+                    that.propagate(result.learningRate, batchGradC);
+                }
             }
             result.epochs = iEpoch;
             result.learningRate = lrFun(result.learningRate);

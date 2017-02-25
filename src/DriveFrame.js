@@ -223,8 +223,9 @@ var Example = require("./Example");
         var examples = Array(nExamples).fill().map(() => {
             var axisPos = vars.map((v) => v.sample());
             frame.axisPos = axisPos;
+            //return new Example(frame.state, frame.axisPos);
             return new Example(frame.state, frame.state.map((x,i) => 
-                i < vars.length ? x : 0
+                factory.vars[i].distribution === "discrete" ? 0 : x
             ));
         });
         var input = examples[0].input;
@@ -237,20 +238,22 @@ var Example = require("./Example");
             console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
         }
 
-        if (false) {
-        var msStart = new Date();
-        var trainResult = ann.train(examples);
-        console.log("done ms:", new Date() - msStart, trainResult);
+        if (true) {
+            var msStart = new Date();
+            var trainResult = ann.train(examples, {
+                batch: 2,
+            });
+            console.log("done ms:", new Date() - msStart, trainResult);
 
-        console.log( 
-            Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] < acc ? ann.weights[k] : acc,0),
-            Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] > acc ? ann.weights[k] : acc,0)
-        );
-        console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
-        for (var i=vars.length; i<varsDir.length; i++) {
-            input[i] = -input[i];
+            console.log( 
+                Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] < acc ? ann.weights[k] : acc,0),
+                Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] > acc ? ann.weights[k] : acc,0)
+            );
             console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
-        }
+            for (var i=vars.length; i<varsDir.length; i++) {
+                input[i] = -input[i];
+                console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
+            }
         }
     })
 })
