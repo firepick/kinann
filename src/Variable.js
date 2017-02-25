@@ -8,6 +8,7 @@ var mathjs = require("mathjs");
         that.max = mathjs.max(values);
         that.min = mathjs.min(values);
         that.values = Object.assign([], values);
+        that.distribution = distribution;
         if (distribution === Variable.UNIFORM) {
             Variable.prototype.sample = () => mathjs.random(that.min, that.max);
             that.median = (that.min+that.max)/2;
@@ -22,7 +23,6 @@ var mathjs = require("mathjs");
     Variable.UNIFORM = "uniform";
     Variable.DISCRETE = "discrete";
     
-
     module.exports = exports.Variable = Variable;
 })(typeof exports === "object" ? exports : (exports = {}));
 

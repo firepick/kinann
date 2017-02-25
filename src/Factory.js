@@ -121,6 +121,11 @@ var Variable = require("./Variable");
             }
             
         };
+        if (options.nRandom) {
+            for (var iR = 0; iR < options.nRandom; iR++) {
+                addExample(that.vars.map((v) => v.sample()));
+            }
+        }
         that.vars.map((v,i) => addv(v));
         return examples;
     }

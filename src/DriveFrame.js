@@ -1,6 +1,8 @@
+var mathjs = require("mathjs");
 var StepperDrive = require("./StepperDrive");
 var Factory = require("./Factory");
 var Variable = require("./Variable");
+var Example = require("./Example");
 
 (function(exports) {
     //// CLASS
@@ -76,12 +78,20 @@ var Variable = require("./Variable");
         }
         return obj;
     }
-    DriveFrame.prototype.createFactory = function(options={}) {
+    DriveFrame.prototype.variables = function(options={}) {
         var that = this;
         var dirVar = new Variable([-1,1], Variable.DISCRETE);
         var vars = that.drives.map( (d) => new Variable([d.minPos, d.maxPos]) )
-        vars = vars.concat(that.drives.map( (d) => dirVar ));
-        var opts = Object.assign({nOut:that.drives.length}, options);
+        if (options.axisDir) {
+            vars = vars.concat(that.drives.map( (d) => dirVar ));
+        }
+        return vars;
+    }
+    DriveFrame.prototype.createFactory = function(options={}) {
+        var that = this;
+        var nOut = that.drives.length;
+        var opts = Object.assign({nOut:nOut}, options);
+        var vars = that.variables(opts);
         return new Factory(vars, opts);
     }
 
@@ -170,10 +180,77 @@ var Variable = require("./Variable");
         frame2.axisPos = [1000,1000,1000];
         should.deepEqual(frame2.state, [300,200,100,1,1,1]);
     })
-    it("createFactory", function() {
+    it("variables(options?) returns neural network input variables", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
-        var factory = frame.createFactory();
-//        console.log(factory);
-    })
 
+        // default variables are motion axes
+        should.deepEqual(frame.variables(), [
+            new Variable([-1,300]),
+            new Variable([-2,200]),
+            new Variable([-3,100]),
+        ]);
+
+        // axisDir variables help with backlash compensation
+        should.deepEqual(frame.variables({axisDir:true}), [
+            new Variable([-1,300]),
+            new Variable([-2,200]),
+            new Variable([-3,100]),
+            new Variable([-1,1], Variable.DISCRETE),
+            new Variable([-1,1], Variable.DISCRETE),
+            new Variable([-1,1], Variable.DISCRETE),
+        ]);
+    })
+    it("Train an ANN to ignore axisDir", function() {
+        this.timeout(60 * 1000);
+        var frame = new DriveFrame([belt300, belt200, screw]);
+        //var frame = new DriveFrame([belt300, belt200]);
+        //var frame = new DriveFrame([belt300]);
+        var vars = frame.variables(); // 3 axis positions
+        var varsDir = frame.variables({axisDir:true}); // 3 axis positions + 3 axis directions
+        var factory = new Factory(varsDir, {
+            //nOut: vars.length, // inputs:6, outputs: 3
+        });
+        var msStart = new Date();
+        var trainExamples;
+        var ann = factory.createNetwork({
+            //nRandom: 50,
+            preTrain: false,
+            onExamples: (ex) => (trainExamples = ex),
+        });
+        console.log("train ms:"+(new Date() - msStart), "trainExamples:"+trainExamples.length);
+
+        var nExamples = 30;
+        var examples = Array(nExamples).fill().map(() => {
+            var axisPos = vars.map((v) => v.sample());
+            frame.axisPos = axisPos;
+            return new Example(frame.state, frame.state.map((x,i) => 
+                i < vars.length ? x : 0
+            ));
+        });
+        var input = examples[0].input;
+        console.log("training");
+
+        var digits = 6;
+        console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
+        for (var i=vars.length; i<varsDir.length; i++) {
+            input[i] = -input[i];
+            console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
+        }
+
+        if (false) {
+        var msStart = new Date();
+        var trainResult = ann.train(examples);
+        console.log("done ms:", new Date() - msStart, trainResult);
+
+        console.log( 
+            Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] < acc ? ann.weights[k] : acc,0),
+            Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] > acc ? ann.weights[k] : acc,0)
+        );
+        console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
+        for (var i=vars.length; i<varsDir.length; i++) {
+            input[i] = -input[i];
+            console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
+        }
+        }
+    })
 })
