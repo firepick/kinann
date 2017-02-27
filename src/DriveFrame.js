@@ -3,6 +3,7 @@ var StepperDrive = require("./StepperDrive");
 var Factory = require("./Factory");
 var Variable = require("./Variable");
 var Example = require("./Example");
+var Network = require("./Network");
 
 (function(exports) {
     //// CLASS
@@ -44,6 +45,13 @@ var Example = require("./Example");
             get: () => that.$state.map((s) => s),
             set: (state) => ((that.$state = state.map((s) => s)), state),
         });
+        Object.defineProperty(that, "outputTransform", {
+            value: options.outputTransform || 
+                ((frame) => frame.state.slice(0, frame.drives.length)),
+        });
+        Object.defineProperty(that, "output", {
+            get: () => that.outputTransform(that),
+        });
 
         // initialize
         that.state = options.state || (
@@ -60,6 +68,19 @@ var Example = require("./Example");
     }
 
     //// INSTANCE
+    DriveFrame.prototype.calibrationExamples = function(nExamples=30, options={}) {
+        var that = this;
+        var vars = that.variables();
+        var targetState = options.targetState || ((state) => state);
+        return Array(nExamples).fill().map((na,iEx) => {
+            if (iEx === 0) {
+                that.axisPos = that.drives.map((d) => d.minPos);
+            } else {
+                that.axisPos = vars.map((v) => v.sample());
+            }
+            return new Example(that.state, targetState(that.state));
+        });
+    }
     DriveFrame.prototype.toAxisPos = function(motorPos) {
         var that = this;
         return motorPos.map((m,i) => that.drives[i].toAxisPos(m));
@@ -217,63 +238,82 @@ var Example = require("./Example");
             new Variable([-1,1], Variable.DISCRETE),
         ]);
     })
-    it("Train an ANN to ignore axisDir", function() {
-        return;
-        this.timeout(60 * 1000);
+    it("output property provides customizable application output", function() {
+        var drives = [belt300, belt200, screw];
+        var c3 = new DriveFrame(drives);
+
+        // Default output is simply axisPos
+        c3.axisPos = [10,11,12];
+        should.deepEqual(c3.output, [10,11,12]);
+        c3.axisPos = [0,11,12];
+        should.deepEqual(c3.output, [0,11,12]); // no backlash
+
+        // change outputTransform to emulate 3-axis Cartesian with backlash
+        var backlash = (driveFrame) => 
+            driveFrame.axisDir.map((d,i) => driveFrame.axisPos[i] + (d < 0 ? 1 : 0)); 
+        var c3Backlash = new DriveFrame(drives, {
+            outputTransform: backlash,
+        });
+        c3Backlash.axisPos = [10,11,12];
+        should.deepEqual(c3Backlash.output, [10,11,12]);
+        c3Backlash.axisPos = [0,11,12];
+        should.deepEqual(c3Backlash.output, [1,11,12]); // backlash position
+        should.deepEqual(c3Backlash.axisPos, [0,11,12]); // control position 
+        c3Backlash.axisPos = [5,11,12];
+        should.deepEqual(c3Backlash.output, [5,11,12]); // backlash position
+        should.deepEqual(c3Backlash.axisPos, [5,11,12]); // control position 
+    })
+    it("calibrationExamples(nExamples) builds calibration random walk examples", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
-        var digits = 6;
-        var vars = frame.variables(); // 3 axis positions
+
+        // more examples yield higher accuracy
+        var examples = frame.calibrationExamples();
+        examples.length.should.equal(30); 
+        var examples = frame.calibrationExamples(10);
+        examples.length.should.equal(10); 
+
+        // examples always start with home
+        should.deepEqual(examples[0].input, [-1,-2,-3,1,1,1]); // home
+        should.deepEqual(examples[0].target, [-1,-2,-3,1,1,1]);
+        var last = examples.length - 1;
+        should.deepEqual(examples[last].input, frame.state); 
+        frame.axisPos.map((p,i) => p.should.above(frame.drives[i].minPos)); // not home
+
+        // build custom examples with targetState option
+        var examples = frame.calibrationExamples(5, {
+            targetState: ((state) => state.map((v,i) => v+i)),
+        });
+        should.deepEqual(examples[0].input, [-1,-2,-3,1,1,1]); // home
+        examples.forEach((ex) => 
+            ex.input.forEach((vin,j) => vin.should.equal(ex.target[j]-j))
+        );
+    })
+    it("Train an ANN to emulate 3-axis Cartesian robot with backlash", function() {
+        this.timeout(60 * 1000);
+        var drives = [belt300, belt200, screw];
+        var frame = new DriveFrame(drives);
+
         var varsDir = frame.variables({axisDir:true}); // 3 axis positions + 3 axis directions
-        var factory = new Factory(varsDir);
-        var msStart = new Date();
-        var trainExamples;
-        var ann = factory.createNetwork({
-            //nRandom: 50,
-            preTrain: false,
-            onExamples: (ex) => (trainExamples = ex),
-        });
-        console.log("train ms:"+(new Date() - msStart), "trainExamples:"+trainExamples.length);
-
-        var nExamples = 30;
-        var idealExamples = factory.createExamples({
-            outline: false,
-            nRandom: nExamples,
-            transform: (data) => data.map((d,i) => (i < frame.axisPos.length ? d : 0)),
-        });
-        //console.log("idealExamples:", idealExamples.map((ex) => mathjs.round(ex.input, digits)) );
-        var backlashExamples = Array(nExamples).fill().map(() => {
-            var axisPos = vars.map((v) => v.sample());
-            frame.axisPos = axisPos;
-            return new Example(frame.state, frame.state.map((x,i) =>  {
-                if (factory.vars[i].distribution === "discrete") {
-                    return 0;
-                } 
-                return (frame.axisDir[i % frame.axisPos.length] < 0) ? x+1 : x;
-            }));
-        });
-        var examples = backlashExamples;
-        var input = examples[0].input;
-        console.log("training");
+        var annPretrain = new Factory(varsDir).createNetwork();
+        var preTrainJson = JSON.stringify(annPretrain);
 
         var msStart = new Date();
-        var trainResult = ann.train(examples, {
-            batch: 2,
-        });
-        console.log("done ms:", new Date() - msStart, trainResult);
+        var ann = Network.fromJSON(preTrainJson);
+        var backlashOpts = {
+            targetState: (state) => state.map((v,i) => (
+                3 <= i ? v : (state[i+drives.length] < 0 ? v+1 : v)
+            ))
+        };
+        var trainEx = frame.calibrationExamples(80, backlashOpts);
+        var trainResult = ann.train(trainEx );
+        //console.log("training ms:", new Date() - msStart, trainResult);
+        trainResult.epochs.should.below(100);
 
-        console.log("after training:");
-        console.log( 
-            ann.keys.reduce((acc,k) => ann.weights[k] < acc ? ann.weights[k] : acc,0),
-            ann.keys.reduce((acc,k) => ann.weights[k] > acc ? ann.weights[k] : acc,0)
+        var testEx = frame.calibrationExamples(50, backlashOpts);
+        testEx.forEach((ex) => 
+            ann.activate(ex.input).map((v,i) =>
+                v.should.approximately(ex.target[i],0.005)
+            )
         );
-        console.log(
-            mathjs.round(input, digits),
-            mathjs.round(ann.activate(input), digits)
-        );
-        for (var i=vars.length; i<varsDir.length; i++) {
-            input[i] = -input[i];
-            console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
-        }
-        trainResult.epochs.should.below(300);
     })
 })

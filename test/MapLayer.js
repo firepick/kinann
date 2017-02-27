@@ -1,6 +1,7 @@
 var should = require("should");
 var mathjs = require("mathjs");
 var Optimizer = require("../src/Optimizer");
+var Layer = require("../src/Layer");
 var MapLayer = require("../src/MapLayer");
 
 // mocha -R min --inline-diffs *.js
@@ -44,33 +45,24 @@ var MapLayer = require("../src/MapLayer");
         ]);
         map.nOut.should.equal(4);
     });
-    it("Layer can be serialized", function() {
-        var layer = new Layer(3, {
-            id: 5,
-            activation: "logistic",
-        });
-
-        var json = layer.toJSON(); // serialize layer
-        var layer2 = Layer.fromJSON(json); // deserialize layer
-
-        layer2.id.should.equal(5);
-        var eIn = ["x0", "x1"];
-        should.deepEqual(layer2.expressions(eIn), layer.expressions(eIn));
-    })
     it("MapLayer can be serialized", function() {
         var layer = new MapLayer([
-            (eIn) => eIn[0],
-            (eIn) => "(" + eIn[0] + "^2)",
+            (eIn,i) => eIn[i] + "+" + i,
+            (eIn,i) => eIn[i] + "+" + i,
+            (eIn,i) => "(" + eIn[0] + "^2)",
         ], {
             id: 3
         });
 
-        var json = layer.toJSON(); // serialize layer
+        var json = JSON.stringify(layer); // serialize layer
         var layer2 = MapLayer.fromJSON(json); // deserialize layer
 
         layer2.id.should.equal(3);
         var eIn = ["x0", "x1"];
-        should.deepEqual(layer2.expressions(eIn), layer.expressions(eIn));
+        var expr = layer.expressions(eIn);
+        var expr2 = layer2.expressions(eIn);
+        //console.log(expr2);
+        should.deepEqual(expr2, expr);
     })
     it("MapLayer.validateStats(stats) applies statistic defaults", function() {
         var normStats = MapLayer.validateStats();

@@ -24,11 +24,11 @@ var Variable = require("./Variable");
     Factory.prototype.createNetwork = function(options={}) {
         var that = this;
         var nvars = that.vars.length;
-        var fmap = that.vars.map((v,i) => (eIn) => eIn[i]);
+        var fmap = that.vars.map((v,iv) => ((eIn,j) => eIn[j]));
         var degree = options.degree || that.degree;
         for (var i = 1; i < degree; i++) {
             let iDeg = i+1; // inner scope 
-            var fpoly = that.vars.map((v,i) => (eIn) => "(" + eIn[i] + "^" + iDeg + ")");
+            var fpoly = that.vars.map((v,iv) => ((eIn,j) => "(" + eIn[iv] + "^" + iDeg + ")"));
             fmap = fmap.concat(fpoly);
         }
 
@@ -50,7 +50,7 @@ var Variable = require("./Variable");
         if (preTrain) {
             var trainOpts = Object.assign({},options);
             var tolerance = trainOpts.tolerance || that.tolerance;
-            trainOpts.minCost = tolerance * tolerance / 2;
+            trainOpts.minCost = tolerance * tolerance / 4;
             var result = network.train(examples, trainOpts);
             options.onTrain && options.onTrain(result);
         }
@@ -86,7 +86,7 @@ var Variable = require("./Variable");
         invNetwork.normalizeInput(invExamples);
         
         // add enough training examples to ensure accuracy 
-        var nExamples = opts.nExamples || 90; 
+        var nExamples = opts.nExamples || 150; 
         for (var iEx = 0; iEx < nExamples; iEx++) {
             var target = inStats.map((stats) => 
                 mathjs.random( 

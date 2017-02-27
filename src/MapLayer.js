@@ -39,7 +39,7 @@ var mathjs = require("mathjs");
         if (!exprIn instanceof Array) {
             throw new Error("Expected input expression vector");
         }
-        return that.fmap.map((f, i) => f(exprIn));
+        return that.fmap.map((f, i) => f(exprIn,i));
     }
 
     MapLayer.validateStats = function(stats = {}) {

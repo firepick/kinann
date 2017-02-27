@@ -111,7 +111,7 @@ var Kinann = require("../index");
         var network = factory.createNetwork({
             onTrain: (r) => (result = r),
         });
-        result.minCost.should.equal(0.0000005); // cost = (tolerance ^ 2)/2
+        result.minCost.should.equal(0.00000025); // cost = (tolerance ^ 2)/4
         result.epochs.should.below(100); // training should converge quickly
         result.learningRate.should.below(0.5); // learningRate is typically ~0.15
     })
@@ -199,7 +199,7 @@ var Kinann = require("../index");
         });
 
         result.epochs.should.below(100); // convergence
-        examples.length.should.equal(92);
+        examples.length.should.equal(152);
         vassertEqual(invNetwork.activate([4,3,2]), [3,2,1]);
         vassertEqual(invNetwork.activate([301,201,11]), [300,200,10]);
         vassertEqual(invNetwork.activate([43,27,9]), [42,26,8]);
@@ -218,6 +218,8 @@ var Kinann = require("../index");
 
         // calibration requires a network trained to model actual machine positions
         var measuredNet = factory.createNetwork({
+            nRandom: 15,
+            outline: false,
             transform: (expected) => { // return measured position
                 var yskew = 30;
                 return [ // simulate measurement of machine with 30-degree y-skew

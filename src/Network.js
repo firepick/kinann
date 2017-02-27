@@ -289,7 +289,7 @@ var MapLayer = require("./MapLayer");
             prevCost = cost;
         }
 
-        var batch = options.batch || 1;
+        var batch = options.batch || 2;
         var iBatch = 0;
         var batchScale = 1/batch;
         var batchGradC;
