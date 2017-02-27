@@ -17,6 +17,7 @@ var Example = require("./Example");
         });
         Object.defineProperty(that, "axisDir", {
             get: () => that.$axisDir,
+            set: (axisDir) => {throw new Error("attempt to set read-only property: axisDir")},
             enumerable: true,
         });
         Object.defineProperty(that, "$axisPos", {
@@ -33,28 +34,40 @@ var Example = require("./Example");
                 axisPos = axisPos.map((p,i) => p < that.drives[i].minPos 
                     ? that.drives[i].minPos
                     : (that.drives[i].maxPos < p ? that.drives[i].maxPos : p));
-                that.$axisDir = that.$axisPos.map((pos,i) => {
-                    if (pos === axisPos[i]) {
+                that.$axisDir = axisPos.map((pos,i) => {
+                    if (that.$axisPos[i] === pos) {
                         return that.$axisDir[i];
                     }
-                    return (axisPos[i] < pos) ? -1 : 1;
+                    if (pos === that.drives[i].minPos) {
+                        return 1; // homing to minPos
+                    }
+                    return (pos < that.$axisPos[i]) ? -1 : 1;
                 });
                 return that.$axisPos = axisPos.map((p) => p);
             },
         });
+
         Object.defineProperty(that, "state", {
+            enumerable: true,
             get: () => that.axisPos.concat(that.$axisDir),
+            set: (state) => {
+                that.$axisPos = state.slice(0,that.drives.length);
+                that.$axisDir = state.slice(that.drives.length);
+                return state;
+            },
         });
 
-        options.axisPos && (that.axisPos = options.axisPos);
-        options.axisDir && (that.$axisDir = options.axisDir);
+        // initialize
+        that.axisPos = that.drives.map((d) => d.minPos);
+        options.state && (that.state = options.state);
 
         return that;
     }
     DriveFrame.fromJSON = function(json) {
         json = typeof json === "string" ? JSON.parse(json) : json;
         var drives = json.drives.map((d) => StepperDrive.fromJSON(d));
-        return new DriveFrame(drives, json);
+        var frame = new DriveFrame(drives, json);
+        return frame;
     }
 
     //// INSTANCE
@@ -68,12 +81,12 @@ var Example = require("./Example");
     }
     DriveFrame.prototype.toJSON = function() {
         var that = this;
-        return that;
         var obj = Object.assign({}, that);
         var obj = {
             type: "DriveFrame",
+            state: that.state,
             axisPos: that.axisPos,
-            axisDir: that.$axisDir,
+            axisDir: that.axisDir,
             drives: that.drives.map((d) => d.toJSON()),
         }
         return obj;
@@ -157,16 +170,30 @@ var Example = require("./Example");
         should.deepEqual(frame.axisPos, [300,-2,100]);
         frame.axisPos = [-1000,1000,-1000];
         should.deepEqual(frame.axisPos, [-1,200,-3]);
+
+        // setting any axis position to its minimum changes the corresponding axis direction to 1 (homing)
+        frame.axisPos = [belt300.minPos,belt200.minPos,screw.minPos];
+        should.deepEqual(frame.axisDir, [1,1,1]);
     })
-    it("state is non-enumerable kinematic state, which includes motion direction", function() {
+    it("state is kinematic state, which includes motion direction", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
         should.deepEqual(frame.state, [-1,-2,-3,1,1,1]);
         frame.axisPos = [1,2,3];
-        should.deepEqual(frame.state, [1,2,3,1,1,1]);
+        var state123 = frame.state;
         frame.axisPos = [0,2,3];
-        should.deepEqual(frame.state, [0,2,3,-1,1,1]);
+        var state023 = frame.state
         frame.axisPos = [1,0,2];
-        should.deepEqual(frame.state, [1,0,2,1,-1,-1]);
+        var state102 = frame.state;
+        should.deepEqual(state123, [1,2,3,1,1,1]);
+        should.deepEqual(state023, [0,2,3,-1,1,1]);
+        should.deepEqual(state102, [1,0,2,1,-1,-1]);
+        should.deepEqual(frame.state, state102);
+
+        // restore prior state
+        frame.state = state123;
+        should.deepEqual(frame.state, state123);
+        frame.axisPos = [0,2,3];
+        should.deepEqual(frame.state, state023);
     })
     it("DriveFrame.fromJSON(json).toJSON() are used to (de-)serializes DriveFrame", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
@@ -175,6 +202,7 @@ var Example = require("./Example");
         var json = JSON.stringify(frame);
         var frame2 = DriveFrame.fromJSON(json);
         frame2.should.instanceOf(DriveFrame);
+        should.deepEqual(frame2.state, frame.state);
         should.deepEqual(frame2, frame);
         should.deepEqual(frame2.state, frame.state);
         frame2.axisPos = [1000,1000,1000];
@@ -201,15 +229,13 @@ var Example = require("./Example");
         ]);
     })
     it("Train an ANN to ignore axisDir", function() {
+        return;
         this.timeout(60 * 1000);
         var frame = new DriveFrame([belt300, belt200, screw]);
-        //var frame = new DriveFrame([belt300, belt200]);
-        //var frame = new DriveFrame([belt300]);
+        var digits = 6;
         var vars = frame.variables(); // 3 axis positions
         var varsDir = frame.variables({axisDir:true}); // 3 axis positions + 3 axis directions
-        var factory = new Factory(varsDir, {
-            //nOut: vars.length, // inputs:6, outputs: 3
-        });
+        var factory = new Factory(varsDir);
         var msStart = new Date();
         var trainExamples;
         var ann = factory.createNetwork({
@@ -220,40 +246,45 @@ var Example = require("./Example");
         console.log("train ms:"+(new Date() - msStart), "trainExamples:"+trainExamples.length);
 
         var nExamples = 30;
-        var examples = Array(nExamples).fill().map(() => {
+        var idealExamples = factory.createExamples({
+            outline: false,
+            nRandom: nExamples,
+            transform: (data) => data.map((d,i) => (i < frame.axisPos.length ? d : 0)),
+        });
+        //console.log("idealExamples:", idealExamples.map((ex) => mathjs.round(ex.input, digits)) );
+        var backlashExamples = Array(nExamples).fill().map(() => {
             var axisPos = vars.map((v) => v.sample());
             frame.axisPos = axisPos;
-            //return new Example(frame.state, frame.axisPos);
-            return new Example(frame.state, frame.state.map((x,i) => 
-                factory.vars[i].distribution === "discrete" ? 0 : x
-            ));
+            return new Example(frame.state, frame.state.map((x,i) =>  {
+                if (factory.vars[i].distribution === "discrete") {
+                    return 0;
+                } 
+                return (frame.axisDir[i % frame.axisPos.length] < 0) ? x+1 : x;
+            }));
         });
+        var examples = backlashExamples;
         var input = examples[0].input;
         console.log("training");
 
-        var digits = 6;
-        console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
+        var msStart = new Date();
+        var trainResult = ann.train(examples, {
+            batch: 2,
+        });
+        console.log("done ms:", new Date() - msStart, trainResult);
+
+        console.log("after training:");
+        console.log( 
+            ann.keys.reduce((acc,k) => ann.weights[k] < acc ? ann.weights[k] : acc,0),
+            ann.keys.reduce((acc,k) => ann.weights[k] > acc ? ann.weights[k] : acc,0)
+        );
+        console.log(
+            mathjs.round(input, digits),
+            mathjs.round(ann.activate(input), digits)
+        );
         for (var i=vars.length; i<varsDir.length; i++) {
             input[i] = -input[i];
             console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
         }
-
-        if (true) {
-            var msStart = new Date();
-            var trainResult = ann.train(examples, {
-                batch: 2,
-            });
-            console.log("done ms:", new Date() - msStart, trainResult);
-
-            console.log( 
-                Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] < acc ? ann.weights[k] : acc,0),
-                Object.keys(ann.weights).reduce((acc,k) => ann.weights[k] > acc ? ann.weights[k] : acc,0)
-            );
-            console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
-            for (var i=vars.length; i<varsDir.length; i++) {
-                input[i] = -input[i];
-                console.log(mathjs.round(input, digits),mathjs.round(ann.activate(input), digits));
-            }
-        }
+        trainResult.epochs.should.below(300);
     })
 })

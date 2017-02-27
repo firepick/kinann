@@ -109,24 +109,27 @@ var Variable = require("./Variable");
         function addExample (data) {
             examples.push( new Example(data, transform(data).slice(0, that.nOut)) );
         };
-        addExample(that.vars.map((v) => v.min));
-        addExample(that.vars.map((v) => v.max));
-        addExample(that.vars.map((v) => v.median));
-        function addv(thatv) {
-            addExample(that.vars.map((v) => v === thatv ? v.min : v.max));
-            addExample(that.vars.map((v) => v === thatv ? v.max : v.min));
-            if (degree > 1) {
-                addExample(that.vars.map((v) => v === thatv ? v.median : v.min));
-                addExample(that.vars.map((v) => v === thatv ? v.median : v.max));
-            }
-            
-        };
+        addExample(that.vars.map((v) => v.min)); // normalization bound
+        addExample(that.vars.map((v) => v.max)); // normalization bound
+
+        if (options.outline == null || options.outline) {
+            addExample(that.vars.map((v) => v.median));
+            function addv(thatv) {
+                addExample(that.vars.map((v) => v === thatv ? v.min : v.max));
+                addExample(that.vars.map((v) => v === thatv ? v.max : v.min));
+                if (degree > 1) {
+                    addExample(that.vars.map((v) => v === thatv ? v.median : v.min));
+                    addExample(that.vars.map((v) => v === thatv ? v.median : v.max));
+                }
+            };
+            that.vars.map((v,i) => addv(v));
+        }
+
         if (options.nRandom) {
             for (var iR = 0; iR < options.nRandom; iR++) {
                 addExample(that.vars.map((v) => v.sample()));
             }
         }
-        that.vars.map((v,i) => addv(v));
         return examples;
     }
 
