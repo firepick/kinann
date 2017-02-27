@@ -11,55 +11,44 @@ var Example = require("./Example");
         that.type = "DriveFrame";
         that.drives = drives;
 
-        Object.defineProperty(that, "$axisDir", {
-            value: drives.map((d) => 1),
-            writable: true,
-        });
         Object.defineProperty(that, "axisDir", {
-            get: () => that.$axisDir,
-            set: (axisDir) => {throw new Error("attempt to set read-only property: axisDir")},
             enumerable: true,
-        });
-        Object.defineProperty(that, "$axisPos", {
-            value: drives.map((d) => d.minPos),
-            writable: true,
+            get: () => that.state.slice(that.drives.length).map((p) => p),
+            set: (axisDir) => {throw new Error("attempt to set read-only property: axisDir")},
         });
         Object.defineProperty(that, "axisPos", {
             enumerable: true,
-            get: () => that.$axisPos,
+            get: () => that.state.slice(0, that.drives.length),
             set: (axisPos) => {
                 if (!(axisPos instanceof Array) || axisPos.length !== that.drives.length) {
                     throw new Error("Expected axisPos array of length:"+that.drives.length);
                 }
-                axisPos = axisPos.map((p,i) => p < that.drives[i].minPos 
-                    ? that.drives[i].minPos
-                    : (that.drives[i].maxPos < p ? that.drives[i].maxPos : p));
-                that.$axisDir = axisPos.map((pos,i) => {
-                    if (that.$axisPos[i] === pos) {
-                        return that.$axisDir[i];
+                return axisPos.map((p,i) => {
+                    var di = that.drives[i];
+                    var pos = mathjs.min(mathjs.max(di.minPos,p), di.maxPos);
+                    if (that.state[i] === pos) {
+                        var dir = that.axisDir[i];
+                    } else if (pos === di.minPos) {
+                        var dir = 1; // homing to minPos
+                    } else {
+                        var dir = (pos < that.state[i]) ? -1 : 1;
                     }
-                    if (pos === that.drives[i].minPos) {
-                        return 1; // homing to minPos
-                    }
-                    return (pos < that.$axisPos[i]) ? -1 : 1;
+                    that.$state[i+that.drives.length] = dir;
+                    that.$state[i] = pos;
+                    return pos;
                 });
-                return that.$axisPos = axisPos.map((p) => p);
             },
         });
-
         Object.defineProperty(that, "state", {
             enumerable: true,
-            get: () => that.axisPos.concat(that.$axisDir),
-            set: (state) => {
-                that.$axisPos = state.slice(0,that.drives.length);
-                that.$axisDir = state.slice(that.drives.length);
-                return state;
-            },
+            get: () => that.$state.map((s) => s),
+            set: (state) => ((that.$state = state.map((s) => s)), state),
         });
 
         // initialize
-        that.axisPos = that.drives.map((d) => d.minPos);
-        options.state && (that.state = options.state);
+        that.state = options.state || (
+            that.drives.map((d) => d.minPos)
+            .concat(that.drives.map((d) => 1)));
 
         return that;
     }
@@ -181,7 +170,8 @@ var Example = require("./Example");
         frame.axisPos = [1,2,3];
         var state123 = frame.state;
         frame.axisPos = [0,2,3];
-        var state023 = frame.state
+        var state023 = frame.state;
+        should.deepEqual(state023, [0,2,3,-1,1,1]);
         frame.axisPos = [1,0,2];
         var state102 = frame.state;
         should.deepEqual(state123, [1,2,3,1,1,1]);
@@ -203,7 +193,6 @@ var Example = require("./Example");
         var frame2 = DriveFrame.fromJSON(json);
         frame2.should.instanceOf(DriveFrame);
         should.deepEqual(frame2.state, frame.state);
-        should.deepEqual(frame2, frame);
         should.deepEqual(frame2.state, frame.state);
         frame2.axisPos = [1000,1000,1000];
         should.deepEqual(frame2.state, [300,200,100,1,1,1]);
