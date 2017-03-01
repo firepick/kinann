@@ -81,6 +81,29 @@ var Network = require("./Network");
             return new Example(that.state, targetState(that.state));
         });
     }
+    DriveFrame.prototype.compile = function(options={}) {
+        var that = this;
+        var factory = new Factory(that.variables({axisDir:true}));
+        return that.annMeasured = factory.createNetwork({
+            preTrain: options.preTrain == null ? false : options.preTrain, // pre-training decreeases accuracy with backlash
+        });
+    }
+    DriveFrame.prototype.calibrate = function(examples, options={}) {
+        var that = this;
+        var factory = new Factory(that.variables({axisDir:true}));
+        that.annMeasured = that.annMeasured || that.compile(options);
+        var trainResult = that.annMeasured.train(examples, options);
+        options.onTrain && options.onTrain(trainResult);
+        return that.annCalibrated = factory.inverseNetwork(that.annMeasured, options);
+    }
+    DriveFrame.prototype.calibratedState = function(state) {
+        var that = this;
+        if (!that.annCalibrated) {
+            throw new Error("DriveFrame is not calibrated");
+        }
+        state = state || that.state;
+        return that.annCalibrated.activate(state);
+    }
     DriveFrame.prototype.toAxisPos = function(motorPos) {
         var that = this;
         return motorPos.map((m,i) => that.drives[i].toAxisPos(m));
@@ -288,32 +311,37 @@ var Network = require("./Network");
             ex.input.forEach((vin,j) => vin.should.equal(ex.target[j]-j))
         );
     })
-    it("Train an ANN to emulate 3-axis Cartesian robot with backlash", function() {
+    it("calibrate(examples) trains DriveFrame to handle backlash", function() {
         this.timeout(60 * 1000);
         var drives = [belt300, belt200, screw];
         var frame = new DriveFrame(drives);
 
-        var varsDir = frame.variables({axisDir:true}); // 3 axis positions + 3 axis directions
-        var annPretrain = new Factory(varsDir).createNetwork();
-        var preTrainJson = JSON.stringify(annPretrain);
+        // compiling the frame saves about 1 second
+        var annMeasured = frame.compile();
 
+        var trainEx = frame.calibrationExamples(80);
+        var measuredState = (state) => // simulate physical measurement of actual position
+            state.map((v,i) => 3 <= i ? v : (state[i+drives.length] < 0 ? v+1 : v));
+
+        // update each training example with measured position
+        trainEx.forEach((ex) => ex.target = measuredState(ex.target));
+
+        // calibration training takes ~2 seconds
         var msStart = new Date();
-        var ann = Network.fromJSON(preTrainJson);
-        var backlashOpts = {
-            targetState: (state) => state.map((v,i) => (
-                3 <= i ? v : (state[i+drives.length] < 0 ? v+1 : v)
-            ))
-        };
-        var trainEx = frame.calibrationExamples(80, backlashOpts);
-        var trainResult = ann.train(trainEx );
-        //console.log("training ms:", new Date() - msStart, trainResult);
-        trainResult.epochs.should.below(100);
+        var calibrateResult = [];
+        var annCalibrated = frame.calibrate(trainEx, {
+            onTrain: (result) => calibrateResult.push(result), // will be called twice (annMeasured+annCalibrated)
+        });
+        //console.log("calibrate ms:", new Date() - msStart, calibrateResult); 
 
-        var testEx = frame.calibrationExamples(50, backlashOpts);
-        testEx.forEach((ex) => 
-            ann.activate(ex.input).map((v,i) =>
-                v.should.approximately(ex.target[i],0.005)
-            )
-        );
+        // calibratedState(state?) returns state required to match given state
+        // In this example, moving forward requires no correction (i.e., calibratedState=[10,10,10,...]).
+        // However, moving backward requires a correction (i.e., calibratedState=[9,9,9,...] vs. [10,10,10,...])
+        // In both cases, the DriveFrame always tracks nominal position as its current state (i.e., [10,10,10,...])
+        // By moving the robot to the calibrated state position [9,9,9,...], we make sure that the robot
+        // position is where we expect it (i.e., [10,10,10,...]
+        should.deepEqual(mathjs.round(frame.calibratedState([10,10,10,1,1,1]),2), [10,10,10,1,1,1]);
+        frame.state = [10,10,10,-1,-1,-1]; // calibratedState will use current state by default
+        should.deepEqual(mathjs.round(frame.calibratedState(),2), [9,9,9,-1,-1,-1]);
     })
 })

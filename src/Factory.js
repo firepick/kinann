@@ -76,6 +76,7 @@ var Variable = require("./Variable");
         });
         var invNetwork = invFactory.createNetwork({
             preTrain: false,
+            onTrain: options.onTrain,
         });
 
         var invExamples = [];
