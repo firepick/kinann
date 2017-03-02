@@ -24,7 +24,7 @@ var Variable = require("./Variable");
     Factory.prototype.createNetwork = function(options={}) {
         var that = this;
         var nvars = that.vars.length;
-        var fmap = that.vars.map((v,iv) => ((eIn,j) => eIn[j]));
+        var fmap = options.fmap || that.vars.map((v,iv) => ((eIn,j) => eIn[j]));
         var degree = options.degree || that.degree;
         for (var i = 1; i < degree; i++) {
             let iDeg = i+1; // inner scope 
@@ -32,8 +32,11 @@ var Variable = require("./Variable");
             fmap = fmap.concat(fpoly);
         }
 
+        var mapOpts = {
+            weights: options.mapWeights,
+        };
         var network = new Sequential(nvars, [
-            new MapLayer(fmap),
+            new MapLayer(fmap,mapOpts),
             new Layer(that.nOut, {
                 activation: Layer.ACT_IDENTITY,
             }),
@@ -76,7 +79,6 @@ var Variable = require("./Variable");
         });
         var invNetwork = invFactory.createNetwork({
             preTrain: false,
-            onTrain: options.onTrain,
         });
 
         var invExamples = [];

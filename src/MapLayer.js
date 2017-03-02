@@ -7,6 +7,7 @@ var mathjs = require("mathjs");
         that.type = "MapLayer";
         that.id = options.id || 0;
         that.nOut = fmap.length;
+        that.weights = options.weights || {};
         that.fmap = fmap;
         return that;
     }
@@ -16,6 +17,7 @@ var mathjs = require("mathjs");
         return {
             type: "MapLayer",
             id: that.id,
+            weights: that.weights,
             fmap: that.fmap.map((f) => f.toString()),
         };
     }
@@ -31,6 +33,8 @@ var mathjs = require("mathjs");
 
     MapLayer.prototype.initialize = function(nIn, weights = {}, options = {}) {
         var that = this;
+        Object.keys(that.weights).forEach((key) => (
+            weights[key] == null && (weights[key] = that.weights[key])));
         return weights;
     }
 

@@ -16,7 +16,7 @@ var Kinann = require("../index");
         vactual.map((xa,i) => xa.should.approximately(vexpected[i], tol));
     }
     
-    it("Factory(vars, options) creates Factory kinmatic model", function() {
+    it("Factory(vars, options) creates Factory kinematic model", function() {
         var factory = new Factory(testVars, {
             nOut: 2,
         });
@@ -138,6 +138,33 @@ var Kinann = require("../index");
             "(x2^3)", // polynomial feed-forward inputs
         ]);
     })
+    it("createNetwork(options) can create ANN with adaptive functions", function() {
+        this.timeout(60*1000);
+        var factory = new Factory(testVars);
+        var fmap = [
+            (eIn,j) => eIn[j],
+            (eIn,j) => eIn[j],
+            (eIn,j) => "sin(phase2+"+eIn[j]+")",
+        ]
+        var network = factory.createNetwork({ 
+            fmap: fmap,
+            mapWeights: {
+                phase2: 30*mathjs.PI/180,
+            },
+            preTrain: false,
+        });
+
+        network.nOut.should.equal(3);
+        network.layers[0].nOut.should.equal(3); 
+        network.layers.length.should.equal(2);
+        should.deepEqual(network.layers[0].expressions(["x0","x1","x2"]), [
+            "x0", // linear feed-forward inputs
+            "x1", // linear feed-forward inputs
+            "sin(phase2+x2)", // non-linear feed-forward inputs
+        ]);
+        var gradC = network.costGradientExpr();
+        gradC.phase2.length.should.equal(330);
+    })
     it("pre-trained quadratic Kinann neural network is accurate to +/-0.001", function() {
         this.timeout(60*1000);
 
@@ -235,11 +262,12 @@ var Kinann = require("../index");
         vassertEqual(measuredNet.activate([10,10,10,10]), [15,8.66,10,10]);
 
         // the calibrated network is the inverse of the measured network
+        var tolerance = 0.002; // we lose a bit of accuracy
         var calibratedNet = factory.inverseNetwork(measuredNet);
-        vassertEqual(calibratedNet.activate([300,200,10,360]), [184.530,230.94,10,360]);
-        vassertEqual(calibratedNet.activate([10,10,10,10]), [4.227,11.547,10,10]);
-        vassertEqual(measuredNet.activate(calibratedNet.activate([0,0,0,0])), [0,0,0,0]);
-        vassertEqual(measuredNet.activate(calibratedNet.activate([300,200,10,0])), [300,200,10,0]);
+        vassertEqual(calibratedNet.activate([300,200,10,360]), [184.530,230.94,10,360], tolerance);
+        vassertEqual(calibratedNet.activate([10,10,10,10]), [4.227,11.547,10,10], tolerance);
+        vassertEqual(measuredNet.activate(calibratedNet.activate([0,0,0,0])), [0,0,0,0], tolerance);
+        vassertEqual(measuredNet.activate(calibratedNet.activate([300,200,10,0])), [300,200,10,0], tolerance);
         //console.log("mathjs", JSON.stringify(measuredNet.gradExpr, null, "  "))
     })
 })

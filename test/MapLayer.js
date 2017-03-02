@@ -45,14 +45,46 @@ var MapLayer = require("../src/MapLayer");
         ]);
         map.nOut.should.equal(4);
     });
+    it("MapLayer(fmap,options) creates a weighted mapping layer", function() {
+        var options = {
+            weights: {
+                gain1:1,
+                gain2:2,
+            }
+        }
+        var vars = [
+            (eIn) => eIn[0],
+            (eIn) => eIn[1],
+            (eIn) => "(" + eIn[0] + "*gain1)",
+            (eIn) => "(" + eIn[1] + "*gain2)",
+        ];
+        var map = new MapLayer(vars, options);
+        should.deepEqual(map.expressions(["x0", "x1", "x2"]), [
+            "x0",
+            "x1",
+            "(x0*gain1)",
+            "(x1*gain2)",
+        ]);
+        map.nOut.should.equal(4);
+        should.deepEqual(map.initialize(4), {
+            gain1: 1,
+            gain2: 2,
+        });
+    });
     it("MapLayer can be serialized", function() {
-        var layer = new MapLayer([
+        var options = {
+            id: 3,
+            weights: {
+                gain1:1,
+                gain2:2,
+            },
+        }
+        var vars = [
             (eIn,i) => eIn[i] + "+" + i,
             (eIn,i) => eIn[i] + "+" + i,
             (eIn,i) => "(" + eIn[0] + "^2)",
-        ], {
-            id: 3
-        });
+        ];
+        var layer = new MapLayer(vars, options);
 
         var json = JSON.stringify(layer); // serialize layer
         var layer2 = MapLayer.fromJSON(json); // deserialize layer
@@ -63,6 +95,12 @@ var MapLayer = require("../src/MapLayer");
         var expr2 = layer2.expressions(eIn);
         //console.log(expr2);
         should.deepEqual(expr2, expr);
+        should.deepEqual(expr, [
+            "x0+0",
+            "x1+1",
+            "(x0^2)",
+        ]);
+        should.deepEqual(expr2.weights, expr.weights);
     })
     it("MapLayer.validateStats(stats) applies statistic defaults", function() {
         var normStats = MapLayer.validateStats();

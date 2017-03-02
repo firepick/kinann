@@ -218,7 +218,9 @@ var MapLayer = require("./MapLayer");
         }
         return results;
     }
-
+    Network.prototype.expressions = function(exprIn) {
+        throw new Error("Abstract method not implemented: expressions()");
+    }
     Network.prototype.normalizeInput = function(examples, options = {}) {
         var that = this;
         var normStats = options.normStats || {
