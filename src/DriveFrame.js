@@ -12,7 +12,7 @@ var Network = require("./Network");
         that.type = "DriveFrame";
         that.drives = drives;
         that.backlash = options.backlash;
-        that.deadbandScale = options.deadbandScale || 1;
+        that.deadbandScale = options.deadbandScale || 10; // provides continuous yet quick transition across deadband
         that.deadbandHome = options.deadbandHome || 0.5; // default is homing to minPos with backoff exceeding positive deadband
 
         Object.defineProperty(that, "deadband", {
@@ -79,7 +79,7 @@ var Network = require("./Network");
         var that = this;
         var vars = that.variables().slice(0, that.drives.length);
         var targetState = options.targetState || ((state) => state);
-        var separation = options.separation || 0;
+        var separation = options.separation || 1; // stay out of deadband
         return Array(nExamples).fill().map((na,iEx) => {
             if (iEx === 0) {
                 that.axisPos = that.drives.map((d) => d.minPos);
@@ -219,7 +219,10 @@ var Network = require("./Network");
         // setting any axis position to its minimum changes the corresponding axis direction to 1 (homing)
     })
     it("deadband is backlash property that varies between -0.5 and 0.5", function() {
-        var frame = new DriveFrame([belt300, belt200, screw], {backlash:true});
+        var frame = new DriveFrame([belt300, belt200, screw], {
+            deadbandScale: 1,
+            backlash:true
+        });
         should.deepEqual(frame.axisPos, [-1,-2,-3]); // home
         should.deepEqual(frame.deadband, [0.5,0.5,0.5]); // home
 
@@ -355,14 +358,14 @@ var Network = require("./Network");
     it("calibrate(examples) trains DriveFrame to handle backlash", function() {
         this.timeout(60 * 1000);
         var drives = [belt300, belt200, screw];
-        var frame = new DriveFrame(drives, {backlash: true});
+        var frame = new DriveFrame(drives, {
+            backlash: true,
+        });
 
         // compiling the frame saves about 1 second
         var annMeasured = frame.compile();
 
-        var trainEx = frame.calibrationExamples(80, {
-            separation: 5, // stay out of deadband
-        });
+        var trainEx = frame.calibrationExamples(80);
         var measuredState = (state) => // simulate physical measurement of actual position
             state.map((v,i) => 3 <= i ? v : (state[i+drives.length] < 0 ? v+1 : v));
 
@@ -387,5 +390,15 @@ var Network = require("./Network");
         should.deepEqual(mathjs.round(frame.calibratedState([10,10,10,0.5,0.5,0.5]),2), [10,10,10,0.5,0.5,0.5]);
         frame.state = [10,10,10,-0.5,-0.5,-0.5]; // calibratedState will use current state by default
         should.deepEqual(mathjs.round(frame.calibratedState(),2), [9,9,9,-0.5,-0.5,-0.5]);
+
+        // explore the deadband
+        frame.axisPos = mathjs.add(frame.axisPos, [0.1,-0.1,0.1]);
+        should.deepEqual(mathjs.round(frame.calibratedState(),2), [9.86,8.9,9.86,0.26,-0.5,0.26]);
+        frame.axisPos = mathjs.add(frame.axisPos, [0.1,-.1,0.1]);
+        should.deepEqual(mathjs.round(frame.calibratedState(),2), [10.2,8.8,10.2,0.5,-0.5,0.5]);
+        frame.axisPos = mathjs.add(frame.axisPos, [0.1,-.1,-.1]);
+        should.deepEqual(mathjs.round(frame.calibratedState(),2), [10.3,8.7,9.34,0.5,-0.5,-0.26]);
+        frame.axisPos = mathjs.add(frame.axisPos, [0.1,-.1,-.1]);
+        should.deepEqual(mathjs.round(frame.calibratedState(),2), [10.4,8.6,9,0.5,-0.5,-0.5]);
     })
 })
