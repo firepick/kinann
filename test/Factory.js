@@ -141,15 +141,15 @@ var Kinann = require("../index");
     it("createNetwork(options) can create ANN with adaptive functions", function() {
         this.timeout(60*1000);
         var factory = new Factory(testVars);
-        var fmap = [
-            (eIn,j) => eIn[j],
-            (eIn,j) => eIn[j],
-            (eIn,j) => "sin(phase2+"+eIn[j]+")",
+        var fmap = [                        // function map for hidden MapLayer
+            factory.mapIdentity(0),         // non-adaptive identity default: input[0]
+            factory.mapPower(1,2),          // non-adaptive quadratic: input[1]^2
+            factory.mapSigmoid(2,"w0r2"),   // adaptive sigmoid: tanh(input[2]*w0r2)    
         ]
         var network = factory.createNetwork({ 
             fmap: fmap,
             mapWeights: {
-                phase2: 30*mathjs.PI/180,
+                w0r2: 3,
             },
             preTrain: false,
         });
@@ -158,12 +158,12 @@ var Kinann = require("../index");
         network.layers[0].nOut.should.equal(3); 
         network.layers.length.should.equal(2);
         should.deepEqual(network.layers[0].expressions(["x0","x1","x2"]), [
-            "x0", // linear feed-forward inputs
-            "x1", // linear feed-forward inputs
-            "sin(phase2+x2)", // non-linear feed-forward inputs
+            "x0", // linear feed-forward input
+            "(x1^2)", // non-linear feed-forward input
+            "tanh(x2*w0r2)", // non-linear feed-forward input
         ]);
         var gradC = network.costGradientExpr();
-        gradC.phase2.length.should.equal(330);
+        gradC.w0r2.length.should.equal(363);
     })
     it("pre-trained quadratic Kinann neural network is accurate to +/-0.001", function() {
         this.timeout(60*1000);
@@ -259,10 +259,12 @@ var Kinann = require("../index");
         });
         vassertEqual(measuredNet.activate([0,0,0,0]), [0,0,0,0]);
         vassertEqual(measuredNet.activate([300,200,10,360]), [400,173.205,10,360]);
-        vassertEqual(measuredNet.activate([10,10,10,10]), [15,8.66,10,10]);
+
+        // we lose a bit of accuracy when activating non-examples
+        var tolerance = 0.002; 
+        vassertEqual(measuredNet.activate([10,10,10,10]), [15,8.66,10,10],tolerance);
 
         // the calibrated network is the inverse of the measured network
-        var tolerance = 0.002; // we lose a bit of accuracy
         var calibratedNet = factory.inverseNetwork(measuredNet);
         vassertEqual(calibratedNet.activate([300,200,10,360]), [184.530,230.94,10,360], tolerance);
         vassertEqual(calibratedNet.activate([10,10,10,10]), [4.227,11.547,10,10], tolerance);

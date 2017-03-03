@@ -21,14 +21,27 @@ var Variable = require("./Variable");
         return that;
     }
 
+    Factory.prototype.mapIdentity = function(iIn) {
+        var that = this;
+        return (eIn) => eIn[iIn];
+    }
+    Factory.prototype.mapPower = function(iIn,degree) {
+        var that = this;
+        return (eIn) => "(" + eIn[iIn] +"^" + degree + ")";
+    }
+    Factory.prototype.mapSigmoid = function(iIn,scale) {
+        var that = this;
+        return (eIn) => "tanh(" + eIn[iIn] + "*" + scale + ")";
+    }
+
     Factory.prototype.createNetwork = function(options={}) {
         var that = this;
         var nvars = that.vars.length;
-        var fmap = options.fmap || that.vars.map((v,iv) => ((eIn,j) => eIn[j]));
+        var fmap = options.fmap || that.vars.map((v,iv) => that.mapIdentity(iv));
         var degree = options.degree || that.degree;
         for (var i = 1; i < degree; i++) {
             let iDeg = i+1; // inner scope 
-            var fpoly = that.vars.map((v,iv) => ((eIn,j) => "(" + eIn[iv] + "^" + iDeg + ")"));
+            var fpoly = that.vars.map((v,iv) => that.mapPower(iv, iDeg));
             fmap = fmap.concat(fpoly);
         }
 
