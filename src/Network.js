@@ -242,7 +242,7 @@ var MapLayer = require("./MapLayer");
 
         that.fNormIn || that.normalizeInput(examples, options);
         var nEpochs = options.maxEpochs || Network.MAX_EPOCHS;
-        var minCost = options.minCost || Network.MIN_COST;
+        var targetCost = options.targetCost || Network.MIN_COST;
         var learningRate = options.learningRate || Network.LEARNING_RATE;
         if (typeof learningRate === "number") {
             var tHalfLife = nEpochs / 2;
@@ -254,7 +254,7 @@ var MapLayer = require("./MapLayer");
         } else {
             throw new Error("learningRate must be number or function");
         }
-        result.minCost = minCost;
+        result.targetCost = targetCost;
         result.learningRate = lrFun();
         var shuffle = options.shuffle == null ? true : options.shuffle;
         var prevCost = null;
@@ -291,19 +291,25 @@ var MapLayer = require("./MapLayer");
             prevCost = cost;
         }
 
-        var batch = options.batch || 2;
+        var defaultBatch =  examples.length > 10 
+            ? 2  // mini-batch gradient descent (normal)
+            : 1; // stochastic gradient descent for few examples
+        var batch = options.batch || defaultBatch;
         var iBatch = 0;
         var batchScale = 1/batch;
         var batchGradC;
         var done = false;
+        var maxCostLimit = null;
         for (var iEpoch = 0; !done && iEpoch < nEpochs; iEpoch++) {
             done = true;
             shuffle && Network.shuffle(examples);
+            result.maxCost = 0;
             for (var iEx = 0; iEx < examples.length; iEx++) {
                 var example = examples[iEx];
                 that.activate(example.input, example.target);
                 var cost = that.cost();
-                (cost > minCost) && (done = false);
+                result.maxCost = mathjs.max(result.maxCost, cost);
+                (cost > targetCost) && (done = false);
                 var gradC = that.costGradient();
                 if (iBatch === 0) {
                     batchGradC = gradC;
@@ -323,7 +329,18 @@ var MapLayer = require("./MapLayer");
                 }
             }
             result.epochs = iEpoch;
+            options.onEpoch && options.onEpoch(result);
+            maxCostLimit = maxCostLimit || result.maxCost; 
+            if (result.epochs > 100 && result.maxCost > maxCostLimit) { // not converging
+                result.maxCostLimit = maxCostLimit;
+                throw new Error("Network training exceeded maxCost limit:"+JSON.stringify(result));
+            }
+            const maxCostWeight = 0.1;
+            maxCostLimit = maxCostLimit * (1-maxCostWeight) + result.maxCost * maxCostWeight; // exponential average
             result.learningRate = lrFun(result.learningRate);
+        }
+        if (nEpochs <= result.epochs + 1) { // convergence too slow
+            throw new Error("Network training exceeded epoch limit:"+JSON.stringify(result));
         }
 
         return result;
@@ -340,7 +357,7 @@ var MapLayer = require("./MapLayer");
         return a;
     }
 
-    Network.MAX_EPOCHS = 10000;
+    Network.MAX_EPOCHS = 500;
     Network.MIN_COST = 0.00005;
     Network.LEARNING_RATE = 0.5;
     Network.LEARNING_RATE_PRESCALE = 8;

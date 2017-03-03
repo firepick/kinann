@@ -287,11 +287,13 @@ var Sequential = require("../src/Sequential");
             normInStd: 0.3, // standard deviation of normalized input
             normInMean: 0, // mean of normalized input
             maxEpochs: Network.MAX_EPOCHS, // maximum number of training epochs
-            minCost: Network.MIN_COST, // stop training if cost for all examples drops below minCost
+            targetCost: Network.MIN_COST, // stop training if epoch maxCost for all examples drops below targetCost
             learningRate: Network.LEARNING_RATE, // initial learning rate or function(lr)
             learningRateDecay: 0.99985, // exponential learning rate decay
             learningRateMin: 0.001, // minimum learning rate
             shuffle: true, // shuffle examples for each epoch
+            onEpoch: (result) => result.epochs % 3 === 0 && // monitor training every third epoch
+                console.log("train.onEpoch:" + JSON.stringify(result)), 
         }
         var result = network.train(examples, options);
         var tests = [-5, -3.1, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.1, 5].map((x) => {
@@ -304,7 +306,7 @@ var Sequential = require("../src/Sequential");
         for (var iTest = 0; iTest < tests.length; iTest++) {
             var test = tests[iTest];
             var outputs = network.activate(test.input, test.target);
-            network.cost().should.below(options.minCost);
+            network.cost().should.below(options.targetCost);
         }
     })
     it("exampleStats(stats, key)", function() {
@@ -449,7 +451,7 @@ var Sequential = require("../src/Sequential");
         examples.map((ex) => makeExample(ex, fskew));
         tests.map((ex) => makeExample(ex, fskew));
         var result = network.train(examples, options);
-        verbose && console.log("learningRate:" + result.learningRate, "epochs:" + result.epochs, "minCost:" + result.minCost);
+        verbose && console.log("learningRate:" + result.learningRate, "epochs:" + result.epochs, "targetCost:" + result.targetCost);
 
         for (var iTest = 0; iTest < tests.length; iTest++) {
             var test = tests[iTest];

@@ -111,7 +111,7 @@ var Kinann = require("../index");
         var network = factory.createNetwork({
             onTrain: (r) => (result = r),
         });
-        result.minCost.should.equal(0.00000025); // cost = (tolerance ^ 2)/4
+        result.targetCost.should.equal(0.00000025); // cost = (tolerance ^ 2)/4
         result.epochs.should.below(100); // training should converge quickly
         result.learningRate.should.below(0.5); // learningRate is typically ~0.15
     })

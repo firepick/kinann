@@ -66,7 +66,7 @@ var Variable = require("./Variable");
         if (preTrain) {
             var trainOpts = Object.assign({},options);
             var tolerance = trainOpts.tolerance || that.tolerance;
-            trainOpts.minCost = tolerance * tolerance / 4;
+            trainOpts.targetCost = tolerance * tolerance / 4;
             var result = network.train(examples, trainOpts);
             options.onTrain && options.onTrain(result);
         }
