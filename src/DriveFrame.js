@@ -75,6 +75,11 @@ var Network = require("./Network");
     }
 
     //// INSTANCE
+    DriveFrame.prototype.home = function() {
+        var that = this;
+        that.axisPos = that.drives.map((d) => d.minPos);
+        return that;
+    }
     DriveFrame.prototype.calibrationExamples = function(nExamples=30, options={}) {
         var that = this;
         var vars = that.variables().slice(0, that.drives.length);
@@ -217,6 +222,13 @@ var Network = require("./Network");
         should.deepEqual(frame.axisPos, [-1,200,-3]);
 
         // setting any axis position to its minimum changes the corresponding axis direction to 1 (homing)
+    })
+    it("home() moves all drives to their minimum position", function() {
+        var frame = new DriveFrame([belt300, belt200, screw]);
+        frame.axisPos = [10,20,30];
+        should.deepEqual(frame.home().state,[
+            -1,-2,-3,0.5,0.5,0.5,
+        ]);
     })
     it("deadband is backlash property that varies between -0.5 and 0.5", function() {
         var frame = new DriveFrame([belt300, belt200, screw], {
@@ -392,24 +404,28 @@ var Network = require("./Network");
         frame.state = [10,10,10,-0.5,-0.5,-0.5]; // calibratedState will use current state by default
         should.deepEqual(mathjs.round(frame.calibratedState(),2), [9,9,10,-0.5,-0.5,-0.5]);
 
-        // move within the deadband
+        // explore the deadband at [10,10,10] by
+        // moving from [9,9,9] to [10,10,10] and reversing y,z to [11,9,9]
+        var rampUp = Array(10).fill().map((e,i) => [
+            9 + i*0.1,
+            9 + i*0.1,
+            9 + i*0.1,
+        ]);
+        var rampDown = Array(11).fill().map((e,i) => [
+            10 + i*0.1,
+            10 - i*0.1,
+            10 - i*0.1,
+        ]);
+        var axisPos = rampUp.concat(rampDown);
+
         frame.state = [9,9,9,0.5,0.5,0.5]; // calibratedState will use current state by default
-        for (var pos=9; pos < 11; pos += 0.1) {
-            var posReverseAt10 = pos < 10 ? pos : pos - 10;
-            frame.axisPos = [
-                pos,
-                pos < 10 ? pos : (10 - (pos - 10)),
-                pos < 10 ? pos : (10 - (pos - 10)),
-            ]
-            console.log("state:", JSON.stringify(mathjs.round(frame.calibratedState(),2)));
-        }
-        //frame.axisPos = mathjs.add(frame.axisPos, [0.1,-0.1,0.1]);
-        //should.deepEqual(mathjs.round(frame.calibratedState(),2), [9.86,8.9,9.86,0.26,-0.5,0.26]);
-        //frame.axisPos = mathjs.add(frame.axisPos, [0.1,-.1,0.1]);
-        //should.deepEqual(mathjs.round(frame.calibratedState(),2), [10.2,8.8,10.2,0.5,-0.5,0.5]);
-        //frame.axisPos = mathjs.add(frame.axisPos, [0.1,-.1,-.1]);
-        //should.deepEqual(mathjs.round(frame.calibratedState(),2), [10.3,8.7,9.34,0.5,-0.5,-0.26]);
-        //frame.axisPos = mathjs.add(frame.axisPos, [0.1,-.1,-.1]);
-        //should.deepEqual(mathjs.round(frame.calibratedState(),2), [10.4,8.6,9,0.5,-0.5,-0.5]);
+        var examples = axisPos.map((axisPos) => {
+            frame.axisPos = axisPos;
+            return new Example(axisPos, frame.calibratedState());
+        });
+
+        examples.forEach((ex) => {
+            console.log("state:", JSON.stringify(mathjs.round(ex.target,2)));
+        });
     })
 })
