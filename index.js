@@ -16,6 +16,9 @@
     Kinann.Variable = require("./src/Variable");
     Kinann.DriveFrame = require("./src/DriveFrame");
     Kinann.StepperDrive = require("./src/StepperDrive");
+    Kinann.models = {
+        RotaryDelta: require("./src/models/RotaryDelta"),
+    };
 
     module.exports = exports.Kinann = Kinann;
 })(typeof exports === "object" ? exports : (exports = {}));
