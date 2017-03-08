@@ -23,21 +23,24 @@ var Variable = require("./Variable");
 
     Factory.prototype.mapIdentity = function(iIn) {
         var that = this;
-        return (eIn) => eIn[iIn];
+        return new Function("eIn", "return  eIn[" +iIn+ "]");
     }
     Factory.prototype.mapPower = function(iIn,degree) {
         var that = this;
-        return (eIn) => "(" + eIn[iIn] +"^" + degree + ")";
+        var body = "return \"(\" + eIn[" +iIn+ "]+\"^" +degree+ ")\"";
+        return new Function("eIn", body);
     }
     Factory.prototype.mapSigmoid = function(iIn,scale) {
         var that = this;
-        return (eIn) => "tanh(" + eIn[iIn] + "*" + scale + ")";
+        var body = "return \"tanh(\" + eIn[" +iIn+ "]+\"*" +scale+ ")\"";
+        return new Function("eIn", body);
     }
 
     Factory.prototype.createNetwork = function(options={}) {
         var that = this;
         var nvars = that.vars.length;
-        var fmap = options.fmap || that.vars.map((v,iv) => that.mapIdentity(iv));
+        //var fmap = options.fmap || that.vars.map((v,iv) => that.mapIdentity(iv));
+        var fmap = options.fmap || that.vars.map((v,iv) => ((eIn,j) => eIn[j]));
         var degree = options.degree || that.degree;
         for (var i = 1; i < degree; i++) {
             let iDeg = i+1; // inner scope 

@@ -283,6 +283,7 @@ var Sequential = require("../src/Sequential");
             }
         });
 
+        var onEpochCalls = 0;
         options = {
             normInStd: 0.3, // standard deviation of normalized input
             normInMean: 0, // mean of normalized input
@@ -292,10 +293,10 @@ var Sequential = require("../src/Sequential");
             learningRateDecay: 0.99985, // exponential learning rate decay
             learningRateMin: 0.001, // minimum learning rate
             shuffle: true, // shuffle examples for each epoch
-            onEpoch: (result) => result.epochs % 3 === 0 && // monitor training every third epoch
-                console.log("train.onEpoch:" + JSON.stringify(result)), 
+            onEpoch: (result) => result.epochs % 3 === 0 && (onEpochCalls++) // do something every third epoch
         }
         var result = network.train(examples, options);
+        onEpochCalls.should.above(0);
         var tests = [-5, -3.1, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.1, 5].map((x) => {
             return {
                 input: [x, 0],
@@ -351,7 +352,7 @@ var Sequential = require("../src/Sequential");
             },
         ];
         network.train(examples);
-        var json = JSON.stringify(network);
+        var json = JSON.stringify(network, null, "  ");
 
         // de-serialized network should be trained
         var network2 = Network.fromJSON(json);

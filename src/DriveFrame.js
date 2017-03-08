@@ -51,6 +51,11 @@ var Network = require("./Network");
             get: () => that.$state.map((s) => s),
             set: (state) => ((that.$state = state.map((s) => s)), state),
         });
+        Object.defineProperty(that, "calibratedState", {
+            enumerable: true,
+            get: () => that.calibratedStateOf(),
+            set: (state) => { throw new Error("calibratedState is read-only"); },
+        });
         Object.defineProperty(that, "outputTransform", {
             value: options.outputTransform || 
                 ((frame) => frame.state.slice(0, frame.drives.length)),
@@ -71,19 +76,40 @@ var Network = require("./Network");
         json = typeof json === "string" ? JSON.parse(json) : json;
         var drives = json.drives.map((d) => StepperDrive.fromJSON(d));
         var frame = new DriveFrame(drives, json);
+        json.annCalibrated && (frame.annCalibrated = Network.fromJSON(json.annCalibrated));
         return frame;
     }
 
     //// INSTANCE
+    DriveFrame.prototype.toJSON = function() {
+        var that = this;
+        var obj = {
+            type: "DriveFrame",
+            state: that.state,
+            axisPos: that.axisPos,
+            backlash: that.backlash,
+            deadbandScale: that.deadbandScale,
+            drives: that.drives.map((d) => d.toJSON()),
+            annCalibrated: that.annCalibrated,
+        }
+        return obj;
+    }
     DriveFrame.prototype.home = function() {
         var that = this;
         that.axisPos = that.drives.map((d) => d.minPos);
         return that;
     }
+    DriveFrame.prototype.moveTo = function(axisPos) {
+        var that = this;
+        that.axisPos = axisPos;
+        return that;
+    }
     DriveFrame.prototype.calibrationExamples = function(nExamples=30, options={}) {
         var that = this;
         var vars = that.variables().slice(0, that.drives.length);
-        var targetState = options.targetState || ((state) => state);
+        var measuredPos = options.measuredPos || ((pos) => pos);
+        var targetState = options.targetState || 
+            ((state) => Object.assign([],state,measuredPos(that.axisPos)));
         var separation = options.separation || 1; // stay out of deadband
         return Array(nExamples).fill().map((na,iEx) => {
             if (iEx === 0) {
@@ -95,14 +121,17 @@ var Network = require("./Network");
                 } while(distance < separation);
                 that.axisPos = axisPos;
             }
-            return new Example(that.state, targetState(that.state));
+            return new Example(that.state, targetState(that.state) 
+            );
         });
     }
     DriveFrame.prototype.compile = function(options={}) {
         var that = this;
         var factory = new Factory(that.variables(options));
         return that.annMeasured = factory.createNetwork({
-            preTrain: options.preTrain == null ? false : options.preTrain, // pre-training decreeases accuracy with backlash
+            preTrain: options.preTrain == null 
+                ? false // pre-training decreeases accuracy with backlash
+                : options.preTrain, 
         });
     }
     DriveFrame.prototype.calibrate = function(examples, options={}) {
@@ -113,7 +142,7 @@ var Network = require("./Network");
         options.onTrain && options.onTrain(trainResult);
         return that.annCalibrated = factory.inverseNetwork(that.annMeasured, options);
     }
-    DriveFrame.prototype.calibratedState = function(state) {
+    DriveFrame.prototype.calibratedStateOf = function(state) {
         var that = this;
         if (!that.annCalibrated) {
             throw new Error("DriveFrame is not calibrated");
@@ -128,18 +157,6 @@ var Network = require("./Network");
     DriveFrame.prototype.toMotorPos = function(axisPos) {
         var that = this;
         return axisPos.map((a,i) => that.drives[i].toMotorPos(a));
-    }
-    DriveFrame.prototype.toJSON = function() {
-        var that = this;
-        var obj = Object.assign({}, that);
-        var obj = {
-            type: "DriveFrame",
-            state: that.state,
-            axisPos: that.axisPos,
-            backlash: that.backlash,
-            drives: that.drives.map((d) => d.toJSON()),
-        }
-        return obj;
     }
     DriveFrame.prototype.variables = function() {
         var that = this;
@@ -168,6 +185,12 @@ var Network = require("./Network");
     var StepperDrive = require("./StepperDrive");
     var BeltDrive = StepperDrive.BeltDrive;
     var ScrewDrive = StepperDrive.ScrewDrive;
+    var sequence = function* (start,last,inc=1, it) {
+        for (var v = start; inc<0 && v>=last || inc>0 && v<=last; v+=inc) {
+            yield v;
+        }
+        it && (yield* it);
+    }
 
     var belt300 = new BeltDrive({
         minPos: -1,
@@ -223,7 +246,11 @@ var Network = require("./Network");
 
         // setting any axis position to its minimum changes the corresponding axis direction to 1 (homing)
     })
-    it("home() moves all drives to their minimum position", function() {
+    it("moveTo(axisPos) moves to position (chainable)", function() {
+        var frame = new DriveFrame([belt300, belt200, screw]);
+        should.deepEqual(frame.moveTo([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
+    })
+    it("home() moves all drives to their minimum position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
         frame.axisPos = [10,20,30];
         should.deepEqual(frame.home().state,[
@@ -232,8 +259,7 @@ var Network = require("./Network");
     })
     it("deadband is backlash property that varies between -0.5 and 0.5", function() {
         var frame = new DriveFrame([belt300, belt200, screw], {
-            deadbandScale: 1,
-            backlash:true
+            deadbandScale: 1
         });
         should.deepEqual(frame.axisPos, [-1,-2,-3]); // home
         should.deepEqual(frame.deadband, [0.5,0.5,0.5]); // home
@@ -296,25 +322,23 @@ var Network = require("./Network");
     it("variables() returns neural network input variables", function() {
         var drives = [belt300, belt200, screw];
 
-        // default variables are motion axes
+        // with backlash disabled, variables are motion axes
         var frame = new DriveFrame(drives, {backlash: false});
         should.deepEqual(frame.variables(), [
-            new Variable([-1,300]),
-            new Variable([-2,200]),
-            new Variable([-3,100]),
+            new Variable([-1,300]), // belt300 motion axis x
+            new Variable([-2,200]), // belt200 motion axis y
+            new Variable([-3,100]), // screw motion axis z
         ]);
 
-        // tracking backlash requires deadband variables
-        var frame = new DriveFrame(drives, {
-            backlash: true,
-        });
+        // default variables track backlash with deadband variables
+        var frame = new DriveFrame(drives);
         should.deepEqual(frame.variables(), [
-            new Variable([-1,300]),
-            new Variable([-2,200]),
-            new Variable([-3,100]),
-            new Variable([-0.5,0.5]),
-            new Variable([-0.5,0.5]),
-            new Variable([-0.5,0.5]),
+            new Variable([-1,300]), // belt300 motion axis x
+            new Variable([-2,200]), // belt200 motion axis y
+            new Variable([-3,100]), // screw motion axis z
+            new Variable([-0.5,0.5]), // x deadband variable
+            new Variable([-0.5,0.5]), // y deadband variable
+            new Variable([-0.5,0.5]), // z deadband variable
         ]);
     })
     it("output property provides customizable application output", function() {
@@ -358,74 +382,72 @@ var Network = require("./Network");
         should.deepEqual(examples[last].input, frame.state); 
         frame.axisPos.map((p,i) => p.should.above(frame.drives[i].minPos)); // not home
 
-        // build custom examples with targetState option
+        // build custom examples with measuredPos option
         var examples = frame.calibrationExamples(5, {
-            targetState: ((state) => state.map((v,i) => v+i)),
+            measuredPos: (axisPos) => mathjs.add(axisPos,[1,2,3]), // measurement callback
         });
         should.deepEqual(examples[0].input, [-1,-2,-3,0.5,0.5,0.5]); // home
-        examples.forEach((ex) => 
-            ex.target.forEach((vtarg,j) => vtarg.should.equal(ex.input[j]+j))
-        );
+        examples.forEach((ex) => {
+            ex.target[0].should.equal(ex.input[0]+1);
+            ex.target[1].should.equal(ex.input[1]+2);
+            ex.target[2].should.equal(ex.input[2]+3);
+        });
     })
     it("calibrate(examples) trains DriveFrame to handle backlash", function() {
         this.timeout(60 * 1000);
-        var drives = [belt300, belt200, screw];
-        var frame = new DriveFrame(drives, {
-            backlash: true,
-        });
-
-        // compiling the frame saves about 1 second
-        var annMeasured = frame.compile();
-
-        // create calibration examples having backlash on x and y axes
-        var trainEx = frame.calibrationExamples(80);
-        var measuredState = (state) => // simulate physical measurement of actual position
-            state.map((v,i) => 2 <= i ? v : (state[i+drives.length] < 0 ? v+1 : v));
-
-        // update each training example with measured position
-        trainEx.forEach((ex) => ex.target = measuredState(ex.target));
-
-        // calibration training takes ~2 seconds
+        var verbose = false;
         var msStart = new Date();
-        var calibrateResult = [];
+
+        var frame = new DriveFrame([belt300, belt200, screw]);
+
+        // create calibration examples having actual application measurements
+        var trainEx = frame.calibrationExamples(80, {
+            measuredPos: (axisPos) => // application provided measurement callback
+                mathjs.add(axisPos, [ // mock measurement
+                    frame.deadband[0] < 0 ? 1 : 0, // mock x-backlash when reversing
+                    frame.deadband[1] < 0 ? 1 : 0, // mock y-backlash when reversing
+                    0, // mock no z-backlash
+                ]), 
+        });
+
+        // calibrate DriveFrame (~2 seconds)
+        var calibrateResult = []; // OPTIONAL: collect annMeasurement and annCalibrated training results
         var annCalibrated = frame.calibrate(trainEx, {
-            onTrain: (result) => calibrateResult.push(result), // will be called twice (annMeasured+annCalibrated),
-            //onEpoch: (result) => (result.epochs % 50) == 0 && console.log("onEpoch:"+JSON.stringify(result)),
+            onTrain: (result) => calibrateResult.push(result), // OPTIONAL: collect training results
+            onEpoch: (result) => verbose && // OPTIONAL: examine training progression
+                (result.epochs % 3) == 0 && // show every third epoch
+                console.log("onEpoch:"+JSON.stringify(result)),
         });
-        //console.log("calibrate ms:", new Date() - msStart, calibrateResult); 
+        verbose && console.log("calibrate ms:", new Date() - msStart, calibrateResult); 
+        
+        function verifyCalibration(frame) {
+            // explore the deadband at [10,10,10] by
+            // moving from [9,9,9] to [10,10,10] and reversing y,z to [11,9,9]
+            var xpath = sequence(9, 11, 0.1);
+            var ypath = sequence(9, 10, 0.1, sequence(9.9, 9, -0.1));
+            var zpath = sequence(9, 10, 0.1, sequence(9.9, 9, -0.1));
+            var calibrationPath = Array(21).fill().map(() => [
+                xpath.next().value,
+                ypath.next().value,
+                zpath.next().value,
+            ]);
 
-        // calibratedState(state?) returns state required to match given state
-        // In this example, moving forward requires no correction (i.e., calibratedState=[10,10,10,...]).
-        // However, moving backward requires a correction (i.e., calibratedState=[9,9,9,...] vs. [10,10,10,...])
-        // In both cases, the DriveFrame always tracks nominal position as its current state (i.e., [10,10,10,...])
-        // By moving the robot to the calibrated state position [9,9,9,...], we make sure that the robot
-        // position is where we expect it (i.e., [10,10,10,...]
-        should.deepEqual(mathjs.round(frame.calibratedState([10,10,10,0.5,0.5,0.5]),2), [10,10,10,0.5,0.5,0.5]);
-        frame.state = [10,10,10,-0.5,-0.5,-0.5]; // calibratedState will use current state by default
-        should.deepEqual(mathjs.round(frame.calibratedState(),2), [9,9,10,-0.5,-0.5,-0.5]);
+            frame.home();
+            var calState = calibrationPath.map((axisPos) => frame.moveTo(axisPos).calibratedState);
+            should.deepEqual(mathjs.round(calState[0],2), [9,9,9,0.5,0.5,0.5]);
+            should.deepEqual(mathjs.round(calState[10],2), [10,10,10,0.5,0.5,0.5]);
+            should.deepEqual(mathjs.round(calState[11],2), [10.1,9.61,9.9,0.5,0.21,0.21]);
+            should.deepEqual(mathjs.round(calState[12],2), [10.2,9.22,9.8,0.5,-0.08,-0.08]);
+            should.deepEqual(mathjs.round(calState[13],2), [10.3,8.83,9.7,0.5,-0.37,-0.37]);
+            should.deepEqual(mathjs.round(calState[14],2), [10.4,8.6,9.6,0.5,-0.5,-0.5]);
+            should.deepEqual(mathjs.round(calState[15],2), [10.5,8.5,9.5,0.5,-0.5,-0.5]);
+        }
+        verifyCalibration(frame);
 
-        // explore the deadband at [10,10,10] by
-        // moving from [9,9,9] to [10,10,10] and reversing y,z to [11,9,9]
-        var rampUp = Array(10).fill().map((e,i) => [
-            9 + i*0.1,
-            9 + i*0.1,
-            9 + i*0.1,
-        ]);
-        var rampDown = Array(11).fill().map((e,i) => [
-            10 + i*0.1,
-            10 - i*0.1,
-            10 - i*0.1,
-        ]);
-        var axisPos = rampUp.concat(rampDown);
-
-        frame.state = [9,9,9,0.5,0.5,0.5]; // calibratedState will use current state by default
-        var examples = axisPos.map((axisPos) => {
-            frame.axisPos = axisPos;
-            return new Example(axisPos, frame.calibratedState());
-        });
-
-        examples.forEach((ex) => {
-            console.log("state:", JSON.stringify(mathjs.round(ex.target,2)));
-        });
+        // Deserialized DriveFrame is still calibrated
+        var json = JSON.stringify(frame);
+        delete frame;
+        var frame2 = DriveFrame.fromJSON(json);
+        verifyCalibration(frame2); 
     })
 })

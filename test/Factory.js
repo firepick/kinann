@@ -165,7 +165,7 @@ var Kinann = require("../index");
         var gradC = network.costGradientExpr();
         gradC.w0r2.length.should.equal(363);
     })
-    it("pre-trained quadratic Kinann neural network is accurate to +/-0.001", function() {
+    it("TESTTESTpre-trained quadratic Kinann neural network is accurate to +/-0.001", function() {
         this.timeout(60*1000);
 
         var xyza = [

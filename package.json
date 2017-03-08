@@ -27,6 +27,7 @@
   },
   "scripts": {
     "test": "mocha -w -R min --inline-diffs",
+    "testg": "mocha -w -R min --inline-diffs -g TESTTEST",
     "testx": "mocha -w --inline-diffs"
   },
   "repository": {

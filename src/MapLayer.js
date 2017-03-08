@@ -14,12 +14,13 @@ var mathjs = require("mathjs");
 
     MapLayer.prototype.toJSON = function() {
         var that = this;
-        return {
+        var obj = {
             type: "MapLayer",
             id: that.id,
             weights: that.weights,
-            fmap: that.fmap.map((f) => f.toString()),
         };
+        that.fmap && (obj.fmap = that.fmap.map((f) => f.toString()));
+        return obj;
     }
 
     MapLayer.fromJSON = function(json) {
