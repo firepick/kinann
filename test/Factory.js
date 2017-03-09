@@ -76,7 +76,7 @@ var Kinann = require("../index");
     it("createNetwork() can create a linear Kinann neural network for identity transform", function() {
         this.timeout(60*1000);
         var factory = new Factory(testVars);
-        var network = factory.createNetwork({ degree: 1 });
+        var network = factory.createNetwork({ power: 1 });
 
         network.nIn.should.equal(3);
         network.nOut.should.equal(3);
@@ -119,7 +119,7 @@ var Kinann = require("../index");
         this.timeout(60*1000);
         var factory = new Factory(testVars);
         var network = factory.createNetwork({ 
-            degree: 3, // cubic polynomial
+            power: 3, // cubic polynomial
             preTrain: false,
         });
 
@@ -210,7 +210,7 @@ var Kinann = require("../index");
             new Variable([0, 10]), // z-axis
             new Variable([0, 360]), // a-axis
         ];
-        var factory = new Factory(xyza, {degree: 2});
+        var factory = new Factory(xyza, {power: 2});
         var network = factory.createNetwork(); 
 
         var tolerance = 0.001;

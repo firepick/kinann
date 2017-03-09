@@ -16,7 +16,7 @@ var Variable = require("./Variable");
         if (that.nIn < that.nOut) {
             throw new Error("Factory cannot generate networks with more outputs than inputs");
         }
-        that.degree = options.degree || 1;
+        that.power = options.power || 1;
         that.fourier = options.fourier || 0;
         that.tolerance = options.tolerance || 0.001;
         return that;
@@ -26,9 +26,9 @@ var Variable = require("./Variable");
         var that = this;
         return new Function("eIn", "return  eIn[" +iIn+ "]");
     }
-    Factory.prototype.mapPower = function(iIn,degree) {
+    Factory.prototype.mapPower = function(iIn,power) {
         var that = this;
-        var body = "return \"(\" + eIn[" +iIn+ "]+\"^" +degree+ ")\"";
+        var body = "return \"(\" + eIn[" +iIn+ "]+\"^" +power+ ")\"";
         return new Function("eIn", body);
     }
     Factory.prototype.mapSigmoid = function(iIn,scale) {
@@ -47,10 +47,10 @@ var Variable = require("./Variable");
         var that = this;
         var nvars = that.vars.length;
         var fmap = options.fmap || that.vars.map((v,iv) => that.mapIdentity(iv));
-        var degree = options.degree || that.degree;
+        var power = options.power || that.power;
         var mapWeights = Object.assign({}, options.mapWeights);
         for (var iv = 0; iv < nvars; iv++) {
-            for (var iDeg = 2; iDeg <= degree; iDeg++) {
+            for (var iDeg = 2; iDeg <= power; iDeg++) {
                 fmap.push(that.mapPower(iv, iDeg)); // polynomial
             }
             for (var nFreq = 1; nFreq <= options.fourier; nFreq++) {
@@ -105,7 +105,7 @@ var Variable = require("./Variable");
         var vars = inStats.map((stats,i) => new Variable([minOutput[i], maxOutput[i]]) );
 
         var invFactory = new Factory(vars, {
-            degree: that.degree,
+            power: that.power,
         });
         var invNetwork = invFactory.createNetwork({
             preTrain: false,
@@ -136,7 +136,7 @@ var Variable = require("./Variable");
     }
     Factory.prototype.createExamples = function(options={}) {
         var that = this;
-        var degree = options.degree || that.degree;
+        var power = options.power || that.power;
         var transform = options.transform || ((data) => data);
         var examples = [];
         function addExample (data) {
@@ -150,7 +150,7 @@ var Variable = require("./Variable");
             function addv(thatv) {
                 addExample(that.vars.map((v) => v === thatv ? v.min : v.max));
                 addExample(that.vars.map((v) => v === thatv ? v.max : v.min));
-                if (degree > 1) {
+                if (power > 1) {
                     addExample(that.vars.map((v) => v === thatv ? v.median : v.min));
                     addExample(that.vars.map((v) => v === thatv ? v.median : v.max));
                 }
