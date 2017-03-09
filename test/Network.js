@@ -167,7 +167,7 @@ var Sequential = require("../src/Sequential");
         // targeted activation is required for cost()
         var inputs = [5, 7];
         var targets = [19.1, 43.2];
-        network.activate(inputs, targets);
+        should.deepEqual(mathjs.round(network.activate(inputs, targets),3),[19.1,43.2]);
         network.cost().should.equal(0); // cost at target
 
         network.activate(inputs, [19, 43.2]);
@@ -466,7 +466,7 @@ var Sequential = require("../src/Sequential");
             );
             error.should.below(0.01);
         }
-        //verbose && console.log("activate:", network.memoizeActivate.toString());
+        //verbose && console.log("activate:", network.memoActivate.toString());
         verbose && console.log("elapsed:", new Date() - msStart);
         //verbose && console.log(network.weights);
     })

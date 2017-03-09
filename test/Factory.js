@@ -131,12 +131,48 @@ var Kinann = require("../index");
             "x1", // linear feed-forward inputs
             "x2", // linear feed-forward inputs
             "(x0^2)", // polynomial feed-forward inputs
-            "(x1^2)", // polynomial feed-forward inputs
-            "(x2^2)", // polynomial feed-forward inputs
             "(x0^3)", // polynomial feed-forward inputs
+            "(x1^2)", // polynomial feed-forward inputs
             "(x1^3)", // polynomial feed-forward inputs
+            "(x2^2)", // polynomial feed-forward inputs
             "(x2^3)", // polynomial feed-forward inputs
         ]);
+    })
+    it("createNetwork(options) can create a Fourier Kinann neural network", function() {
+        this.timeout(10*1000);
+        var factory = new Factory(testVars);
+        var network = factory.createNetwork({ 
+            fourier: 2, // number of fourier terms
+            preTrain: false,
+        });
+
+        network.nOut.should.equal(3);
+        network.layers[0].nOut.should.equal(9); 
+        network.layers.length.should.equal(2);
+        should.deepEqual(network.layers[0].expressions(["x0","x1","x2"]), [
+            "x0", // linear feed-forward inputs
+            "x1", // linear feed-forward inputs
+            "x2", // linear feed-forward inputs
+            "(sin((x0*w0x0f+w0x0p1)))", // fourier feed-forward inputs
+            "(sin((x0*(2*w0x0f)+w0x0p2)))", // fourier feed-forward inputs
+            "(sin((x1*w0x1f+w0x1p1)))", // fourier feed-forward inputs
+            "(sin((x1*(2*w0x1f)+w0x1p2)))", // fourier feed-forward inputs
+            "(sin((x2*w0x2f+w0x2p1)))", // fourier feed-forward inputs
+            "(sin((x2*(2*w0x2f)+w0x2p2)))", // fourier feed-forward inputs
+        ]);
+        network.initialize();
+        network.weights.should.properties({
+            "w0x0f": 1,
+            "w0x0p1": 0,
+            "w0x1f": 1,
+            "w0x1p1": 0,
+            "w0x2f": 1,
+            "w0x2p1": 0,
+        });
+        Object.keys(network.weights).length.should.equal(39); // that's a lot of weights
+        //console.log("grad:", network.costGradientExpr());
+        //console.log("activate", network.memoActivate.toString());
+        //console.log("propagate", network.memoPropagate.toString());
     })
     it("createNetwork(options) can create ANN with adaptive functions", function() {
         this.timeout(60*1000);

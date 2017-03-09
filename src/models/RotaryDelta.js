@@ -166,4 +166,16 @@ var mathjs = require("mathjs");
         var rd = new RotaryDelta();
         rd.getMinDegrees().should.within(-52.33002, -52.33001);
     });
+    it("eipi() should return minimum homing angle", function() {
+        var expr = "exp(i*x)";
+        var dexpr = mathjs.derivative(expr, "x").toString();
+        return;
+        console.log("dexpr:"+dexpr, "typeof"+(typeof dexpr));
+        console.log("eval", mathjs.eval(dexpr,{x:0}));
+        console.log("eval", mathjs.round(mathjs.eval(dexpr,{x:mathjs.PI/2}),3));
+        console.log("eval", mathjs.round(mathjs.eval(dexpr,{x:mathjs.PI}),3));
+        console.log("eval", mathjs.round(mathjs.eval(dexpr,{x:mathjs.PI*1.5}),3));
+        console.log("eval", mathjs.round(mathjs.eval(dexpr,{x:mathjs.PI/6}),3));
+        console.log("eval", mathjs.round(mathjs.norm(mathjs.eval(dexpr,{x:mathjs.PI/6})),3));
+    });
 });

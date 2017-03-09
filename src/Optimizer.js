@@ -26,6 +26,9 @@ var mathjs = require("mathjs");
                 if (node.isParenthesisNode && parent) {
                     var e = node.toString();
                     !that.emap[e] && that.optimize(e);
+                } else if (node.isFunctionNode && parent) {
+                    var e = node.toString();
+                    !that.emap[e] && that.optimize(e);
                 }
             });
             for (var i = 0; i < that.findex; i++) { // apply accumulated optimizations
@@ -33,6 +36,8 @@ var mathjs = require("mathjs");
                 var subExpr = that.memo[fsub];
                 if (subExpr[0] === '(' && ememo.indexOf(subExpr) >= 0) {
                     ememo = ememo.split(subExpr).join("(" + fsub + ")"); // eliminate sub-expressions
+                } else if (subExpr.indexOf("(") > 0 && ememo.indexOf(subExpr) >= 0) { // eliminate duplicate function invocations
+                    ememo = ememo.split(subExpr).join(fsub); // eliminate sub-expressions
                 }
             }
             fname = "f" + that.findex++;

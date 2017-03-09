@@ -17,6 +17,7 @@ var Variable = require("./Variable");
             throw new Error("Factory cannot generate networks with more outputs than inputs");
         }
         that.degree = options.degree || 1;
+        that.fourier = options.fourier || 0;
         that.tolerance = options.tolerance || 0.001;
         return that;
     }
@@ -35,21 +36,34 @@ var Variable = require("./Variable");
         var body = "return \"tanh(\" + eIn[" +iIn+ "]+\"*" +scale+ ")\"";
         return new Function("eIn", body);
     }
+    Factory.prototype.mapFourier = function(iIn,n,freq,phase) {
+        var that = this;
+        var mult = n === 1 ? freq : ("(" + n +"*"+freq+")");
+        var body = "return \"(sin((\" + eIn[" +iIn+ "]+\"*" +mult+ "+" +phase+ ")))\"";
+        return new Function("eIn", body);
+    }
 
     Factory.prototype.createNetwork = function(options={}) {
         var that = this;
         var nvars = that.vars.length;
-        //var fmap = options.fmap || that.vars.map((v,iv) => that.mapIdentity(iv));
-        var fmap = options.fmap || that.vars.map((v,iv) => ((eIn,j) => eIn[j]));
+        var fmap = options.fmap || that.vars.map((v,iv) => that.mapIdentity(iv));
         var degree = options.degree || that.degree;
-        for (var i = 1; i < degree; i++) {
-            let iDeg = i+1; // inner scope 
-            var fpoly = that.vars.map((v,iv) => that.mapPower(iv, iDeg));
-            fmap = fmap.concat(fpoly);
+        var mapWeights = Object.assign({}, options.mapWeights);
+        for (var iv = 0; iv < nvars; iv++) {
+            for (var iDeg = 2; iDeg <= degree; iDeg++) {
+                fmap.push(that.mapPower(iv, iDeg)); // polynomial
+            }
+            for (var nFreq = 1; nFreq <= options.fourier; nFreq++) {
+                var w0xf = "w0x" + iv + "f";            // frequency weight
+                var w0xp = "w0x" + iv + "p" + nFreq;    // phase weight
+                mapWeights[w0xf] = 1;
+                mapWeights[w0xp] = 0;
+                fmap.push(that.mapFourier(iv, nFreq, w0xf, w0xp));
+            }
         }
 
         var mapOpts = {
-            weights: options.mapWeights,
+            weights: mapWeights,
         };
         var network = new Sequential(nvars, [
             new MapLayer(fmap,mapOpts),

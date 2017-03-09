@@ -113,7 +113,7 @@ var MapLayer = require("./MapLayer");
         that.nOut = that.layers[that.layers.length - 1].nOut;
         var exprs = that.expressions(exprsIn);
         that.fmemo_outputs = that.opt.optimize(exprs);
-        that.memoizeActivate = that.opt.compile();
+        that.memoActivate = that.opt.compile();
         that.scope = Object.create(that.weights);
 
         that.gradExpr = that.gradExpr || that.costGradientExpr(exprsIn, options);
@@ -127,7 +127,7 @@ var MapLayer = require("./MapLayer");
         }
 
         that.fmemo_cost = that.opt.optimize(that.costFunExpr);
-        that.memoizePropagate = that.opt.compile();
+        that.memoPropagate = that.opt.compile();
 
         return that;
     }
@@ -137,16 +137,16 @@ var MapLayer = require("./MapLayer");
         if (input.length !== that.nIn) {
             throw new Error("activation vector input length expected:"+that.nIn + " actual:"+input.length);
         }
-        if (!that.memoizeActivate) {
+        if (!that.memoActivate) {
             throw new Error("compile() before activate()");
         }
         input.map((x, i) => that.scope["x" + i] = that.fNormIn ? that.fNormIn[i](x) : x);
         that.target = target;
         if (target) {
             target.map((y, i) => that.scope["yt" + i] = y);
-            that.memoizePropagate(that.scope);
+            that.memoPropagate(that.scope);
         } else {
-            that.memoizeActivate(that.scope);
+            that.memoActivate(that.scope);
         }
         return that.fmemo_outputs.map((f, i) => that.scope["y" + i] = that.scope[f]);
     }
@@ -171,7 +171,7 @@ var MapLayer = require("./MapLayer");
 
     Network.prototype.propagate = function(learningRate, gradC) { // see compile
         var that = this;
-        if (!that.memoizeActivate) {
+        if (!that.memoActivate) {
             throw new Error("compile() must be called before propagate()");
         }
         gradC = gradC || that.costGradient();
