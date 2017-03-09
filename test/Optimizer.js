@@ -7,24 +7,26 @@ var Optimizer = require("../src/Optimizer");
 
     it("Optimizer.optimize(expr) returns memoized expression name", function() {
         var opt = new Optimizer();
-        opt.optimize("2*(a+b)+1/(a+b)").should.equal("f1");
+        opt.optimize("2*(a+b)+1/(a+b)+sin(a+b)").should.equal("f2");
         should.deepEqual(opt.memo, {
             f0: "(a + b)",
-            f1: "2 * (f0) + 1 / (f0)",
+            f1: "sin(f0)",
+            f2: "2 * (f0) + 1 / (f0) + f1",
         });
 
         // re-optimization of expressions matching existing optimizations has no effect 
-        opt.optimize("2*(a + b)+1/(a+b)").should.equal("f1");
+        opt.optimize("2*(a + b)+1/(a+b)+sin(a+b)").should.equal("f2");
 
         // optimizations accumulate
-        opt.optimize("((a+b)*(b+c)+1/(a + exp(b+c)))").should.equal("f5");
+        opt.optimize("((a+b)*(b+c)+1/(a + exp(b+c)))").should.equal("f6");
         should.deepEqual(opt.memo, {
-            f0: "(a + b)",
-            f1: "2 * (f0) + 1 / (f0)",
-            f2: "(b + c)",
-            f3: "exp(f2)",
-            f4: "(a + f3)",
-            f5: "((f0) * (f2) + 1 / (f4))",
+            f0: "(a + b)",                  // old
+            f1: "sin(f0)",                  // old
+            f2: "2 * (f0) + 1 / (f0) + f1", // old
+            f3: "(b + c)",                  // new
+            f4: "exp(f3)",                  // new
+            f5: "(a + f4)",                 // new
+            f6: "((f0) * (f3) + 1 / (f5))", // new
         });
 
         // vector optimizations are supported

@@ -34,10 +34,13 @@ var mathjs = require("mathjs");
             for (var i = 0; i < that.findex; i++) { // apply accumulated optimizations
                 var fsub = "f" + i;
                 var subExpr = that.memo[fsub];
-                if (subExpr[0] === '(' && ememo.indexOf(subExpr) >= 0) {
-                    ememo = ememo.split(subExpr).join("(" + fsub + ")"); // eliminate sub-expressions
-                } else if (subExpr.indexOf("(") > 0 && ememo.indexOf(subExpr) >= 0) { // eliminate duplicate function invocations
-                    ememo = ememo.split(subExpr).join(fsub); // eliminate sub-expressions
+                if (ememo.indexOf(subExpr) >= 0) {
+                    if (subExpr[0] === '(') {
+                        // retain parenthesis in case of function invocation
+                        ememo = ememo.split(subExpr).join("("+fsub+")"); // eliminate parenthesized sub-expression
+                    } else if (subExpr.indexOf("(") > 0) {
+                        ememo = ememo.split(subExpr).join(fsub); // eliminate duplicate function invocation
+                    }
                 }
             }
             fname = "f" + that.findex++;
