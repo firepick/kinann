@@ -1,4 +1,5 @@
 var mathjs = require("mathjs");
+var Variable = require("./Variable");
 
 (function(exports) {
     ////////////////// constructor
@@ -28,15 +29,14 @@ var mathjs = require("mathjs");
     Layer.prototype.initialize = function(nIn, weights = {}, options = {}) {
         var that = this;
         var xavier = 2 / (nIn + that.nOut);
-        var wInit = Layer.randomGaussian(nIn * that.nOut, xavier); // weight initializations
-        var bInit = Layer.randomGaussian(that.nOut, 1); // offset initializations
-        var iInit = 0;
+        var gaussw = Variable.createGaussian(xavier);
+        var gaussb = Variable.createGaussian(1);
         for (var r = 0; r < that.nOut; r++) {
             var bkey = Layer.weight(that.id, r);
-            weights[bkey] == null && (weights[bkey] = bInit[r]);
+            weights[bkey] == null && (weights[bkey] = gaussb.sample());
             for (var c = 0; c < nIn; c++) {
                 var wkey = Layer.weight(that.id, r, c);
-                weights[wkey] == null && (weights[wkey] = wInit[iInit++]);
+                weights[wkey] == null && (weights[wkey] = gaussw.sample());
             }
         }
 
@@ -76,21 +76,6 @@ var mathjs = require("mathjs");
     }
 
     /////////////////// class
-    Layer.randomGaussian = function(n = 1, sigma = 1, mu = 0) {
-        var that = this;
-        var list = [];
-        while (list.length < n) {
-            do {
-                var x1 = 2.0 * mathjs.random() - 1.0;
-                var x2 = 2.0 * mathjs.random() - 1.0;
-                var w = x1 * x1 + x2 * x2;
-            } while (w >= 1.0);
-            w = mathjs.sqrt((-2.0 * mathjs.log(w)) / w);
-            list.push(x1 * w * sigma + mu);
-            list.length < n && list.push(x2 * w * sigma + mu);
-        }
-        return list;
-    }
     Layer.weight = (layer, row, col) => {
         return col == null ?
             "w" + layer + "b" + row : // offset

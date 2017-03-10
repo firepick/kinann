@@ -333,14 +333,15 @@ var MapLayer = require("./MapLayer");
             maxCostLimit = maxCostLimit || result.maxCost; 
             if (result.epochs > 100 && result.maxCost > maxCostLimit) { // not converging
                 result.maxCostLimit = maxCostLimit;
-                throw new Error("Network training exceeded maxCost limit:"+JSON.stringify(result));
+                result.error = new Error("Network training exceeded maxCost limit:"+JSON.stringify(result));
+                return result;
             }
             const maxCostWeight = 0.1;
             maxCostLimit = maxCostLimit * (1-maxCostWeight) + result.maxCost * maxCostWeight; // exponential average
             result.learningRate = lrFun(result.learningRate);
         }
         if (nEpochs <= result.epochs + 1) { // convergence too slow
-            throw new Error("Network training exceeded epoch limit:"+JSON.stringify(result));
+            result.error = new Error("Network training exceeded epoch limit:"+JSON.stringify(result));
         }
 
         return result;

@@ -28,14 +28,6 @@ var MapLayer = require("../src/MapLayer");
         mathjs.var(w).should.below(variance);
         mathjs.var(w).should.above(0);
     }
-    it("randomGaussian(n, sigma, mu) returns n random numbers with Gaussian distribution", function() {
-        var list = Layer.randomGaussian(1000);
-        mathjs.mean(list).should.approximately(0, 0.10);
-        mathjs.std(list).should.approximately(1, 0.1);
-        var list = Layer.randomGaussian(1000, 2, 3);
-        mathjs.mean(list).should.approximately(3, 0.21);
-        mathjs.std(list).should.approximately(2, 0.15);
-    })
     it("Layer(nOut, id, options) creates neural network layer", function() {
         var nOut = 2;
         // create layer with default identity activation typically used for regression output

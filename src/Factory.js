@@ -48,12 +48,13 @@ var Variable = require("./Variable");
         var nvars = that.vars.length;
         var fmap = options.fmap || that.vars.map((v,iv) => that.mapIdentity(iv));
         var power = options.power || that.power;
+        var fourier = options.fourier || that.fourier;
         var mapWeights = Object.assign({}, options.mapWeights);
         for (var iv = 0; iv < nvars; iv++) {
             for (var iDeg = 2; iDeg <= power; iDeg++) {
                 fmap.push(that.mapPower(iv, iDeg)); // polynomial
             }
-            for (var nFreq = 1; nFreq <= options.fourier; nFreq++) {
+            for (var nFreq = 1; nFreq <= fourier; nFreq++) {
                 var w0xf = "w0x" + iv + "f";            // frequency weight
                 var w0xp = "w0x" + iv + "p" + nFreq;    // phase weight
                 mapWeights[w0xf] = 1;
