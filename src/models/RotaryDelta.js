@@ -126,7 +126,6 @@ var Variable = require("../Variable");
         var mutateValue = function(v) {
             var dv = mutation * v;
             var vnew = v + gauss.sample() * dv;
-            //console.log("mutate v:"+v, "=>"+vnew);
             return vnew;
         }
         var keys = options.keys || Object.keys(that);
@@ -171,7 +170,7 @@ var Variable = require("../Variable");
         var that = this;
         var mutation = options.mutation || .01;
         var anneal = options.anneal || 1;
-        var maxEpochs = options.maxEpochs || 200;
+        var maxEpochs = options.maxEpochs || 1000;
         var models = [that, that];
         var dmutation = mutation / maxEpochs;
         var costMap = new WeakMap();
@@ -187,6 +186,7 @@ var Variable = require("../Variable");
         var result = {
             model: that,
             cost: modelCost(that),
+            mutation: mutation,
         };
         if (result.cost === Number.MAX_VALUE) {
             throw new Error("cannot compute cost for evolving model:" + JSON.stringify(that));
@@ -417,6 +417,7 @@ var Variable = require("../Variable");
     it("KNN can emulate RotaryDelta", function() {
     return; // TODO
         this.timeout(60*1000);
+        var verbose = true;
         var theta = [
             new Variable([-40,40]),
             new Variable([-40,40]),
@@ -425,39 +426,47 @@ var Variable = require("../Variable");
         var xyz = [
             new Variable([-50,50]),
             new Variable([-50,50]),
-            new Variable([0,-50]),
+            new Variable([-70,-75]),
         ];
-        var rdIdeal = new RotaryDelta();
-        var rdActual = rdIdeal.mutate(0.03);
-        var factory = new Factory(xyz, {
+        var rdDesign = new RotaryDelta();
+        var rdActual = rdDesign.mutate(0.02);
+        var factory = new Factory(xyz);
+        var calibrationPath = Array(120).fill().map(() => xyz.map((v) => v.sample()));
+        var examplesEvolve = calibrationPath.map((world) => {
+            var drive = rdDesign.toDrive(world)
+            var worldActual = rdActual.toWorld(drive);
+            var worldMeasured = worldActual;
+            return new Example(drive, worldMeasured);
+        });
+        var resultEvolve = rdDesign.evolve(examplesEvolve, {
+            onEpoch: (result) => verbose && (result.epochs % 50 === 0) && 
+                console.log("evolve...", JSON.stringify(result)),
+        });
+        verbose && console.log("evolve result", JSON.stringify(resultEvolve));
+        should.deepEqual(undefined, resultEvolve.error);
+        var rdMeasured = resultEvolve.model;
+
+        var examplesKNN = calibrationPath.map((world,i)=> {
+            var drive = rdMeasured.toDrive(world);
+            var worldMeasured = examplesEvolve[i].target;
+            return new Example(world, worldMeasured);
+        });
+        verbose && examplesKNN.forEach((ex,i) => console.log("examplesKNN"+i,JSON.stringify(ex, rounder)));
+        verbose && console.log("rdActual", JSON.stringify(rdActual, rounder));
+        verbose && console.log("rdMeasured", JSON.stringify(rdMeasured, rounder));
+
+        var knn = factory.createNetwork({
             power: 2,
             fourier: 0,
         });
-        var examplesActual = factory.createExamples({
-            outline: false,
-            nRandom: 80,
-            transform: (xyz) => {
-                var drive = rdIdeal.toDrive(xyz);
-                drive == null && console.log("TODO actual xyz", xyz);
-                return rdActual.toWorld(drive);
-            },
-        })
-        var rdModel = rdIdeal.evolve(examplesActual).model;
-        var examplesModel = examplesActual.map((ex) => {
-            var drive = rdModel.toDrive(ex.input);
-            drive == null && console.log("TODO model xyz", xyz);
-            return new Example(ex.input, rdActual.toWorld(drive));
-        });
-
-        //console.log("TODO examples",examples);
-        var knn = factory.createNetwork();
         console.log("TODO propagate", knn.memoPropagate.toString().length);
         //console.log("TODO propagate", knn.memoPropagate.toString());
-        var result = knn.train(examplesModel, {
+        var resultTrain = knn.train(examplesKNN, {
+            power: 2,
             batch: 2,
-            onEpoch: (result) => (result.epochs % 10 === 0) &&
-                console.log("TODO result", JSON.stringify(result)),
+            //onEpoch: (result) => (result.epochs % 10 === 0) && console.log("TODO result", JSON.stringify(result,rounder)),
         });
-        should.deepEqual(undefined, result.error);
+        verbose && console.log("train result", JSON.stringify(resultTrain));
+        should.deepEqual(undefined, resultTrain.error);
     });
 });
