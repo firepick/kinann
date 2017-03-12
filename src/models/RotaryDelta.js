@@ -1,7 +1,7 @@
 var mathjs = require("mathjs");
 var Variable = require("../Variable");
 
-(function(exports) {
+(function(exports) { 
     const sqrt3 = mathjs.sqrt(3.0);
     const pi = mathjs.PI;
     const sin120 = sqrt3 / 2.0;
@@ -12,7 +12,8 @@ var Variable = require("../Variable");
     const tan30_half = tan30 / 2.0;
     const toRadians = pi / 180.0;
 
-    function RotaryDelta(options) {
+class RotaryDelta {
+    constructor(options) {
         var that = this;
         options = options || {};
         that.e = options.e || 131.636; // effector equilateral triangle side
@@ -28,13 +29,15 @@ var Variable = require("../Variable");
 
         return that;
     };
-    RotaryDelta.prototype.getMinDegrees = function() {
+
+    getMinDegrees() {
         var that = this;
         var crf = that.f / sqrt3; // base circumcircle radius
         var degrees = 180 * mathjs.asin(crf / (that.re - that.rf)) / pi - 90;
         return degrees;
     }
-    RotaryDelta.prototype.toWorld = function(angles) {
+
+    toWorld(angles) {
         var that = this;
         if (angles == null) {
             that.verbose && console.log("ERROR: toWorld(null)");
@@ -76,8 +79,9 @@ var Variable = require("../Variable");
             (a2 * z + b2) / dnm,
             z + that.dz,
         ]
-    };
-    RotaryDelta.prototype.calcAngleYZ = function(X, Y, Z) {
+    }
+
+    calcAngleYZ(X, Y, Z) {
         var that = this;
         var y1 = -tan30_half * that.f; // f/2 * tg 30
         Y -= tan30_half * that.e; // shift center to edge
@@ -93,8 +97,9 @@ var Variable = require("../Variable");
         var yj = (y1 - a * b - mathjs.sqrt(d)) / (b * b + 1.0); // choosing outer point
         var zj = a + b * yj;
         return 180.0 * mathjs.atan(-zj / (y1 - yj)) / pi + ((yj > y1) ? 180.0 : 0.0);
-    };
-    RotaryDelta.prototype.toDrive = function(xyz) {
+    }
+
+    toDrive(xyz) {
         var that = this;
         if (xyz == null) {
             that.verbose && console.log("ERROR: toDrive(null)");
@@ -119,8 +124,9 @@ var Variable = require("../Variable");
             return null;
         }
         return [theta1,theta2,theta3];
-    };
-    RotaryDelta.prototype.mutate = function(mutation=0.01, options={}) {
+    }
+
+    mutate(mutation=0.01, options={}) {
         var that = this;
         var gauss = Variable.createGaussian();
         var mutateValue = function(v) {
@@ -142,7 +148,8 @@ var Variable = require("../Variable");
        } while (mutant.dz == null);
        return mutant;
     }
-    RotaryDelta.prototype.cost = function(examples) {
+
+    cost(examples) {
         var that = this;
         return examples.reduce((acc,ex) => {
             if (ex.input == null) {
@@ -156,7 +163,8 @@ var Variable = require("../Variable");
             return mathjs.max(mathjs.multiply(diff, diff), acc);
         },0);
     }
-    RotaryDelta.prototype.crossover = function(...parents) {
+
+    crossover(...parents) {
         var that = this;
         var n = parents.length+1;
         return new RotaryDelta({
@@ -166,7 +174,8 @@ var Variable = require("../Variable");
             re: parents.reduce((acc,rd) => rd.re + acc, that.re)/n,
         });
     }
-    RotaryDelta.prototype.evolve = function(examples, options={}) {
+
+    evolve(examples, options={}) {
         var that = this;
         var mutation = options.mutation || .01;
         var anneal = options.anneal || 1;
@@ -235,6 +244,7 @@ var Variable = require("../Variable");
         result.error = new Error("evolve did not converge");
         return result;
     }
+}
 
     ///////////// CLASS ////////////
 
