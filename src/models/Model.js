@@ -5,6 +5,7 @@ var Variable = require("../Variable");
     constructor (options={}) {
         Object.defineProperty(this, "cost", {
             value: options.cost || this.driveCost,
+            writable: true,
         });
         Object.defineProperty(this, "verbose", {
             value: options.verbose,
@@ -33,20 +34,32 @@ var Variable = require("../Variable");
 
     mutate(options={}) {
         var variable = options.variable || Variable.createGaussian();
-        var mutation = options.mutation || 0.01;
+        var mutationRate = options.mutationRate || 0.01;
         var mutateValue = function(v) {
-            var dv = mutation * v;
+            var dv = mutationRate * v;
             var vnew = v + variable.sample() * dv;
             return vnew;
         }
         var modelOpts = Object.assign({}, this);
+        modelOpts.cost = this.cost;
         var mutableKeys = options.keys || this.mutableKeys || (this.mutableKeys = Object.keys(this));
-        if (!options.mutateAll) {
-            mutableKeys = [mathjs.pickRandom(mutableKeys)];
+        if (options.mutation === "all") {
+            mutableKeys.forEach((key) => modelOpts[key] = mutateValue(this[key]));
+            var result = new this.constructor(modelOpts);
+        } else if (options.mutation === "keyPair") {
+            var key = mathjs.pickRandom(mutableKeys);
+            var oldValue = this[key];
+            modelOpts[key] = mutateValue(this[key]); // +mutation
+            var mutantA = new this.constructor(modelOpts);
+            modelOpts[key] = 2*oldValue - modelOpts[key]; // -mutation
+            var mutantB = new this.constructor(modelOpts);
+            var result = [mutantA, mutantB];
+        } else { // single mutation on one key
+            var key = mathjs.pickRandom(mutableKeys);
+            modelOpts[key] = mutateValue(this[key]);
+            var result = new this.constructor(modelOpts);
         }
-        mutableKeys.forEach((key) => modelOpts[key] = mutateValue(this[key]));
-        var mutant = new this.constructor(modelOpts);
-        return mutant;
+        return result;
     }
 
     driveCost(examples) {
@@ -91,11 +104,11 @@ var Variable = require("../Variable");
 
     evolve(examples, options={}) {
         var that = this;
-        var mutation = options.mutation || .01;
+        var mutationRate = options.mutationRate || .01;
         var anneal = options.anneal || 1;
         var maxEpochs = options.maxEpochs || 1000;
         var models = [that, that];
-        var dmutation = mutation / maxEpochs;
+        var dmutation = mutationRate / maxEpochs;
         var maxAge = options.maxAge || 20;
         var costMap = new WeakMap();
         var modelCost = (model) => {
@@ -109,34 +122,46 @@ var Variable = require("../Variable");
         var result = {
             model: that,
             cost: modelCost(that),
-            mutation: mutation,
+            mutationRate: mutationRate,
         };
         if (result.cost === Number.MAX_VALUE) {
             throw new Error("cannot compute cost for evolving model:" + JSON.stringify(that));
         }
 
-        var mutate = function(model, m=mutation) {
+        var mutateModel = function(model, m=mutationRate) {
             let iterations = 0;
             if (modelCost(model) === Number.MAX_VALUE){
                 throw new Error("cannot mutate invalid model" + JSON.stringify(model));
             }
+            var mutant = null;
             do {
                 if (++iterations > 100) {
                     throw new Error("cannot mutate:" + JSON.stringify(model));
                 }
-                var mutant = model.mutate(m);
-                var cost = modelCost(mutant);
+                var mutants = model.mutate({
+                    examples: examples,
+                    mutationRate:m,
+                    mutation: "keyPair",
+                });
+                var costs = mutants.map((m) => modelCost(m));
+                if (costs[0] < costs[1]) {
+                    var cost = costs[0];
+                    mutant = mutants[0];
+                } else {
+                    cost = costs[1];
+                    var mutant = mutants[1];
+                }
             } while (cost === Number.MAX_VALUE);
             return mutant;
         }
 
         result.age = 0;
         for (var iEpoch = 0; iEpoch < maxEpochs; iEpoch++) {
-            mutation -= anneal * dmutation; 
+            mutationRate -= anneal * dmutation; 
             if (modelCost(models[0]) > modelCost(models[1])) {
                 result.model = models[1];
                 if (iEpoch %2) {
-                    models[0] = mutate(result.model)
+                    models[0] = mutateModel(result.model)
                 } else {
                     models[0] = models[0].crossover(models[1]);
                 }
@@ -144,11 +169,11 @@ var Variable = require("../Variable");
             } else {
                 result.model = models[0];
                 result.age++;
-                models[1] = mutate(result.model);
+                models[1] = mutateModel(result.model);
             }
             result.epochs = iEpoch;
             result.cost = modelCost(result.model);
-            result.mutation = mutation;
+            result.mutationRate = mutationRate;
             options.onEpoch && options.onEpoch(result);
             if (result.age >= maxAge) {
                 return result;
@@ -186,43 +211,43 @@ var Variable = require("../Variable");
         }
     }
 
-    it("TESTTESTSubModel() extends Model", function() {
+    it("SubModel() extends Model", function() {
         var sub = new SubModel({a:1,b:2});
         sub.b.should.equal(2);
         should.deepEqual(Object.keys(sub), ["a","b"]);
         should.deepEqual(sub.toWorld([1,2,3]), [2,3,4]);
     });
-    it("TESTTESTtoWorld(drive) transforms drive coordinates to world", function() {
+    it("toWorld(drive) transforms drive coordinates to world", function() {
         var rd = new SubModel();
         should.deepEqual(mathjs.round(rd.toWorld([0,0,0]), 13), [10,10,10]);
         should.deepEqual(mathjs.round(rd.toWorld([1,1,1]), 4), [11,11,11]);
         should.deepEqual(mathjs.round(rd.toWorld([10,20,30]), 4), [20,30,40]);
     });
-    it("TESTTESTtoDrive(world) transforms world to drive coordinates ", function() {
+    it("toDrive(world) transforms world to drive coordinates ", function() {
         var rd = new Model();
         should.deepEqual(mathjs.round(rd.toDrive([0,0,0]), 13), [0,0,0]);
         should.deepEqual(mathjs.round(rd.toDrive([1,1,1]), 4), [1,1,-1]);
         should.deepEqual(mathjs.round(rd.toDrive([10,20,30]), 4), [10,20,-30]);
     });
-    it("TESTTESTmutate(options) generates a slightly different model", function() {
+    it("mutate(options) generates a slightly different model", function() {
         var sub = new SubModel({a:1,b:2});
         sub.should.properties({
             a: 1,
             b: 2,
         });
-        var mutation = 0.01;
+        var mutationRate = 0.01;
         var mutant = sub.mutate({
-            mutation: 0.01, // default
-            mutateAll: true, // default is false
+            mutationRate: 0.01, // default
+            mutation: "all", // mutate all keys
         });
-        var tolerance = 5*mutation;
+        var tolerance = 5*mutationRate;
         mutant.a.should.approximately(sub.a, tolerance*sub.a);
         mutant.b.should.approximately(sub.b, tolerance*sub.b);
         mutant.a.should.not.equal(sub.a);
         mutant.b.should.not.equal(sub.b);
 
         var mutant = sub.mutate();
-        var tolerance = 5*mutation;
+        var tolerance = 5*mutationRate;
         mutant.a.should.approximately(sub.a, tolerance*sub.a);
         mutant.b.should.approximately(sub.b, tolerance*sub.b);
         if (sub.a === mutant.a) {
@@ -231,7 +256,7 @@ var Variable = require("../Variable");
             mutant.b.should.equal(sub.b);
         }
     });
-    it("TESTTESTworldCost(examples) returns toWorld() fitness comparison", function() {
+    it("worldCost(examples) returns toWorld() fitness comparison", function() {
         var mIdeal = new SubModel({a:1,b:2});
         var ma1 = new SubModel({
             a: mIdeal.a + 1,
@@ -251,7 +276,7 @@ var Variable = require("../Variable");
         ma1.worldCost(examples).should.equal(1); // diff 1
         ma2.worldCost(examples).should.equal(4); // diff 2
     });
-    it("TESTTESTdriveCost(examples) returns toDrive() fitness comparison", function() {
+    it("driveCost(examples) returns toDrive() fitness comparison", function() {
         var mIdeal = new SubModel({a:1,b:2});
         var ma1 = new SubModel({
             a: mIdeal.a + 1,
@@ -272,7 +297,7 @@ var Variable = require("../Variable");
         ma2.driveCost(examples).should.equal(4); // diff 2
         ma2.cost(examples).should.equal(4); // diff 2
     });
-    it("TESTTESTcrossover(...parents) blends models", function() {
+    it("crossover(...parents) blends models", function() {
         var model1 = new SubModel({a:1,b:10});
         var model2 = new SubModel({a:2,b:20});
         var model3 = new SubModel({a:6,b:60});
@@ -281,7 +306,7 @@ var Variable = require("../Variable");
             b: 30,
         });
     });
-    it("TESTTESTevolve(examples) returns a model evolved to fit the given examples", function() {
+    it("evolve(examples) returns a model evolved to fit the given examples", function() {
         this.timeout(60*1000);
         var verbose = false;
 
@@ -300,15 +325,15 @@ var Variable = require("../Variable");
         verbose && console.log("modelMeasured", JSON.stringify(modelMeasured, rounder));
 
         // The cost() function reveals that the design model doesn't match measured data
-        modelDesign.cost(measurements).should.equal(4);
+        modelDesign.cost(measurements).should.approximately(4, .0000000000001);
 
         // set up evolution parameters
         var visitor = (resultEvolve) => verbose && (resultEvolve.epochs % 10 === 0) && 
                 console.log("evolve...", JSON.stringify(resultEvolve, rounder));
         var evolveOptions = {
-            mutation: 0.2, // gaussian standard deviation of fractional mutation change 
-            anneal: 1, // adjust mutation over maxEpochs [0..1]. 0:no annealing, 1:linear annealing to 0
-            maxAge:50, // candidate model must survive this many epochs
+            mutationRate: 0.001, // gaussian standard deviation of fractional mutationRate change 
+            anneal: 1, // adjust mutationRate over maxEpochs [0..1]. 0:no annealing, 1:linear annealing to 0
+            maxAge: 20, // candidate model must survive this many epochs
             maxEpochs: 500, // when to give up
             onEpoch: visitor, // monitor training progress
         };

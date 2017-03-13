@@ -119,7 +119,7 @@ var mathjs = require("mathjs");
     it("TESTTESTVariable([A,B],Variable.GAUSSIAN) create Gaussian variable with mean (A+B)/2 and stadev |A-B|", function() {
         var distribution = new Variable([1,10], Variable.GAUSSIAN);
         var data = Array(1000).fill().map(() => distribution.sample());
-        mathjs.median(data).should.approximately(5.5,1.1);
+        mathjs.median(data).should.approximately(5.5,1.2);
         mathjs.mean(data).should.approximately(5.5,0.9);
         mathjs.std(data).should.approximately(9,0.7);
 

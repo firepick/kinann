@@ -1,7 +1,9 @@
 var mathjs = require("mathjs");
 var Variable = require("../Variable");
+var Model = require("./Model");
 
 (function(exports) { 
+
     const sqrt3 = mathjs.sqrt(3.0);
     const pi = mathjs.PI;
     const sin120 = sqrt3 / 2.0;
@@ -12,47 +14,43 @@ var Variable = require("../Variable");
     const tan30_half = tan30 / 2.0;
     const toRadians = pi / 180.0;
 
-class RotaryDelta {
-    constructor(options) {
-        var that = this;
-        options = options || {};
-        that.e = options.e || 131.636; // effector equilateral triangle side
-        that.f = options.f || 190.526; // base equilateral triangle side
-        that.re = options.re || 270.000; // effector arm length
-        that.rf = options.rf || 90.000; // base arm length
-        if (options.verbose) {
-            that.verbose = true;
-        }
-        that.dz = 0; // effector z from drive plane
-        var zworld = that.toWorld([0,0,0]);
-        that.dz = options.dz || zworld && -zworld[2];
-
-        return that;
+class RotaryDelta extends Model {
+    constructor(options={}) {
+        super(options);
+        this.cost = super.worldCost;
+        this.e = options.e || 131.636; // effector equilateral triangle side
+        this.f = options.f || 190.526; // base equilateral triangle side
+        this.re = options.re || 270.000; // effector arm length
+        this.rf = options.rf || 90.000; // base arm length
+        Object.defineProperty(this, "dz", {
+            value: 0, // effector z from drive plane
+            writable: true,
+        });
+        var zworld = this.toWorld([0,0,0]);
+        this.dz = options.dz || zworld && -zworld[2];
     };
 
     getMinDegrees() {
-        var that = this;
-        var crf = that.f / sqrt3; // base circumcircle radius
-        var degrees = 180 * mathjs.asin(crf / (that.re - that.rf)) / pi - 90;
+        var crf = this.f / sqrt3; // base circumcircle radius
+        var degrees = 180 * mathjs.asin(crf / (this.re - this.rf)) / pi - 90;
         return degrees;
     }
 
     toWorld(angles) {
-        var that = this;
         if (angles == null) {
-            that.verbose && console.log("ERROR: toWorld(null)");
+            this.verbose && console.log("ERROR: toWorld(null)");
             return null;
         }
-        var t = (that.f - that.e) * tan30 / 2;
+        var t = (this.f - this.e) * tan30 / 2;
         var theta = mathjs.multiply(angles, toRadians);
-        var y1 = -(t + that.rf * mathjs.cos(theta[0]));
-        var z1 = -that.rf * mathjs.sin(theta[0]);
-        var y2 = (t + that.rf * mathjs.cos(theta[1])) * sin30;
+        var y1 = -(t + this.rf * mathjs.cos(theta[0]));
+        var z1 = -this.rf * mathjs.sin(theta[0]);
+        var y2 = (t + this.rf * mathjs.cos(theta[1])) * sin30;
         var x2 = y2 * tan60;
-        var z2 = -that.rf * mathjs.sin(theta[1]);
-        var y3 = (t + that.rf * mathjs.cos(theta[2])) * sin30;
+        var z2 = -this.rf * mathjs.sin(theta[1]);
+        var y3 = (t + this.rf * mathjs.cos(theta[2])) * sin30;
         var x3 = -y3 * tan60;
-        var z3 = -that.rf * mathjs.sin(theta[2]);
+        var z3 = -this.rf * mathjs.sin(theta[2]);
         var dnm = (y2 - y1) * x3 - (y3 - y1) * x2;
         var w1 = y1 * y1 + z1 * z1;
         var w2 = x2 * x2 + y2 * y2 + z2 * z2;
@@ -66,32 +64,31 @@ class RotaryDelta {
         // a*z^2 + b*z + c = 0
         var a = a1 * a1 + a2 * a2 + dnm * dnm;
         var b = 2.0 * (a1 * b1 + a2 * (b2 - y1 * dnm) - z1 * dnm * dnm);
-        var c = (b2 - y1 * dnm) * (b2 - y1 * dnm) + b1 * b1 + dnm * dnm * (z1 * z1 - that.re * that.re);
+        var c = (b2 - y1 * dnm) * (b2 - y1 * dnm) + b1 * b1 + dnm * dnm * (z1 * z1 - this.re * this.re);
         // discriminant
         var d = b * b - 4.0 * a * c;
         if (d < 0) { // point exists
-            that.verbose && console.log("ERROR: RotaryDelta toWorld(", angles, ") point exists");
+            this.verbose && console.log("ERROR: RotaryDelta toWorld(", angles, ") point exists");
             return null;
         }
         var z = -0.5 * (b + mathjs.sqrt(d)) / a;
         return [
             (a1 * z + b1) / dnm,
             (a2 * z + b2) / dnm,
-            z + that.dz,
+            z + this.dz,
         ]
     }
 
     calcAngleYZ(X, Y, Z) {
-        var that = this;
-        var y1 = -tan30_half * that.f; // f/2 * tg 30
-        Y -= tan30_half * that.e; // shift center to edge
+        var y1 = -tan30_half * this.f; // f/2 * tg 30
+        Y -= tan30_half * this.e; // shift center to edge
         // z = a + b*y
-        var a = (X * X + Y * Y + Z * Z + that.rf * that.rf - that.re * that.re - y1 * y1) / (2.0 * Z);
+        var a = (X * X + Y * Y + Z * Z + this.rf * this.rf - this.re * this.re - y1 * y1) / (2.0 * Z);
         var b = (y1 - Y) / Z;
         // discriminant
-        var d = -(a + b * y1) * (a + b * y1) + that.rf * (b * b * that.rf + that.rf);
+        var d = -(a + b * y1) * (a + b * y1) + this.rf * (b * b * this.rf + this.rf);
         if (d < 0) {
-            that.verbose && console.log("RotaryDelta calcAngleYZ(", X, ",", Y, ",", Z, ") discriminant");
+            this.verbose && console.log("RotaryDelta calcAngleYZ(", X, ",", Y, ",", Z, ") discriminant");
             return null;
         }
         var yj = (y1 - a * b - mathjs.sqrt(d)) / (b * b + 1.0); // choosing outer point
@@ -100,150 +97,35 @@ class RotaryDelta {
     }
 
     toDrive(xyz) {
-        var that = this;
         if (xyz == null) {
-            that.verbose && console.log("ERROR: toDrive(null)");
+            this.verbose && console.log("ERROR: toDrive(null)");
             return null;
         }
         var x = xyz[0];
         var y = xyz[1];
-        var z = xyz[2] - that.dz;
-        var theta1 = that.calcAngleYZ(x, y, z);
+        var z = xyz[2] - this.dz;
+        var theta1 = this.calcAngleYZ(x, y, z);
         if (theta1 == null) {
-            that.verbose && console.log("ERROR: toDrive(", xyz, ") theta1 is null");
+            this.verbose && console.log("ERROR: toDrive(", xyz, ") theta1 is null");
             return null;
         }
-        var theta2 = that.calcAngleYZ(x * cos120 + y * sin120, y * cos120 - x * sin120, z);
+        var theta2 = this.calcAngleYZ(x * cos120 + y * sin120, y * cos120 - x * sin120, z);
         if (theta2 == null) {
-            that.verbose && console.log("ERROR: toDrive(", xyz, ") theta2 is null");
+            this.verbose && console.log("ERROR: toDrive(", xyz, ") theta2 is null");
             return null;
         }
-        var theta3 = that.calcAngleYZ(x * cos120 - y * sin120, y * cos120 + x * sin120, z);
+        var theta3 = this.calcAngleYZ(x * cos120 - y * sin120, y * cos120 + x * sin120, z);
         if (theta3 == null) {
-            that.verbose && console.log("ERROR: toDrive(", xyz, ") theta3 is null");
+            this.verbose && console.log("ERROR: toDrive(", xyz, ") theta3 is null");
             return null;
         }
         return [theta1,theta2,theta3];
     }
 
-    mutate(mutation=0.01, options={}) {
-        var that = this;
-        var gauss = Variable.createGaussian();
-        var mutateValue = function(v) {
-            var dv = mutation * v;
-            var vnew = v + gauss.sample() * dv;
-            return vnew;
-        }
-        var keys = options.keys || Object.keys(that);
-        var mutateAll = options.mutateAll;
-        do {
-            var modelOpts = {};
-            if (mutateAll) {
-                var mutableKeys = keys;
-            } else {
-                var mutableKeys = [mathjs.pickRandom(keys)];
-            }
-            mutableKeys.forEach((key) => modelOpts[key] = mutateValue(that[key]));
-            var mutant = new RotaryDelta(modelOpts);
-       } while (mutant.dz == null);
-       return mutant;
+    mutate(options={}) {
+        return super.mutate(options);
     }
 
-    cost(examples) {
-        var that = this;
-        return examples.reduce((acc,ex) => {
-            if (ex.input == null) {
-                throw new Error("cannot compute cost for invalid example:" + JSON.stringify(ex));
-            }
-            var world = that.toWorld(ex.input);
-            if (world == null) {
-                return Number.MAX_VALUE;
-            }
-            var diff = mathjs.subtract(world,ex.target);
-            return mathjs.max(mathjs.multiply(diff, diff), acc);
-        },0);
-    }
-
-    crossover(...parents) {
-        var that = this;
-        var n = parents.length+1;
-        return new RotaryDelta({
-            e: parents.reduce((acc,rd) => rd.e + acc, that.e)/n,
-            f: parents.reduce((acc,rd) => rd.f + acc, that.f)/n,
-            rf: parents.reduce((acc,rd) => rd.rf + acc, that.rf)/n,
-            re: parents.reduce((acc,rd) => rd.re + acc, that.re)/n,
-        });
-    }
-
-    evolve(examples, options={}) {
-        var that = this;
-        var mutation = options.mutation || .01;
-        var anneal = options.anneal || 1;
-        var maxEpochs = options.maxEpochs || 1000;
-        var models = [that, that];
-        var dmutation = mutation / maxEpochs;
-        var costMap = new WeakMap();
-        var survivorAge = options.survivorAge || 20;
-        var modelCost = function(model) {
-            var cost = costMap.get(model);
-            if (cost == null) {
-                cost = model.cost(examples);
-                costMap.set(model, cost);
-            }
-            return cost;
-        }
-        var result = {
-            model: that,
-            cost: modelCost(that),
-            mutation: mutation,
-        };
-        if (result.cost === Number.MAX_VALUE) {
-            throw new Error("cannot compute cost for evolving model:" + JSON.stringify(that));
-        }
-
-        var mutate = function(model, m=mutation) {
-            let iterations = 0;
-            if (modelCost(model) === Number.MAX_VALUE){
-                throw new Error("cannot mutate invalid model" + JSON.stringify(model));
-            }
-            do {
-                if (++iterations > 100) {
-                    throw new Error("cannot mutate:" + JSON.stringify(model));
-                }
-                var mutant = model.mutate(m);
-                var cost = modelCost(mutant);
-            } while (cost === Number.MAX_VALUE);
-            return mutant;
-        }
-
-        result.survivorAge = 0;
-        for (var iEpoch = 0; iEpoch < maxEpochs; iEpoch++) {
-            mutation -= anneal * dmutation; 
-            if (modelCost(models[0]) > modelCost(models[1])) {
-                result.model = models[1];
-                if (iEpoch %2) {
-                    models[0] = mutate(result.model)
-                } else {
-                    models[0] = models[0].crossover(models[1]);
-                }
-                result.survivorAge = 0;
-            } else {
-                result.model = models[0];
-                result.survivorAge++;
-                models[1] = mutate(result.model);
-            }
-            result.epochs = iEpoch;
-            options.onEpoch && options.onEpoch(result);
-            result.cost = modelCost(result.model);
-            result.mutation = mutation;
-            if (result.survivorAge >= survivorAge) {
-                return result;
-            }
-        }
-
-        result.error = new Error("evolve did not converge");
-        return result;
-    }
 }
 
     ///////////// CLASS ////////////
@@ -317,12 +199,12 @@ class RotaryDelta {
         console.log("eval", mathjs.round(mathjs.eval(dexpr,{x:mathjs.PI/6}),3));
         console.log("eval", mathjs.round(mathjs.norm(mathjs.eval(dexpr,{x:mathjs.PI/6})),3));
     });
-    it("mutate(mutation) generates a slightly different model", function() {
+    it("TESTTESTmutate(options) generates a slightly different model", function() {
         var rd1 = new RotaryDelta();
-        var mutation = 0.01;
+        var mutationRate = 0.01;
         for (var ird = 0; ird < 10; ird++) {
-            var mrd = rd1.mutate(mutation, {mutateAll: true});
-            var tolerance = 5*mutation;
+            var mrd = rd1.mutate({mutationRate: mutationRate, mutation: "all"});
+            var tolerance = 5*mutationRate;
             mrd.e.should.approximately(rd1.e, tolerance*rd1.e);
             mrd.f.should.approximately(rd1.f, tolerance*rd1.f);
             mrd.rf.should.approximately(rd1.rf, tolerance*rd1.rf);
@@ -331,6 +213,7 @@ class RotaryDelta {
             mrd.f.should.not.equal(rd1.f);
             mrd.re.should.not.equal(rd1.re);
             mrd.rf.should.not.equal(rd1.rf);
+            should(typeof mrd.dz).equal("number");
         }
     });
     it("cost(examples) returns fitness comparison", function() {
@@ -351,7 +234,7 @@ class RotaryDelta {
             [3,1,2], 
             [2,1,3], 
         ].map((input) => new Example(input, rdIdeal.toWorld(input)));
-        rdIdeal.cost(examples).should.equal(0);
+        rdIdeal.cost(examples).should.approximately(0,0.0000000000000001);
         rde1.cost(examples).should.approximately(.000182, .000001);
         rde2.cost(examples).should.approximately(.000731, .000001);
     });
@@ -378,7 +261,7 @@ class RotaryDelta {
             rf: (rdIdeal.rf+rde1.rf+rde2.rf)/3,
         });
     });
-    it("evolve(examples) returns a model evolved to fit the given examples", function() {
+    it("TESTTESTevolve(examples) returns a model evolved to fit the given examples", function() {
         this.timeout(60*1000);
         var verbose = false;
         var rdIdeal = new RotaryDelta({
@@ -412,7 +295,10 @@ class RotaryDelta {
         verbose && console.log("rdStart", JSON.stringify(rdStart, rounder));
         rdStart.cost(examples).should.above(maxCost);
         var result = rdStart.evolve(examples, {
-            onEpoch: (result) => verbose && (result.epochs % 5 === 0) && 
+            mutationRate: 0.001,
+            maxAge: 30,
+            maxEpochs: 1000,
+            onEpoch: (result) => verbose && (result.epochs % 50 === 0) && 
                 console.log("evolve...", JSON.stringify(result, rounder)),
         });
         verbose && console.log("evolve result", JSON.stringify(result, rounder));
@@ -439,7 +325,7 @@ class RotaryDelta {
             new Variable([-70,-75]),
         ];
         var rdDesign = new RotaryDelta();
-        var rdActual = rdDesign.mutate(0.02);
+        var rdActual = rdDesign.mutate({mutationRate:0.02});
         var factory = new Factory(xyz);
         var calibrationPath = Array(120).fill().map(() => xyz.map((v) => v.sample()));
         var examplesEvolve = calibrationPath.map((world) => {
