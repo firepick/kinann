@@ -105,7 +105,7 @@ var Variable = require("../Variable");
     evolve(examples, options={}) {
         var that = this;
         var mutationRate = options.mutationRate || .01;
-        var anneal = options.anneal || 1;
+        var anneal = options.anneal == null && 1 || options.anneal;
         var maxEpochs = options.maxEpochs || 1000;
         var models = [that, that];
         var dmutation = mutationRate / maxEpochs;
@@ -160,15 +160,19 @@ var Variable = require("../Variable");
             mutationRate -= anneal * dmutation; 
             if (modelCost(models[0]) > modelCost(models[1])) {
                 result.model = models[1];
-                if (iEpoch %2) {
-                    models[0] = mutateModel(result.model)
+                if (iEpoch % 2) {
+                    models[1] = mutateModel(result.model)
                 } else {
-                    models[0] = models[0].crossover(models[1]);
+                    models[1] = models[0].crossover(models[1]);
                 }
+                models[0] = result.model; // promote
                 result.age = 0;
             } else {
                 result.model = models[0];
                 result.age++;
+                if (result.age % 10 === 0 && mutationRate > 0.0001) {
+                    mutationRate = mutationRate * 0.7;
+                }
                 models[1] = mutateModel(result.model);
             }
             result.epochs = iEpoch;

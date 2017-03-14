@@ -98,7 +98,7 @@ var mathjs = require("mathjs");
         vdiscrete.median.should.equal(20);
         s[s.length-1].should.equal(30);
     });
-    it("TESTTESTVariable([A,B],Variable.UNIFORM) create uniform variable over interval [A,B)", function() {
+    it("Variable([A,B],Variable.UNIFORM) create uniform variable over interval [A,B)", function() {
         var distribution = new Variable([1,10], Variable.UNIFORM);
         var data = Array(1000).fill().map(() => distribution.sample());
         distribution.mean.should.equal(5.5);
@@ -109,18 +109,18 @@ var mathjs = require("mathjs");
         mathjs.mean(data).should.approximately(5.5,0.5);
         mathjs.std(data).should.approximately(9/mathjs.sqrt(12),0.5);
     });
-    it("TESTTESTVariable([A,B],Variable.DISCRETE) create discrete variable over given values", function() {
+    it("Variable([A,B],Variable.DISCRETE) create discrete variable over given values", function() {
         var distribution = new Variable([1,2,3,10], Variable.DISCRETE);
         var data = Array(1000).fill().map(() => distribution.sample());
         mathjs.median(data).should.approximately(2.5,0.5);
         mathjs.mean(data).should.approximately(4,0.5);
         mathjs.std(data).should.approximately(4,0.8);  // by definition 
     });
-    it("TESTTESTVariable([A,B],Variable.GAUSSIAN) create Gaussian variable with mean (A+B)/2 and stadev |A-B|", function() {
+    it("Variable([A,B],Variable.GAUSSIAN) create Gaussian variable with mean (A+B)/2 and stadev |A-B|", function() {
         var distribution = new Variable([1,10], Variable.GAUSSIAN);
         var data = Array(1000).fill().map(() => distribution.sample());
         mathjs.median(data).should.approximately(5.5,1.2);
-        mathjs.mean(data).should.approximately(5.5,0.9);
+        mathjs.mean(data).should.approximately(5.5,1.0);
         mathjs.std(data).should.approximately(9,0.7);
 
         // createGaussian is an alternate constructor

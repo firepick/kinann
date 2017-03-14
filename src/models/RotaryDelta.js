@@ -25,6 +25,7 @@ class RotaryDelta extends Model {
         Object.defineProperty(this, "dz", {
             value: 0, // effector z from drive plane
             writable: true,
+            enumerable: true,
         });
         var zworld = this.toWorld([0,0,0]);
         this.dz = options.dz || zworld && -zworld[2];
@@ -139,7 +140,7 @@ class RotaryDelta extends Model {
     var Factory = require("../Factory");
     var Variable = require("../Variable");
     var Example = require("../Example");
-    var rounder = (key,value) => typeof value == "number" ? mathjs.round(value,3) : value;
+    var rounder = (key,value) => typeof value == "number" ? mathjs.round(value,5) : value;
 
     it("has effector equilateral triangle side length option", function() {
         new RotaryDelta().e.should.equal(131.636);
@@ -263,8 +264,8 @@ class RotaryDelta extends Model {
     });
     it("TESTTESTevolve(examples) returns a model evolved to fit the given examples", function() {
         this.timeout(60*1000);
-        var verbose = false;
-        var rdIdeal = new RotaryDelta({
+        var verbose = true;
+        var rdTarget = new RotaryDelta({
             verbose: true,
         });
         var theta = [
@@ -272,41 +273,52 @@ class RotaryDelta extends Model {
             new Variable([-40,40]),
             new Variable([-40,40]),
         ];
-        var randx = new Variable([-50,50], Variable.UNIFORM);
-        var randy = new Variable([-50,50], Variable.UNIFORM);
-        var randz = new Variable([-70,-75], Variable.UNIFORM);
         var examples = [];
-        for (var iex = 0; iex < 80; iex++) {
-            var xyz = [
-                randx.sample(),
-                randy.sample(),
-                randz.sample(),
-            ];
-            examples.push(new Example(rdIdeal.toDrive(xyz), xyz));
+        var radial = true;
+        if (radial) { // radial lattice is much better than random
+            const sin120 = mathjs.sin(120 * mathjs.PI/180);
+            const cos120 = mathjs.cos(120 * mathjs.PI/180);
+            var z = -75;
+            var xyz = [ 0, 0, z ];
+            examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+            for (var radius = 10; radius <= 70; radius += 5) {
+                var xyz = [ radius, 0, z ];
+                examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                var a = radius * cos120;
+                var b = radius * sin120;
+                var xyz = [ a, b, z ];
+                examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                var xyz = [ a, -b, z ];
+                examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+            }
+            //examples.forEach((ex) => console.log("ex", JSON.stringify(ex, rounder)));
         }
         var maxCost = 1;
         var rdStart = new RotaryDelta({ // start evolution from a different model
-            e: rdIdeal.e + 2,
-            f: rdIdeal.f + 2,
-            re: rdIdeal.re + 2,
-            rf: rdIdeal.rf + 2,
+            e: rdTarget.e + 2,
+            f: rdTarget.f + 1,
+            re: rdTarget.re + 1.5,
+            rf: rdTarget.rf - 1,
             verbose: true,
         });
         verbose && console.log("rdStart", JSON.stringify(rdStart, rounder));
         rdStart.cost(examples).should.above(maxCost);
         var result = rdStart.evolve(examples, {
-            mutationRate: 0.001,
-            maxAge: 30,
+            mutationRate: 0.005,
+            maxAge: 50,
+            anneal: 0,
             maxEpochs: 1000,
-            onEpoch: (result) => verbose && (result.epochs % 50 === 0) && 
+            onEpoch: (result) => verbose && (result.epochs % 20 === 0) && 
                 console.log("evolve...", JSON.stringify(result, rounder)),
         });
         verbose && console.log("evolve result", JSON.stringify(result, rounder));
         var rdevolve = result.model;
-        verbose && console.log("diff f", rdevolve.e-rdIdeal.e);
-        verbose && console.log("diff e", rdevolve.f-rdIdeal.f);
-        verbose && console.log("diff rf", rdevolve.re-rdIdeal.re);
-        verbose && console.log("diff re", rdevolve.rf-rdIdeal.rf);
+        verbose && console.log("mutableKeys", rdevolve.mutableKeys);
+        verbose && console.log("diff f", rdevolve.e-rdTarget.e);
+        verbose && console.log("diff e", rdevolve.f-rdTarget.f);
+        verbose && console.log("diff rf", rdevolve.re-rdTarget.re);
+        verbose && console.log("diff re", rdevolve.rf-rdTarget.rf);
+        verbose && console.log("diff dz", rdevolve.dz-rdTarget.dz);
         should.deepEqual(undefined, result.error);
         rdevolve.cost(examples).should.below(0.01);
     });
