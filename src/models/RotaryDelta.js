@@ -202,10 +202,10 @@ class RotaryDelta extends Model {
     });
     it("TESTTESTmutate(options) generates a slightly different model", function() {
         var rd1 = new RotaryDelta();
-        var mutationRate = 0.01;
+        var rate = 0.01;
         for (var ird = 0; ird < 10; ird++) {
-            var mrd = rd1.mutate({mutationRate: mutationRate, mutation: "all"});
-            var tolerance = 5*mutationRate;
+            var mrd = rd1.mutate({rate: rate, mutation: "all"});
+            var tolerance = 5*rate;
             mrd.e.should.approximately(rd1.e, tolerance*rd1.e);
             mrd.f.should.approximately(rd1.f, tolerance*rd1.f);
             mrd.rf.should.approximately(rd1.rf, tolerance*rd1.rf);
@@ -304,9 +304,8 @@ class RotaryDelta extends Model {
         verbose && console.log("rdStart", JSON.stringify(rdStart, rounder));
         rdStart.cost(examples).should.above(maxCost);
         var result = rdStart.evolve(examples, {
-            mutationRate: 0.005,
+            rate: 0.005,
             maxAge: 50,
-            anneal: 0,
             maxEpochs: 1000,
             onEpoch: (result) => verbose && (result.epochs % 20 === 0) && 
                 console.log("evolve...", JSON.stringify(result, rounder)),
@@ -337,7 +336,7 @@ class RotaryDelta extends Model {
             new Variable([-70,-75]),
         ];
         var rdDesign = new RotaryDelta();
-        var rdActual = rdDesign.mutate({mutationRate:0.02});
+        var rdActual = rdDesign.mutate({rate:0.02});
         var factory = new Factory(xyz);
         var calibrationPath = Array(120).fill().map(() => xyz.map((v) => v.sample()));
         var examplesEvolve = calibrationPath.map((world) => {

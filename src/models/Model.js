@@ -34,9 +34,9 @@ var Variable = require("../Variable");
 
     mutate(options={}) {
         var variable = options.variable || Variable.createGaussian();
-        var mutationRate = options.mutationRate || 0.01;
+        var rate = options.rate || 0.01;
         var mutateValue = function(v) {
-            var dv = mutationRate * v;
+            var dv = rate * v;
             var vnew = v + variable.sample() * dv;
             return vnew;
         }
@@ -104,11 +104,11 @@ var Variable = require("../Variable");
 
     evolve(examples, options={}) {
         var that = this;
-        var mutationRate = options.mutationRate || .01;
+        var rate = options.rate || .01;
         var anneal = options.anneal == null && 1 || options.anneal;
         var maxEpochs = options.maxEpochs || 1000;
         var models = [that, that];
-        var dmutation = mutationRate / maxEpochs;
+        var dmutation = rate / maxEpochs;
         var maxAge = options.maxAge || 20;
         var costMap = new WeakMap();
         var modelCost = (model) => {
@@ -122,13 +122,13 @@ var Variable = require("../Variable");
         var result = {
             model: that,
             cost: modelCost(that),
-            mutationRate: mutationRate,
+            rate: rate,
         };
         if (result.cost === Number.MAX_VALUE) {
             throw new Error("cannot compute cost for evolving model:" + JSON.stringify(that));
         }
 
-        var mutateModel = function(model, m=mutationRate) {
+        var mutateModel = function(model, m=rate) {
             let iterations = 0;
             if (modelCost(model) === Number.MAX_VALUE){
                 throw new Error("cannot mutate invalid model" + JSON.stringify(model));
@@ -140,7 +140,7 @@ var Variable = require("../Variable");
                 }
                 var mutants = model.mutate({
                     examples: examples,
-                    mutationRate:m,
+                    rate:m,
                     mutation: "keyPair",
                 });
                 var costs = mutants.map((m) => modelCost(m));
@@ -157,7 +157,6 @@ var Variable = require("../Variable");
 
         result.age = 0;
         for (var iEpoch = 0; iEpoch < maxEpochs; iEpoch++) {
-            mutationRate -= anneal * dmutation; 
             if (modelCost(models[0]) > modelCost(models[1])) {
                 result.model = models[1];
                 if (iEpoch % 2) {
@@ -170,14 +169,14 @@ var Variable = require("../Variable");
             } else {
                 result.model = models[0];
                 result.age++;
-                if (result.age % 10 === 0 && mutationRate > 0.0001) {
-                    mutationRate = mutationRate * 0.7;
+                if (result.age % 10 === 0 && rate > 0.0001) {
+                    rate = rate * 0.7;
                 }
                 models[1] = mutateModel(result.model);
             }
             result.epochs = iEpoch;
             result.cost = modelCost(result.model);
-            result.mutationRate = mutationRate;
+            result.rate = rate;
             options.onEpoch && options.onEpoch(result);
             if (result.age >= maxAge) {
                 return result;
@@ -239,19 +238,19 @@ var Variable = require("../Variable");
             a: 1,
             b: 2,
         });
-        var mutationRate = 0.01;
+        var rate = 0.01;
         var mutant = sub.mutate({
-            mutationRate: 0.01, // default
+            rate: 0.01, // default
             mutation: "all", // mutate all keys
         });
-        var tolerance = 5*mutationRate;
+        var tolerance = 5*rate;
         mutant.a.should.approximately(sub.a, tolerance*sub.a);
         mutant.b.should.approximately(sub.b, tolerance*sub.b);
         mutant.a.should.not.equal(sub.a);
         mutant.b.should.not.equal(sub.b);
 
         var mutant = sub.mutate();
-        var tolerance = 5*mutationRate;
+        var tolerance = 5*rate;
         mutant.a.should.approximately(sub.a, tolerance*sub.a);
         mutant.b.should.approximately(sub.b, tolerance*sub.b);
         if (sub.a === mutant.a) {
@@ -335,8 +334,7 @@ var Variable = require("../Variable");
         var visitor = (resultEvolve) => verbose && (resultEvolve.epochs % 10 === 0) && 
                 console.log("evolve...", JSON.stringify(resultEvolve, rounder));
         var evolveOptions = {
-            mutationRate: 0.001, // gaussian standard deviation of fractional mutationRate change 
-            anneal: 1, // adjust mutationRate over maxEpochs [0..1]. 0:no annealing, 1:linear annealing to 0
+            rate: 0.001, // gaussian standard deviation of fractional rate change 
             maxAge: 20, // candidate model must survive this many epochs
             maxEpochs: 500, // when to give up
             onEpoch: visitor, // monitor training progress
