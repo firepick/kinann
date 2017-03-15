@@ -106,7 +106,7 @@ var Variable = require("../Variable");
 
     evolve(examples, options={}) {
         var that = this;
-        var rate = options.rate || .01;
+        var rate = options.rate || .01; 
         var minRate = options.minRate || rate / 100;
         var nKeys = this.mutableKeys.length;
         var maxAge = options.maxAge || nKeys * 15;
@@ -131,31 +131,13 @@ var Variable = require("../Variable");
             throw new Error("cannot compute cost for evolving model:" + JSON.stringify(that));
         }
 
-        var mutateModel = function(model, m=rate) {
-            let iterations = 0;
-            if (modelCost(model) === Number.MAX_VALUE){
-                throw new Error("cannot mutate invalid model" + JSON.stringify(model));
-            }
-            var mutant = null;
-            do {
-                if (++iterations > 100) {
-                    throw new Error("cannot mutate:" + JSON.stringify(model));
-                }
-                var mutants = model.mutate({
-                    examples: examples,
-                    rate:m,
-                    mutation: "keyPair",
-                });
-                var costs = mutants.map((m) => modelCost(m));
-                if (costs[0] < costs[1]) {
-                    var cost = costs[0];
-                    mutant = mutants[0];
-                } else {
-                    cost = costs[1];
-                    var mutant = mutants[1];
-                }
-            } while (cost === Number.MAX_VALUE);
-            return mutant;
+        var mutateModel = function(model) {
+            var mutants = model.mutate({
+                rate:rate,
+                mutation: "keyPair",
+            });
+            var costs = mutants.map((m) => modelCost(m));
+            return costs[0] < costs[1] ? mutants[0] : mutants[1];
         }
 
         result.age = 0;
@@ -337,7 +319,7 @@ var Variable = require("../Variable");
         var visitor = (resultEvolve) => verbose && (resultEvolve.epochs % 10 === 0) && 
                 console.log("evolve...", JSON.stringify(resultEvolve, rounder));
         var evolveOptions = {
-            rate: 0.01, // gaussian standard deviation of fractional rate change 
+            rate: 0.01, // gaussian standard deviation of expected fractional error
             onEpoch: visitor, // monitor training progress
         };
         
