@@ -16,7 +16,7 @@ var Model = require("./Model");
 
 class RotaryDelta extends Model {
     constructor(options={}) {
-        super(options);
+        super(["e","f","re","rf","dz"], options);
         this.cost = super.worldCost;
         this.e = options.e || 131.636; // effector equilateral triangle side
         this.f = options.f || 190.526; // base equilateral triangle side
@@ -304,9 +304,7 @@ class RotaryDelta extends Model {
         verbose && console.log("rdStart", JSON.stringify(rdStart, rounder));
         rdStart.cost(examples).should.above(maxCost);
         var result = rdStart.evolve(examples, {
-            rate: 0.005,
-            maxAge: 50,
-            maxEpochs: 1000,
+            rate: 0.01,
             onEpoch: (result) => verbose && (result.epochs % 20 === 0) && 
                 console.log("evolve...", JSON.stringify(result, rounder)),
         });

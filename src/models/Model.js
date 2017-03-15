@@ -2,7 +2,7 @@ var mathjs = require("mathjs");
 var Variable = require("../Variable");
 
 (function(exports) { class Model {
-    constructor (options={}) {
+    constructor (mutableKeys, options={}) {
         Object.defineProperty(this, "cost", {
             value: options.cost || this.driveCost,
             writable: true,
@@ -11,9 +11,12 @@ var Variable = require("../Variable");
             value: options.verbose,
         });
         Object.defineProperty(this, "mutableKeys", {
-            value: null,
+            value: mutableKeys,
             writable: true,
         });
+        if (!(mutableKeys instanceof Array) || !mutableKeys.length) {
+            throw new Error("Model constructuor expects Array of mutable key names");
+        }
     }   
 
     toWorld(drive) {
@@ -42,7 +45,7 @@ var Variable = require("../Variable");
         }
         var modelOpts = Object.assign({}, this);
         modelOpts.cost = this.cost;
-        var mutableKeys = options.keys || this.mutableKeys || (this.mutableKeys = Object.keys(this));
+        var mutableKeys = options.keys || this.mutableKeys;
         if (options.mutation === "all") {
             mutableKeys.forEach((key) => modelOpts[key] = mutateValue(this[key]));
             var result = new this.constructor(modelOpts);
@@ -95,8 +98,7 @@ var Variable = require("../Variable");
     crossover(...parents) {
         var n = parents.length+1;
         var modelOpts = {};
-        var mutableKeys = this.mutableKeys || (this.mutableKeys = Object.keys(this));
-        mutableKeys.forEach((key) => {
+        this.mutableKeys.forEach((key) => {
             modelOpts[key] = parents.reduce((acc,model) => acc + model[key], this[key])/n;
         });
         return new this.constructor(modelOpts);
@@ -105,11 +107,12 @@ var Variable = require("../Variable");
     evolve(examples, options={}) {
         var that = this;
         var rate = options.rate || .01;
-        var anneal = options.anneal == null && 1 || options.anneal;
-        var maxEpochs = options.maxEpochs || 1000;
+        var minRate = options.minRate || rate / 100;
+        var nKeys = this.mutableKeys.length;
+        var maxAge = options.maxAge || nKeys * 15;
+        var anneal = options.anneal || 0.89;
+        var maxEpochs = options.maxEpochs || maxAge * 20;
         var models = [that, that];
-        var dmutation = rate / maxEpochs;
-        var maxAge = options.maxAge || 20;
         var costMap = new WeakMap();
         var modelCost = (model) => {
             let cost = costMap.get(model);
@@ -165,12 +168,12 @@ var Variable = require("../Variable");
                     models[1] = models[0].crossover(models[1]);
                 }
                 models[0] = result.model; // promote
-                result.age = 0;
+                result.age = 1;
             } else {
                 result.model = models[0];
                 result.age++;
-                if (result.age % 10 === 0 && rate > 0.0001) {
-                    rate = rate * 0.7;
+                if (result.age % nKeys*2 === 0 && rate > minRate) {
+                    rate = rate * anneal + minRate * (1-anneal);
                 }
                 models[1] = mutateModel(result.model);
             }
@@ -202,7 +205,7 @@ var Variable = require("../Variable");
     var rounder = (key,value) => typeof value == "number" ? mathjs.round(value,3) : value;
     class SubModel extends Model {
         constructor(options={}) {
-            super(options);
+            super(["a","b"], options);
             this.a = options.a || 10;
             this.b = options.b || 20;
         }
@@ -227,10 +230,10 @@ var Variable = require("../Variable");
         should.deepEqual(mathjs.round(rd.toWorld([10,20,30]), 4), [20,30,40]);
     });
     it("toDrive(world) transforms world to drive coordinates ", function() {
-        var rd = new Model();
-        should.deepEqual(mathjs.round(rd.toDrive([0,0,0]), 13), [0,0,0]);
-        should.deepEqual(mathjs.round(rd.toDrive([1,1,1]), 4), [1,1,-1]);
-        should.deepEqual(mathjs.round(rd.toDrive([10,20,30]), 4), [10,20,-30]);
+        var rd = new SubModel();
+        should.deepEqual(mathjs.round(rd.toDrive([0,0,0]), 13), [-10,-10,-10]);
+        should.deepEqual(mathjs.round(rd.toDrive([1,1,1]), 4), [-9,-9,-9]);
+        should.deepEqual(mathjs.round(rd.toDrive([10,20,30]), 4), [0,10,20]);
     });
     it("mutate(options) generates a slightly different model", function() {
         var sub = new SubModel({a:1,b:2});
@@ -334,9 +337,7 @@ var Variable = require("../Variable");
         var visitor = (resultEvolve) => verbose && (resultEvolve.epochs % 10 === 0) && 
                 console.log("evolve...", JSON.stringify(resultEvolve, rounder));
         var evolveOptions = {
-            rate: 0.001, // gaussian standard deviation of fractional rate change 
-            maxAge: 20, // candidate model must survive this many epochs
-            maxEpochs: 500, // when to give up
+            rate: 0.01, // gaussian standard deviation of fractional rate change 
             onEpoch: visitor, // monitor training progress
         };
         
