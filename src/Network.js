@@ -2,6 +2,7 @@ var mathjs = require("mathjs");
 var Optimizer = require("./Optimizer");
 var Layer = require("./Layer");
 var MapLayer = require("./MapLayer");
+var Example = require("./Example");
 
 (function(exports) {
     ////////////////// constructor
@@ -302,7 +303,7 @@ var MapLayer = require("./MapLayer");
         var maxCostLimit = null;
         for (var iEpoch = 0; !done && iEpoch < nEpochs; iEpoch++) {
             done = true;
-            shuffle && Network.shuffle(examples);
+            shuffle && Example.shuffle(examples);
             result.maxCost = 0;
             for (var iEx = 0; iEx < examples.length; iEx++) {
                 var example = examples[iEx];
@@ -348,15 +349,6 @@ var MapLayer = require("./MapLayer");
     }
 
     ////////////////// class
-    Network.shuffle = function(a) {
-        for (var i = a.length; i--;) {
-            var j = mathjs.floor(mathjs.random() * (i + 1));
-            var tmp = a[i];
-            a[i] = a[j];
-            a[j] = tmp;
-        }
-        return a;
-    }
 
     Network.MAX_EPOCHS = 500;
     Network.MIN_COST = 0.00005;
