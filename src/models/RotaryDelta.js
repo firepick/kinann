@@ -140,7 +140,7 @@ class RotaryDelta extends Model {
     var Factory = require("../Factory");
     var Variable = require("../Variable");
     var Example = require("../Example");
-    var rounder = (key,value) => typeof value == "number" ? mathjs.round(value,5) : value;
+    var rounder = (key,value) => typeof value == "number" ? mathjs.round(value,4) : value;
 
     it("has effector equilateral triangle side length option", function() {
         new RotaryDelta().e.should.equal(131.636);
@@ -264,7 +264,7 @@ class RotaryDelta extends Model {
     });
     it("TESTTESTevolve(examples) returns a model evolved to fit the given examples", function() {
         this.timeout(60*1000);
-        var verbose = true;
+        var verbose = false;
         var rdTarget = new RotaryDelta({
             verbose: true,
         });
@@ -284,15 +284,25 @@ class RotaryDelta extends Model {
                 var xyz = [ 0, 0, z ];
                 examples.push(new Example(rdTarget.toDrive(xyz), xyz));
             }
-            for (var radius = 10; radius <= 70; radius += 10) {
-                var xyz = [ radius, 0, zmin ];
-                examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+            for (var iRing = 1; iRing <= 7; iRing++) {
+                var radius = iRing * 10; 
                 var a = radius * cos120;
                 var b = radius * sin120;
-                var xyz = [ a, b, zmin ];
-                examples.push(new Example(rdTarget.toDrive(xyz), xyz));
-                var xyz = [ a, -b, zmin ];
-                examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                if (iRing % 2) {
+                    var xyz = [ -radius, 0, zmin ];
+                    examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                    var xyz = [ -a, b, zmin ];
+                    examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                    var xyz = [ -a, -b, zmin ];
+                    examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                } else {
+                    var xyz = [ radius, 0, zmin ];
+                    examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                    var xyz = [ a, b, zmin ];
+                    examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                    var xyz = [ a, -b, zmin ];
+                    examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+                }
             }
             //examples.forEach((ex) => console.log("ex", JSON.stringify(ex, rounder)));
         }
@@ -306,20 +316,14 @@ class RotaryDelta extends Model {
         });
         verbose && console.log("rdStart", JSON.stringify(rdStart, rounder), "cost", rdStart.cost(examples));
         rdStart.cost(examples).should.above(maxCost);
-        var result = rdStart.evolve(examples, {
-            rate: 0.01,
-            onEpoch: (result) => verbose && (result.epochs % 20 === 0) && 
-                console.log("evolve...", JSON.stringify(result, rounder)),
-        });
-        verbose && console.log("evolve result", JSON.stringify(result, rounder));
+        var result = rdStart.evolve(examples);
+        verbose && console.log("evolve result", JSON.stringify(result, rounder, "  "));
         verbose && console.log("rdTarget", JSON.stringify(rdTarget, rounder));
         var rdevolve = result.model;
-        verbose && console.log("mutableKeys", rdevolve.mutableKeys);
-        verbose && console.log("diff f", rdevolve.e-rdTarget.e);
-        verbose && console.log("diff e", rdevolve.f-rdTarget.f);
-        verbose && console.log("diff rf", rdevolve.re-rdTarget.re);
-        verbose && console.log("diff re", rdevolve.rf-rdTarget.rf);
-        verbose && console.log("diff dz", rdevolve.dz-rdTarget.dz);
+        verbose && console.log("diff", JSON.stringify(
+            rdStart.genes.reduce((acc, gene) => Object.assign(acc, {[gene]: rdevolve[gene] - rdTarget[gene]}), {}), 
+            rounder
+        ));
         should.deepEqual(undefined, result.error);
         rdevolve.cost(examples).should.below(0.01);
     });

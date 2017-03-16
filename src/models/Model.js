@@ -3,19 +3,19 @@ var Variable = require("../Variable");
 var Example = require("../Example");
 
 (function(exports) { class Model {
-    constructor (mutableKeys, options={}) {
-        Object.defineProperty(this, "cost", {
-            value: options.cost || this.driveCost,
+    constructor (genes, options={}) {
+        Object.defineProperty(this, "$cost", {
+            value: options.$cost || this.driveCost,
             writable: true,
         });
         Object.defineProperty(this, "verbose", {
             value: options.verbose,
         });
-        Object.defineProperty(this, "mutableKeys", {
-            value: mutableKeys,
+        Object.defineProperty(this, "genes", {
+            value: genes,
             writable: true,
         });
-        if (!(mutableKeys instanceof Array) || !mutableKeys.length) {
+        if (!(genes instanceof Array) || !genes.length) {
             throw new Error("Model constructuor expects Array of mutable key names");
         }
     }   
@@ -45,13 +45,13 @@ var Example = require("../Example");
             return vnew;
         }
         var modelOpts = Object.assign({}, this);
-        modelOpts.cost = this.cost;
-        var mutableKeys = options.keys || this.mutableKeys;
+        modelOpts.cost = this.$cost;
+        var genes = options.genes || this.genes;
         if (options.mutation === "all") {
-            mutableKeys.forEach((key) => modelOpts[key] = mutateValue(this[key]));
+            genes.forEach((key) => modelOpts[key] = mutateValue(this[key]));
             var result = new this.constructor(modelOpts);
         } else if (options.mutation === "keyPair") {
-            var key = options.key || mathjs.pickRandom(mutableKeys);
+            var key = options.key || mathjs.pickRandom(genes);
             var oldValue = this[key];
             modelOpts[key] = mutateValue(this[key]); // +mutation
             var mutantA = new this.constructor(modelOpts);
@@ -59,7 +59,7 @@ var Example = require("../Example");
             var mutantB = new this.constructor(modelOpts);
             var result = [mutantA, mutantB];
         } else { // single mutation on one key
-            var key = mathjs.pickRandom(mutableKeys);
+            var key = mathjs.pickRandom(genes);
             modelOpts[key] = mutateValue(this[key]);
             var result = new this.constructor(modelOpts);
         }
@@ -96,82 +96,97 @@ var Example = require("../Example");
         }, 0);
     }
 
+    cost(examples, weakMap) {
+        if (weakMap) {
+            var cost = weakMap.get(this);
+            if (cost == null) {
+                cost = this.$cost(examples);
+                weakMap.set(this, cost);
+            }
+            return cost;
+        }
+        return this.$cost(examples);
+    }
+
     crossover(...parents) {
         var n = parents.length+1;
         var modelOpts = {};
-        this.mutableKeys.forEach((key) => {
+        this.genes.forEach((key) => {
             modelOpts[key] = parents.reduce((acc,model) => acc + model[key], this[key])/n;
         });
         return new this.constructor(modelOpts);
     }
 
     evolve(examples, options={}) {
-        var that = this;
-        var rate = options.rate || .01; 
+        var rate = options.rate || .002; 
         var minRate = options.minRate || rate / 100;
-        var nKeys = this.mutableKeys.length;
-        var maxAge = options.maxAge || nKeys * 15;
-        var anneal = options.anneal || 0.9458;
+        var ngenes = this.genes.length;
+        var maxAge = options.maxAge || ngenes * 15;
+        var costGoal = options.costGoal || rate * 2;
         var maxEpochs = options.maxEpochs || maxAge * 20;
         var minEpochs = options.minEpochs || 2*maxAge;
-        console.log("maxAge", maxAge);
-        var models = [that, that];
+        var models = [this, this];
         var costMap = new WeakMap();
-        var modelCost = (model) => {
-            let cost = costMap.get(model);
-            if (cost == null) {
-                cost = model.cost(examples);
-                costMap.set(model, cost);
-            }
-            return cost;
-        }
+        var modelCost = (model) => model.cost(examples, costMap);
         var result = {
-            model: that,
-            cost: modelCost(that),
+            model: this,
+            cost: modelCost(this),
             rate: rate,
+            costGoal: costGoal,
+            maxAge: maxAge,
+            minEpochs: minEpochs,
         };
         if (result.cost === Number.MAX_VALUE) {
-            throw new Error("cannot compute cost for evolving model:" + JSON.stringify(that));
+            throw new Error("cannot compute cost for evolving model:" + JSON.stringify(this));
         }
 
-        var mutateModel = function(model, key) {
-            var mutants = model.mutate({
+        var mutateModel = function(model1, model2, genes) {
+            var gene = genes.pop();
+            var mutants = model1.mutate({
                 rate:rate,
-                key: key,
+                key: gene,
                 mutation: "keyPair",
             });
             var costs = mutants.map((m) => modelCost(m));
-            return costs[0] < costs[1] ? mutants[0] : mutants[1];
+            var mutant = costs[0] < costs[1] ? mutants[0] : mutants[1];
+            if (modelCost(mutant) < modelCost(model2)) {
+                return mutant; // singe gene mutation succeeded
+            }
+            mutant = model1.crossover(model2);
+            if (modelCost(mutant) < modelCost(model2)) {
+                return mutant; // crossover is better than worst parent
+            }
+            mutant = model1.mutate({
+                rate: rate/ngenes, // since we're mutating all genes, do it less drastically
+                mutation: "all",
+            });
+            if (modelCost(mutant) < modelCost(model2)) {
+                //console.log("mutate all!", modelCost(model2), modelCost(mutant));
+                return mutant; // mutation of all genes succeded 
+            } 
+            return model2; // do no harm
         }
 
         result.age = 0;
         for (var iEpoch = 0; iEpoch < maxEpochs; iEpoch++) {
-            var keys = Example.shuffle(this.mutableKeys.map((k) => k));
-            while (keys.length) {
-                var key = keys.pop();
-                if (modelCost(models[0]) > modelCost(models[1])) {
+            var genes = Example.shuffle(this.genes.map((k) => k));
+            while (genes.length) {
+                if (modelCost(models[0]) <= modelCost(models[1])) {
+                    result.model = models[0];
+                    models[1] = mutateModel(result.model, models[1], genes);
+                    result.age++; // survivor!
+                } else {
                     result.model = models[1];
-                    if (iEpoch % 2) {
-                        models[1] = mutateModel(result.model, key);
-                    } else {
-                        models[1] = models[0].crossover(models[1]);
-                    }
+                    models[1] = mutateModel(result.model, models[0], genes);
                     models[0] = result.model; // promote
                     result.age = 1;
-                } else {
-                    result.model = models[0];
-                    result.age++;
-                    if (result.age % nKeys === 0 && rate > minRate) {
-                        rate = rate * anneal + minRate * (1-anneal);
-                    }
-                    models[1] = mutateModel(result.model, key);
                 }
                 result.epochs = iEpoch;
                 result.cost = modelCost(result.model);
                 result.rate = rate;
             }
             options.onEpoch && options.onEpoch(result);
-            if (result.age >= maxAge && iEpoch >= minEpochs) {
+            if (result.cost < costGoal || (result.age >= maxAge && iEpoch >= minEpochs)) {
                 return result;
             }
         }
@@ -234,7 +249,7 @@ var Example = require("../Example");
         var rate = 0.01;
         var mutant = sub.mutate({
             rate: 0.01, // default
-            mutation: "all", // mutate all keys
+            mutation: "all", // mutate all genes
         });
         var tolerance = 5*rate;
         mutant.a.should.approximately(sub.a, tolerance*sub.a);
@@ -327,7 +342,6 @@ var Example = require("../Example");
         var visitor = (resultEvolve) => verbose && (resultEvolve.epochs % 10 === 0) && 
                 console.log("evolve...", JSON.stringify(resultEvolve, rounder));
         var evolveOptions = {
-            rate: 0.01, // gaussian standard deviation of expected fractional error
             onEpoch: visitor, // monitor training progress
         };
         
