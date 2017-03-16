@@ -278,17 +278,20 @@ class RotaryDelta extends Model {
         if (radial) { // radial lattice is much better than random
             const sin120 = mathjs.sin(120 * mathjs.PI/180);
             const cos120 = mathjs.cos(120 * mathjs.PI/180);
-            var z = -75;
-            var xyz = [ 0, 0, z ];
-            examples.push(new Example(rdTarget.toDrive(xyz), xyz));
-            for (var radius = 10; radius <= 70; radius += 5) {
-                var xyz = [ radius, 0, z ];
+            var zmin = -75;
+            var dz = 5;
+            for (var z = zmin + 5*dz; z <= zmin; z -= dz) {
+                var xyz = [ 0, 0, z ];
+                examples.push(new Example(rdTarget.toDrive(xyz), xyz));
+            }
+            for (var radius = 10; radius <= 70; radius += 10) {
+                var xyz = [ radius, 0, zmin ];
                 examples.push(new Example(rdTarget.toDrive(xyz), xyz));
                 var a = radius * cos120;
                 var b = radius * sin120;
-                var xyz = [ a, b, z ];
+                var xyz = [ a, b, zmin ];
                 examples.push(new Example(rdTarget.toDrive(xyz), xyz));
-                var xyz = [ a, -b, z ];
+                var xyz = [ a, -b, zmin ];
                 examples.push(new Example(rdTarget.toDrive(xyz), xyz));
             }
             //examples.forEach((ex) => console.log("ex", JSON.stringify(ex, rounder)));
@@ -301,7 +304,7 @@ class RotaryDelta extends Model {
             rf: rdTarget.rf - 1,
             verbose: true,
         });
-        verbose && console.log("rdStart", JSON.stringify(rdStart, rounder));
+        verbose && console.log("rdStart", JSON.stringify(rdStart, rounder), "cost", rdStart.cost(examples));
         rdStart.cost(examples).should.above(maxCost);
         var result = rdStart.evolve(examples, {
             rate: 0.01,
@@ -309,6 +312,7 @@ class RotaryDelta extends Model {
                 console.log("evolve...", JSON.stringify(result, rounder)),
         });
         verbose && console.log("evolve result", JSON.stringify(result, rounder));
+        verbose && console.log("rdTarget", JSON.stringify(rdTarget, rounder));
         var rdevolve = result.model;
         verbose && console.log("mutableKeys", rdevolve.mutableKeys);
         verbose && console.log("diff f", rdevolve.e-rdTarget.e);

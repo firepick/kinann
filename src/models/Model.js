@@ -111,9 +111,10 @@ var Example = require("../Example");
         var minRate = options.minRate || rate / 100;
         var nKeys = this.mutableKeys.length;
         var maxAge = options.maxAge || nKeys * 15;
-        var anneal = options.anneal || 0.9;
+        var anneal = options.anneal || 0.9458;
         var maxEpochs = options.maxEpochs || maxAge * 20;
-        var minEpochs = options.minEpochs || 125;
+        var minEpochs = options.minEpochs || 2*maxAge;
+        console.log("maxAge", maxAge);
         var models = [that, that];
         var costMap = new WeakMap();
         var modelCost = (model) => {
