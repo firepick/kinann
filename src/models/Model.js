@@ -41,36 +41,6 @@ var Evolver = require("./Evolver");
         return new this.constructor(Object.assign({}, this, genes));
     }
 
-    mutate(options={}) {
-        var variable = options.variable || Variable.createGaussian();
-        var rate = options.rate || 0.01;
-        var mutateValue = function(v) {
-            var dv = rate * v;
-            var vnew = v + variable.sample() * dv;
-            return vnew;
-        }
-        var modelOpts = Object.assign({}, this);
-        var genes = options.genes || this.genes;
-        if (options.mutation === "all") {
-            var newGenes = genes.reduce((acc,gene) => Object.assign(acc, 
-                {[gene]: mutateValue(this[gene])}), {});
-            var result = this.clone(newGenes);
-        } else if (options.mutation === "keyPair") {
-            var key = options.key || mathjs.pickRandom(genes);
-            var oldValue = this[key];
-            modelOpts[key] = mutateValue(this[key]); // +mutation
-            var mutantA = new this.constructor(modelOpts);
-            modelOpts[key] = 2*oldValue - modelOpts[key]; // -mutation
-            var mutantB = new this.constructor(modelOpts);
-            var result = [mutantA, mutantB];
-        } else { // single mutation on one key
-            var key = mathjs.pickRandom(genes);
-            modelOpts[key] = mutateValue(this[key]);
-            var result = new this.constructor(modelOpts);
-        }
-        return result;
-    }
-
     driveCost(examples) {
         return examples.reduce((acc,ex) => {
             if (ex == null || ex.input == null || ex.target == null) {
@@ -99,15 +69,6 @@ var Evolver = require("./Evolver");
             var square = diff.map((v) => v*v);
             return mathjs.max(square.concat(acc));
         }, 0);
-    }
-
-    crossover(...parents) {
-        var n = parents.length+1;
-        var modelOpts = {};
-        this.genes.forEach((key) => {
-            modelOpts[key] = parents.reduce((acc,model) => acc + model[key], this[key])/n;
-        });
-        return new this.constructor(modelOpts);
     }
 
     evolve(examples, options={}) {
@@ -160,33 +121,6 @@ var Evolver = require("./Evolver");
         should.deepEqual(mathjs.round(rd.toDrive([1,1,1]), 4), [-9,-9,-9]);
         should.deepEqual(mathjs.round(rd.toDrive([10,20,30]), 4), [0,10,20]);
     });
-    it("mutate(options) generates a slightly different model", function() {
-        var sub = new SubModel({a:1,b:2});
-        sub.should.properties({
-            a: 1,
-            b: 2,
-        });
-        var rate = 0.01;
-        var mutant = sub.mutate({
-            rate: 0.01, // default
-            mutation: "all", // mutate all genes
-        });
-        var tolerance = 5*rate;
-        mutant.a.should.approximately(sub.a, tolerance*sub.a);
-        mutant.b.should.approximately(sub.b, tolerance*sub.b);
-        mutant.a.should.not.equal(sub.a);
-        mutant.b.should.not.equal(sub.b);
-
-        var mutant = sub.mutate();
-        var tolerance = 5*rate;
-        mutant.a.should.approximately(sub.a, tolerance*sub.a);
-        mutant.b.should.approximately(sub.b, tolerance*sub.b);
-        if (sub.a === mutant.a) {
-            mutant.b.should.not.equal(sub.b);
-        } else {
-            mutant.b.should.equal(sub.b);
-        }
-    });
     it("worldCost(examples) returns toWorld() fitness comparison", function() {
         var mIdeal = new SubModel({a:1,b:2});
         var ma1 = new SubModel({
@@ -227,15 +161,6 @@ var Evolver = require("./Evolver");
         ma1.driveCost(examples).should.equal(1); // diff 1
         ma2.driveCost(examples).should.equal(4); // diff 2
         ma2.cost(examples).should.equal(4); // diff 2
-    });
-    it("crossover(...parents) blends models", function() {
-        var model1 = new SubModel({a:1,b:10});
-        var model2 = new SubModel({a:2,b:20});
-        var model3 = new SubModel({a:6,b:60});
-        model1.crossover(model2, model3).should.properties({
-            a: 3,
-            b: 30,
-        });
     });
     it("evolve(examples) returns a model evolved to fit the given examples", function() {
         this.timeout(60*1000);

@@ -166,7 +166,7 @@ var Variable = require("../Variable");
         mutant.b.should.not.equal(line.b);
     })
     it("TESTTESTevolve(model) returns mutation of given model that fits examples", function() {
-        var verbose = true;
+        var verbose = false;
         var lineTarget = new Line(32,150);
         var examples = [1,100,200].map((x) => new Example([x], [lineTarget.calculate(x)]));
         var lineStart = new Line(32.5,149);

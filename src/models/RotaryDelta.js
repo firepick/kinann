@@ -123,9 +123,6 @@ class RotaryDelta extends Model {
         return [theta1,theta2,theta3];
     }
 
-    mutate(options={}) {
-        return super.mutate(options);
-    }
 
 }
 
@@ -200,23 +197,6 @@ class RotaryDelta extends Model {
         console.log("eval", mathjs.round(mathjs.eval(dexpr,{x:mathjs.PI/6}),3));
         console.log("eval", mathjs.round(mathjs.norm(mathjs.eval(dexpr,{x:mathjs.PI/6})),3));
     });
-    it("mutate(options) generates a slightly different model", function() {
-        var rd1 = new RotaryDelta();
-        var rate = 0.01;
-        for (var ird = 0; ird < 10; ird++) {
-            var mrd = rd1.mutate({rate: rate, mutation: "all"});
-            var tolerance = 5*rate;
-            mrd.e.should.approximately(rd1.e, tolerance*rd1.e);
-            mrd.f.should.approximately(rd1.f, tolerance*rd1.f);
-            mrd.rf.should.approximately(rd1.rf, tolerance*rd1.rf);
-            mrd.re.should.approximately(rd1.re, tolerance*rd1.re);
-            mrd.e.should.not.equal(rd1.e);
-            mrd.f.should.not.equal(rd1.f);
-            mrd.re.should.not.equal(rd1.re);
-            mrd.rf.should.not.equal(rd1.rf);
-            should(typeof mrd.dz).equal("number");
-        }
-    });
     it("cost(examples) returns fitness comparison", function() {
         var rdIdeal = new RotaryDelta();
         var rde1 = new RotaryDelta({
@@ -238,29 +218,6 @@ class RotaryDelta extends Model {
         rdIdeal.cost(examples).should.approximately(0,0.0000000000000001);
         rde1.cost(examples).should.approximately(.000182, .000001);
         rde2.cost(examples).should.approximately(.000731, .000001);
-    });
-    it("crossover(...parents) blends models", function() {
-        var rdIdeal = new RotaryDelta();
-        var rde1 = new RotaryDelta({
-            e: rdIdeal.e + 1,
-        });
-        var rde2 = new RotaryDelta({
-            e: rdIdeal.e + 2,
-        });
-        var rde12 = rde1.crossover(rde2);
-        rde12.should.properties({
-            e: (rde1.e+rde2.e)/2,
-            f: rde1.f,
-            re: rde1.re,
-            rf: rde1.rf,
-        });
-        var rdall = rdIdeal.crossover(rde1,rde2);
-        rdall.should.properties({
-            e: (rdIdeal.e+rde1.e+rde2.e)/3,
-            f: (rdIdeal.f+rde1.f+rde2.f)/3,
-            re: (rdIdeal.re+rde1.re+rde2.re)/3,
-            rf: (rdIdeal.rf+rde1.rf+rde2.rf)/3,
-        });
     });
     it("evolve(examples) returns a model evolved to fit the given examples", function() {
         this.timeout(60*1000);
