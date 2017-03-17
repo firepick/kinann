@@ -1,11 +1,12 @@
 var mathjs = require("mathjs");
 var Variable = require("../Variable");
 var Example = require("../Example");
+var Evolver = require("./Evolver");
 
 (function(exports) { class Model {
     constructor (genes, options={}) {
-        Object.defineProperty(this, "$cost", {
-            value: options.$cost || this.driveCost,
+        Object.defineProperty(this, "cost", {
+            value: options.cost || this.driveCost,
             writable: true,
         });
         Object.defineProperty(this, "verbose", {
@@ -36,6 +37,10 @@ var Example = require("../Example");
         return world.map((v,i) => i === 2 ? -v : v);
     };
 
+    clone(genes) {
+        return new this.constructor(Object.assign({}, this, genes));
+    }
+
     mutate(options={}) {
         var variable = options.variable || Variable.createGaussian();
         var rate = options.rate || 0.01;
@@ -45,11 +50,11 @@ var Example = require("../Example");
             return vnew;
         }
         var modelOpts = Object.assign({}, this);
-        modelOpts.cost = this.$cost;
         var genes = options.genes || this.genes;
         if (options.mutation === "all") {
-            genes.forEach((key) => modelOpts[key] = mutateValue(this[key]));
-            var result = new this.constructor(modelOpts);
+            var newGenes = genes.reduce((acc,gene) => Object.assign(acc, 
+                {[gene]: mutateValue(this[gene])}), {});
+            var result = this.clone(newGenes);
         } else if (options.mutation === "keyPair") {
             var key = options.key || mathjs.pickRandom(genes);
             var oldValue = this[key];
@@ -96,18 +101,6 @@ var Example = require("../Example");
         }, 0);
     }
 
-    cost(examples, weakMap) {
-        if (weakMap) {
-            var cost = weakMap.get(this);
-            if (cost == null) {
-                cost = this.$cost(examples);
-                weakMap.set(this, cost);
-            }
-            return cost;
-        }
-        return this.$cost(examples);
-    }
-
     crossover(...parents) {
         var n = parents.length+1;
         var modelOpts = {};
@@ -118,81 +111,8 @@ var Example = require("../Example");
     }
 
     evolve(examples, options={}) {
-        var rate = options.rate || .002; 
-        var minRate = options.minRate || rate / 100;
-        var ngenes = this.genes.length;
-        var maxAge = options.maxAge || ngenes * 15;
-        var costGoal = options.costGoal || rate * 2;
-        var maxEpochs = options.maxEpochs || maxAge * 20;
-        var minEpochs = options.minEpochs || 2*maxAge;
-        var models = [this, this];
-        var costMap = new WeakMap();
-        var modelCost = (model) => model.cost(examples, costMap);
-        var result = {
-            model: this,
-            cost: modelCost(this),
-            rate: rate,
-            costGoal: costGoal,
-            maxAge: maxAge,
-            minEpochs: minEpochs,
-        };
-        if (result.cost === Number.MAX_VALUE) {
-            throw new Error("cannot compute cost for evolving model:" + JSON.stringify(this));
-        }
-
-        var mutateModel = function(model1, model2, genes) {
-            var gene = genes.pop();
-            var mutants = model1.mutate({
-                rate:rate,
-                key: gene,
-                mutation: "keyPair",
-            });
-            var costs = mutants.map((m) => modelCost(m));
-            var mutant = costs[0] < costs[1] ? mutants[0] : mutants[1];
-            if (modelCost(mutant) < modelCost(model2)) {
-                return mutant; // singe gene mutation succeeded
-            }
-            mutant = model1.crossover(model2);
-            if (modelCost(mutant) < modelCost(model2)) {
-                return mutant; // crossover is better than worst parent
-            }
-            mutant = model1.mutate({
-                rate: rate/ngenes, // since we're mutating all genes, do it less drastically
-                mutation: "all",
-            });
-            if (modelCost(mutant) < modelCost(model2)) {
-                //console.log("mutate all!", modelCost(model2), modelCost(mutant));
-                return mutant; // mutation of all genes succeded 
-            } 
-            return model2; // do no harm
-        }
-
-        result.age = 0;
-        for (var iEpoch = 0; iEpoch < maxEpochs; iEpoch++) {
-            var genes = Example.shuffle(this.genes.map((k) => k));
-            while (genes.length) {
-                if (modelCost(models[0]) <= modelCost(models[1])) {
-                    result.model = models[0];
-                    models[1] = mutateModel(result.model, models[1], genes);
-                    result.age++; // survivor!
-                } else {
-                    result.model = models[1];
-                    models[1] = mutateModel(result.model, models[0], genes);
-                    models[0] = result.model; // promote
-                    result.age = 1;
-                }
-                result.epochs = iEpoch;
-                result.cost = modelCost(result.model);
-                result.rate = rate;
-            }
-            options.onEpoch && options.onEpoch(result);
-            if (result.cost < costGoal || (result.age >= maxAge && iEpoch >= minEpochs)) {
-                return result;
-            }
-        }
-
-        result.error = new Error("evolve did not converge");
-        return result;
+        var evolver = new Evolver(this.genes, examples, options);
+        return evolver.evolve(this);
     }
 } // class
 

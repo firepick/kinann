@@ -200,7 +200,7 @@ class RotaryDelta extends Model {
         console.log("eval", mathjs.round(mathjs.eval(dexpr,{x:mathjs.PI/6}),3));
         console.log("eval", mathjs.round(mathjs.norm(mathjs.eval(dexpr,{x:mathjs.PI/6})),3));
     });
-    it("TESTTESTmutate(options) generates a slightly different model", function() {
+    it("mutate(options) generates a slightly different model", function() {
         var rd1 = new RotaryDelta();
         var rate = 0.01;
         for (var ird = 0; ird < 10; ird++) {
@@ -262,7 +262,7 @@ class RotaryDelta extends Model {
             rf: (rdIdeal.rf+rde1.rf+rde2.rf)/3,
         });
     });
-    it("TESTTESTevolve(examples) returns a model evolved to fit the given examples", function() {
+    it("evolve(examples) returns a model evolved to fit the given examples", function() {
         this.timeout(60*1000);
         var verbose = false;
         var rdTarget = new RotaryDelta({
