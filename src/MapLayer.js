@@ -34,9 +34,7 @@ var mathjs = require("mathjs");
 
     MapLayer.prototype.initialize = function(nIn, weights = {}, options = {}) {
         var that = this;
-        Object.keys(that.weights).forEach((key) => (
-            weights[key] == null && (weights[key] = that.weights[key])));
-        return weights;
+        return Object.assign(weights, Object.assign({}, that.weights, weights));
     }
 
     MapLayer.prototype.expressions = function(exprIn) {
