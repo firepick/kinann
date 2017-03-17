@@ -3,6 +3,7 @@ var mathjs = require("mathjs");
 var Optimizer = require("../src/Optimizer");
 var Layer = require("../src/Layer");
 var MapLayer = require("../src/MapLayer");
+var Factory = require("../src/Factory");
 
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("Learn", function() {

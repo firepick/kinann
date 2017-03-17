@@ -66,12 +66,13 @@ var Variable = require("./Variable");
         var mapOpts = {
             weights: mapWeights,
         };
-        var network = new Sequential(nvars, [
+        var layers = options.layers || [
             new MapLayer(fmap,mapOpts),
             new Layer(that.nOut, {
                 activation: Layer.ACT_IDENTITY,
             }),
-        ]);
+        ];
+        var network = new Sequential(nvars, layers);
 
         var examples = that.createExamples(options);
         options.onExamples && options.onExamples(examples);

@@ -7,6 +7,7 @@ var Kinann = require("../index");
     var Factory = Kinann.Factory;
     var Example = Kinann.Example;
     var Variable = Kinann.Variable;
+    var MapLayer = Kinann.MapLayer;
     var testVars = [
         new Variable([3, 300]),
         new Variable([2, 200]),
@@ -308,4 +309,28 @@ var Kinann = require("../index");
         vassertEqual(measuredNet.activate(calibratedNet.activate([300,200,10,0])), [300,200,10,0], tolerance);
         //console.log("mathjs", JSON.stringify(measuredNet.gradExpr, null, "  "))
     })
+    it("TESTTESTMapLayer can do linear regression", function() {
+        var verbose = false;
+        var exprs = [ (eIn) => "(x0*slope+offset)" ];
+        var map = new MapLayer(exprs, {
+            weights: {
+                slope: 0,
+                offset: 0,
+            }
+        });
+        var vars = [ new Variable([0,200]) ]; // univariate
+        var factory = new Factory(vars);
+        var knn = factory.createNetwork({
+            layers: [map],
+        });
+        var examples = [0,100,200].map((x) => new Example([x], [3 * x + 4]));
+        var trainResult = knn.train(examples, {
+            onEpoch: (result) => verbose && result.epochs % 10 === 0 && 
+                console.log("onEpoch", JSON.stringify(result)),
+        });
+        verbose && console.log("trainResult", trainResult);
+        verbose && console.log("weights", knn.weights);
+        knn.activate([75])[0].should.approximately(229,0.002);
+        knn.activate([175])[0].should.approximately(529,0.005);
+    });
 })
