@@ -16,12 +16,15 @@ var Model = require("./Model");
 
 class RotaryDelta extends Model {
     constructor(options={}) {
-        super(["e","f","re","rf","dz"], options);
+        super(["e","f","re","rf","dz","dx0", "dx1", "dx2"], options);
         this.cost = super.worldCost;
         this.e = options.e || 131.636; // effector equilateral triangle side
         this.f = options.f || 190.526; // base equilateral triangle side
         this.re = options.re || 270.000; // effector arm length
         this.rf = options.rf || 90.000; // base arm length
+        this.dx0 = options.dx0 || 0; // degrees offset
+        this.dx1 = options.dx1 || 0; // degrees offset
+        this.dx2 = options.dx2 || 0; // degrees offset
         Object.defineProperty(this, "dz", {
             value: 0, // effector z from drive plane
             writable: true,
@@ -43,7 +46,10 @@ class RotaryDelta extends Model {
             return null;
         }
         var t = (this.f - this.e) * tan30 / 2;
-        var theta = mathjs.multiply(angles, toRadians);
+        var theta = mathjs.add(
+            mathjs.multiply(angles, toRadians),
+            [this.dx0,this.dx1,this.dx2]
+        );
         var y1 = -(t + this.rf * mathjs.cos(theta[0]));
         var z1 = -this.rf * mathjs.sin(theta[0]);
         var y2 = (t + this.rf * mathjs.cos(theta[1])) * sin30;
@@ -78,6 +84,64 @@ class RotaryDelta extends Model {
             (a2 * z + b2) / dnm,
             z + this.dz,
         ]
+    }
+
+    worldExpressions(angles) {
+        var t = "((f-e)*" + tan30/2 + ")";
+        var theta = [ 
+            "((x0+dx0)*" + toRadians + ")",
+            "((x1+dx1)*" + toRadians + ")",
+            "((x2+dx2)*" + toRadians + ")",
+        ];
+        var y1 = "(-(" + t + "+(rf*cos(" + theta[0] + "))))";
+        //var y1 = -(t + this.rf * mathjs.cos(theta[0]));
+        var z1 = "(-rf*sin(" + theta[0] + "))";
+        //var z1 = -this.rf * mathjs.sin(theta[0]);
+        var y2 = "((" +t+ "+(rf*cos(" +theta[1]+ ")))*" + sin30 + ")";
+        //var y2 = (t + this.rf * mathjs.cos(theta[1])) * sin30;
+        var x2 = "(" +y2+ "*" +tan60+ ")";
+        //var x2 = y2 * tan60;
+        var z2 = "(-rf*sin(" +theta[1]+ "))";
+        //var z2 = -this.rf * mathjs.sin(theta[1]);
+        var y3 = "((" +t+ "+rf*cos(" +theta[2]+ "))*" +sin30+ ")";
+        //var y3 = (t + this.rf * mathjs.cos(theta[2])) * sin30;
+        var x3 = "(-" +y3+ "*" +tan60+ ")";
+        //var x3 = -y3 * tan60;
+        var z3 = "(-rf*sin(" +theta[2]+ "))";
+        //var z3 = -this.rf * mathjs.sin(theta[2]);
+        var dnm = "((" +y2+ "-" +y1+ ")*" +x3+ "-(" +y3+ "-" +y1+ ")*" +x2+ ")";
+        //var dnm = (y2 - y1) * x3 - (y3 - y1) * x2;
+        var w1 = "(" +y1+ "^2+" +z1+ "^2)";
+        //var w1 = y1 * y1 + z1 * z1;
+        var w2 = "(" +x2+ "^2+" +y2+ "^2+" +z2+ "^2)";
+        //var w2 = x2 * x2 + y2 * y2 + z2 * z2;
+        var w3 = "(" +x3+ "^2+" +y3+ "^2+" +z3+ "^2)";
+        //var w3 = x3 * x3 + y3 * y3 + z3 * z3;
+        // x = (a1*z + b1)/dnm
+        var a1 = "((" +z2+ "-" +z1+ ")*(" +y3+ "-" +y1+ ")-(" +z3+ "-" +z1+ ")*(" +y2+ "-" +y1+ "))";
+        var b1 = "(-((" +w2+ "-" +w1+ ")*(" +y3+ "-" +y1+ ")-(" +w3+ "-" +w1+ ")*(" +y2+ "-" +y1+ "))/2)";
+        // y = (a2*z + b2)/dnm
+        var a2 = "(-(" +z2+ "-" +z1+ ")*" +x3+ "+(" +z3+ "-" +z1+ ")*" +x2+ ")";
+        //var a2 = -(z2 - z1) * x3 + (z3 - z1) * x2;
+        var b2 = "(((" +w2+ "-" +w1+ ")*" +x3+ "-(" +w3+ "-" +w1+ ")*" +x2+ ")/2)";
+        //var b2 = ((w2 - w1) * x3 - (w3 - w1) * x2) / 2.0;
+        // a*z^2 + b*z + c = 0
+        var a = "(" +a1+ "^2+" +a2+ "^2+" +dnm+ "^2)";
+        var b = "(2*(" +a1+ "*" +b1+ "+" +a2+ "*(" +b2+ "-" +y1+ "*" +dnm+ ")-" +z1+ "*" +dnm+ "^2))";
+        var c = "((" +b2+ "-" +y1+ "*" +dnm+ ")*(" +b2+ "-" +y1+ "*" +dnm+ ")+" +b1+ "^2+" +dnm+ "^2*(" +z1+ "^2-re^2))";
+        // discriminant
+        var d = "(" +b+ "^2-4*" +a+ "*" +c+ ")";
+        if (d < 0) { // point exists
+            this.verbose && console.log("ERROR: RotaryDelta toWorld(", angles, ") point exists");
+            return null;
+        }
+        var z = "(-0.5*(" +b+ "+sqrt(" +d+ "))/" +a+ ")";
+        var exprs = [
+            "((" +a1+ "*" +z+ "+" +b1+ ")/" +dnm+ ")",
+            "((" +a2+ "*" +z+ "+" +b2+ ")/" +dnm+ ")",
+            "(" +z+ "+dz)",
+        ];
+        return exprs;
     }
 
     calcAngleYZ(X, Y, Z) {
@@ -338,5 +402,29 @@ class RotaryDelta extends Model {
         });
         verbose && console.log("train result", JSON.stringify(resultTrain));
         should.deepEqual(undefined, resultTrain.error);
+    });
+    it("TESTTESTworldExpressions() returns weights and expressions", function() {
+        var verbose = true;
+        var rd = new RotaryDelta();
+        var exprs = rd.worldExpressions();
+        var xexpr = mathjs.compile(exprs[0]);
+        var yexpr = mathjs.compile(exprs[1]);
+        var zexpr = mathjs.compile(exprs[2]);
+        var tol = 0.0001;
+
+        var weights = rd.genes.reduce((acc,gene) => Object.assign(acc, {[gene]:rd[gene]} ), {});
+        console.log("weights", weights);
+        var w = Object.assign({}, weights, { x0:0, x1:0, x2:0 });
+        should.deepEqual(mathjs.round(rd.toWorld([0,0,0]),3), [0,0,0]);
+        xexpr.eval(w).should.approximately(0, tol);
+        yexpr.eval(w).should.approximately(0, tol);
+        zexpr.eval(w).should.approximately(0, tol);
+
+        var w = Object.assign({}, weights, { x0:10, x1:20, x2:30 });
+        var xyz = rd.toWorld([10,20,30]);
+        should.deepEqual(mathjs.round(xyz,3), [24.574,-41.061,-28.746]);
+        xexpr.eval(w).should.approximately(xyz[0], tol);
+        yexpr.eval(w).should.approximately(xyz[1], tol);
+        zexpr.eval(w).should.approximately(xyz[2], tol);
     });
 });
