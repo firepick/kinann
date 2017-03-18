@@ -42,7 +42,7 @@ var Evolver = require("./Evolver");
     }
 
     initializeLayer(nIn, weights, options) {
-        this.genes.reduce((acc, gene) => Object.assign(acc, {[gene]:this[gene]}), weights);
+        return this.genes.reduce((acc, gene) => Object.assign(acc, {[gene]:this[gene]}), weights);
     }
 
     driveCost(examples) {
@@ -207,10 +207,11 @@ var Evolver = require("./Evolver");
         var sub = new SubModel({a:3, b:4});
         var nIn = 123; // dummy value
         var weights = {};
-        sub.initializeLayer(nIn, weights);
+        var w = sub.initializeLayer(nIn, weights);
         should.deepEqual(weights, {
             a: 3,
             b: 4,
         });
+        weights.should.equal(w);
     });
 });
