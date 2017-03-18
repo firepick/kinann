@@ -403,8 +403,8 @@ class RotaryDelta extends Model {
         verbose && console.log("train result", JSON.stringify(resultTrain));
         should.deepEqual(undefined, resultTrain.error);
     });
-    it("TESTTESTworldExpressions() returns weights and expressions", function() {
-        var verbose = true;
+    it("worldExpressions() returns forward kinematic expressions", function() {
+        var verbose = false;
         var rd = new RotaryDelta();
         var exprs = rd.worldExpressions();
         var xexpr = mathjs.compile(exprs[0]);
@@ -413,7 +413,7 @@ class RotaryDelta extends Model {
         var tol = 0.0001;
 
         var weights = rd.genes.reduce((acc,gene) => Object.assign(acc, {[gene]:rd[gene]} ), {});
-        console.log("weights", weights);
+        verbose && console.log("weights", weights);
         var w = Object.assign({}, weights, { x0:0, x1:0, x2:0 });
         should.deepEqual(mathjs.round(rd.toWorld([0,0,0]),3), [0,0,0]);
         xexpr.eval(w).should.approximately(0, tol);
