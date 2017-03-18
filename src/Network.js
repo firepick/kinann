@@ -66,7 +66,7 @@ var Example = require("./Example");
         var layers = that.layers;
         var nIn = that.nIn;
         for (var iLayer = 0; iLayer < layers.length; iLayer++) {
-            layers[iLayer].initialize(nIn, weights, options);
+            layers[iLayer].initializeLayer(nIn, weights, options);
             nIn = layers[iLayer].nOut;
         }
         return that.weights = weights;

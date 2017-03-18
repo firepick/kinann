@@ -68,7 +68,7 @@ var MapLayer = require("../src/MapLayer");
             "w1b1+w1r1c0/(1+exp(-(w0b0+w0r0c0*x0+w0r0c1*x1)))+w1r1c1/(1+exp(-(w0b1+w0r1c0*x0+w0r1c1*x1)))+w1r1c2/(1+exp(-(w0b2+w0r2c0*x0+w0r2c1*x1)))",
         ]);
     })
-    it("Layer.initialize(nIn, weights, options) initializes layer weights", function() {
+    it("Layer.initializeLayer(nIn, weights, options) initializes layer weights", function() {
         // create layer with logistic sigmoid activation typically used for hidden layer(s)
         var nIn = 2;
         var nOut = 3;
@@ -77,7 +77,7 @@ var MapLayer = require("../src/MapLayer");
         // default initialization is with random gaussian distribution 
         // having xavier variance and 0 mean
         var weightsIn = {};
-        var weights = hidden.initialize(nIn, {});
+        var weights = hidden.initializeLayer(nIn, {});
         var wkeys = Object.keys(weights).sort();
         should.deepEqual(wkeys, [
             "w0b0",
@@ -94,7 +94,7 @@ var MapLayer = require("../src/MapLayer");
 
         // weights can be copied
         var hidden2 = new Layer(nOut, logistic_opts);
-        var weights2 = hidden2.initialize(nIn, weights);
+        var weights2 = hidden2.initializeLayer(nIn, weights);
         should.deepEqual(hidden2, hidden);
     })
     it("Layer can be serialized", function() {

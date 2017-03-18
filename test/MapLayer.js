@@ -67,7 +67,7 @@ var Factory = require("../src/Factory");
             "(x1*gain2)",
         ]);
         map.nOut.should.equal(4);
-        should.deepEqual(map.initialize(4), {
+        should.deepEqual(map.initializeLayer(4), {
             gain1: 1,
             gain2: 2,
         });

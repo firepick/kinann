@@ -32,7 +32,7 @@ var mathjs = require("mathjs");
         return new MapLayer(fmap, json);
     }
 
-    MapLayer.prototype.initialize = function(nIn, weights = {}, options = {}) {
+    MapLayer.prototype.initializeLayer = function(nIn, weights = {}, options = {}) {
         var that = this;
         return Object.assign(weights, Object.assign({}, that.weights, weights));
     }

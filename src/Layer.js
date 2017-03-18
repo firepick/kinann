@@ -26,7 +26,7 @@ var Variable = require("./Variable");
         }
         return null;
     }
-    Layer.prototype.initialize = function(nIn, weights = {}, options = {}) {
+    Layer.prototype.initializeLayer = function(nIn, weights = {}, options = {}) {
         var that = this;
         var xavier = 2 / (nIn + that.nOut);
         var gaussw = Variable.createGaussian(xavier);

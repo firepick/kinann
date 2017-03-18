@@ -41,7 +41,7 @@ var Evolver = require("./Evolver");
         return new this.constructor(Object.assign({}, this, genes));
     }
 
-    initialize(nIn, weights, options) {
+    initializeLayer(nIn, weights, options) {
         this.genes.reduce((acc, gene) => Object.assign(acc, {[gene]:this[gene]}), weights);
     }
 
@@ -203,11 +203,11 @@ var Evolver = require("./Evolver");
         should.deepEqual(undefined, resultEvolve.error);
         modelEvolved.cost(measurements).should.below(0.01);
     });
-    it("initialize(nIn, weights) initializes layer", function() {
+    it("initializeLayer(nIn, weights) initializes layer", function() {
         var sub = new SubModel({a:3, b:4});
         var nIn = 123; // dummy value
         var weights = {};
-        sub.initialize(nIn, weights);
+        sub.initializeLayer(nIn, weights);
         should.deepEqual(weights, {
             a: 3,
             b: 4,
