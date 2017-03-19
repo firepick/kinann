@@ -86,7 +86,7 @@ class RotaryDelta extends Model {
         ]
     }
 
-    worldExpressions(angles) {
+    worldExpressions() {
         var t = "((f-e)*" + tan30/2 + ")";
         var theta = [ 
             "((x0+dx0)*" + toRadians + ")",
@@ -131,10 +131,6 @@ class RotaryDelta extends Model {
         var c = "((" +b2+ "-" +y1+ "*" +dnm+ ")*(" +b2+ "-" +y1+ "*" +dnm+ ")+" +b1+ "^2+" +dnm+ "^2*(" +z1+ "^2-re^2))";
         // discriminant
         var d = "(" +b+ "^2-4*" +a+ "*" +c+ ")";
-        if (d < 0) { // point exists
-            this.verbose && console.log("ERROR: RotaryDelta toWorld(", angles, ") point exists");
-            return null;
-        }
         var z = "(-0.5*(" +b+ "+sqrt(" +d+ "))/" +a+ ")";
         var exprs = [
             "((" +a1+ "*" +z+ "+" +b1+ ")/" +dnm+ ")",
@@ -201,6 +197,7 @@ class RotaryDelta extends Model {
     var Factory = require("../Factory");
     var Variable = require("../Variable");
     var Example = require("../Example");
+    var Optimizer = require("../Optimizer");
     var rounder = (key,value) => typeof value == "number" ? mathjs.round(value,4) : value;
 
     it("has effector equilateral triangle side length option", function() {
@@ -406,10 +403,12 @@ class RotaryDelta extends Model {
     it("worldExpressions() returns forward kinematic expressions", function() {
         var verbose = false;
         var rd = new RotaryDelta();
-        var exprs = rd.worldExpressions();
-        var xexpr = mathjs.compile(exprs[0]);
-        var yexpr = mathjs.compile(exprs[1]);
-        var zexpr = mathjs.compile(exprs[2]);
+        var wexprs = rd.worldExpressions();
+        var xexpr = mathjs.compile(wexprs[0]);
+        var yexpr = mathjs.compile(wexprs[1]);
+        var zexpr = mathjs.compile(wexprs[2]);
+        var exprs = rd.expressions();
+        should.deepEqual(exprs, wexprs);
         var tol = 0.0001;
 
         var weights = rd.genes.reduce((acc,gene) => Object.assign(acc, {[gene]:rd[gene]} ), {});
@@ -426,5 +425,30 @@ class RotaryDelta extends Model {
         xexpr.eval(w).should.approximately(xyz[0], tol);
         yexpr.eval(w).should.approximately(xyz[1], tol);
         zexpr.eval(w).should.approximately(xyz[2], tol);
+    });
+    it("worldExpressions() can be optimized", function() {
+        var rd = new RotaryDelta();
+        var exprs = rd.expressions();
+        var opt = new Optimizer();
+        var fname = opt.optimize(exprs[0]);
+        console.log("fname", fname);
+        var root = mathjs.parse(exprs[0]);
+        //var de = mathjs.derivative(exprs[0], "e");
+        var nodes = 0;
+        var s = "";
+        root.traverse((node, path, parent) => {
+            if (node.isSymbolNode) {
+                s += "v";
+            } else if (node.isFunctionNode) {
+                s += node.fn.name;
+            } else if (node.isOperatorNode) {
+                s += node.op;
+            } else if (node.isConstantNode) {
+                s += "#";
+            }
+            nodes++;
+        });
+        //console.log("nodes", nodes, s);
+        console.log("memo", opt.memo);
     });
 });

@@ -12,6 +12,66 @@ var mathjs = require("mathjs");
         return that;
     }
 
+    Optimizer.prototype.nodeDerivative = function(node, variable) {
+        var that = this;
+        var dnode = null;
+        var msg = "";
+        if (node.isConstantNode) {
+            dnode = new mathjs.expression.node.ConstantNode(0);
+        } else if (node.isSymbolNode) {
+            console.log("name", node.name, variable);
+            if (node.name === variable) {
+                dnode = new mathjs.expression.node.ConstantNode(1);
+            } else {
+                dnode = new mathjs.expression.node.ConstantNode(0);
+            }
+        } else if (node.isParenthesisNode) {
+        console.log("()", node.content.type, node.content);
+            dnode = new mathjs.expression.node.ParenthesisNode(
+                that.nodeDerivative(node.content, variable));
+        } else if (node.isOperatorNode) {
+            msg = node.op;
+            if (node.op === "+") {
+                if (node.args[0].isConstantNode) {
+                    dnode = that.nodeDerivative(node.args[1], variable);
+                } else if (node.args[1].isConstantNode) {
+                    dnode = that.nodeDerivative(node.args[0], variable);
+                } else if (node.args[0].isSymbolNode && node.args[0].name !== variable) {
+                    dnode = that.nodeDerivative(node.args[1], variable);
+                } else if (node.args[1].isSymbolNode && node.args[1].name !== variable) {
+                    dnode = that.nodeDerivative(node.args[0], variable);
+                } else {
+                    dnode = new mathjs.expression.node.OperatorNode(node.op, "add", [
+                        that.nodeDerivative(node.args[0], variable),
+                        that.nodeDerivative(node.args[1], variable),
+                    ]);
+                }
+            }
+        }
+        if (dnode == null) {
+            throw new Error("nodeDerivative does not support: " + node.type + " " + msg);
+        }
+        return dnode;
+    }
+    Optimizer.prototype.derivative = function(fname, variable) {
+        var that = this;
+        var dfname = fname + "_d" + variable;
+        var dexpr = that.memo[dfname];
+
+        if (dexpr == null) {
+            var expr = that.memo[fname];
+            if (expr == null) {
+                throw new Error("Expected optimized function name:" + fname);
+            }
+            var root = mathjs.parse(expr);
+            var droot = that.nodeDerivative(root, variable);
+            expr = droot.toString();
+            that.memo[dfname] = expr;
+        }
+
+        return dfname;
+    }
+
     Optimizer.prototype.optimize = function(expr) {
         var that = this;
         if (expr instanceof Array) {

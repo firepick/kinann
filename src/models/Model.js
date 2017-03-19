@@ -16,6 +16,10 @@ var Evolver = require("./Evolver");
             value: genes,
             writable: true,
         });
+        Object.defineProperty(this, "$expressions", {
+            value: this.worldExpressions,
+            writable: true,
+        });
         if (!(genes instanceof Array) || !genes.length) {
             throw new Error("Model constructuor expects Array of mutable key names");
         }
@@ -43,6 +47,15 @@ var Evolver = require("./Evolver");
 
     initializeLayer(nIn, weights, options) {
         return this.genes.reduce((acc, gene) => Object.assign(acc, {[gene]:this[gene]}), weights);
+    }
+
+    expressions() {
+        return this.$expressions();
+        return this.$expressions().map((expr) => ((eIn) => expr));
+    }
+
+    worldExpression() {
+        throw new Error("worldExpressions() not implemented");
     }
 
     driveCost(examples) {
@@ -98,6 +111,9 @@ var Evolver = require("./Evolver");
             super(["a","b"], options);
             this.a = options.a || 10;
             this.b = options.b || 20;
+        }
+        worldExpressions() {
+            return [ "abc", "def" ];
         }
         toWorld(drive) {
             return drive.map((v) => v+this.a);
@@ -213,5 +229,11 @@ var Evolver = require("./Evolver");
             b: 4,
         });
         weights.should.equal(w);
+    });
+    it("expressions() returns worldExpression functions", function() {
+        var sub = new SubModel({a:3, b:4});
+        var exprs = sub.expressions();
+        exprs.forEach((expr) => should(typeof expr).equal("function"));
+        should.deepEqual(exprs.map((expr) => expr(undefined)), ["abc", "def"]);
     });
 });

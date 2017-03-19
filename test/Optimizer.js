@@ -93,4 +93,29 @@ var Optimizer = require("../src/Optimizer");
             f4: 512,
         });
     });
+    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of constant and variable", function() {
+        var opt = new Optimizer();
+        var fname = opt.optimize("3");
+        var dfname = opt.derivative(fname, "x");
+        dfname.should.equal(fname + "_dx")
+        opt.memo[dfname].should.equal("0");
+
+        var fname = opt.optimize("y");
+        var dfname = opt.derivative(fname, "x");
+        dfname.should.equal(fname + "_dx")
+        opt.memo[dfname].should.equal("0");
+
+        var fname = opt.optimize("x");
+        var dfname = opt.derivative(fname, "x");
+        dfname.should.equal(fname + "_dx")
+        opt.memo[dfname].should.equal("1");
+    });
+    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of sum", function() {
+        var opt = new Optimizer();
+
+        var fname = opt.optimize("3+x+y");
+        var dfname = opt.derivative(fname, "x");
+        dfname.should.equal(fname + "_dx")
+        opt.memo[dfname].should.equal("1");
+    });
 })
