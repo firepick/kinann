@@ -9,6 +9,8 @@ var mathjs = require("mathjs");
         that.findex = 0;
         that.emap = {};
         that.memo = {};
+        that.node0 = new mathjs.expression.node.ConstantNode(0);
+        that.node1 = new mathjs.expression.node.ConstantNode(1);
         return that;
     }
 
@@ -42,11 +44,19 @@ var mathjs = require("mathjs");
                 } else if (node.args[1].isSymbolNode && node.args[1].name !== variable) {
                     dnode = that.nodeDerivative(node.args[0], variable);
                 } else {
-                    dnode = new mathjs.expression.node.OperatorNode(node.op, "add", [
+                    dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [
                         that.nodeDerivative(node.args[0], variable),
                         that.nodeDerivative(node.args[1], variable),
                     ]);
                 }
+            } else if (node.op === "*") {
+                var u = node.args[0];
+                var du = that.nodeDerivative(u, variable);
+                var v = node.args[1];
+                var dv = that.nodeDerivative(v, variable);
+                var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [v, du]);
+                var udv = new mathjs.expression.node.OperatorNode("*", "multiply", [u, dv]);
+                dnode = new mathjs.expression.node.OperatorNode("+", "add", [udv, vdu]);
             }
         }
         if (dnode == null) {
@@ -66,11 +76,68 @@ var mathjs = require("mathjs");
             }
             var root = mathjs.parse(expr);
             var droot = that.nodeDerivative(root, variable);
+            droot = that.pruneNode(droot);
             expr = droot.toString();
             that.memo[dfname] = expr;
         }
 
         return dfname;
+    }
+
+    Optimizer.prototype.pruneNode = function(node, parent) {
+        var that = this;
+        if (node.isOperatorNode) {
+            var a0 = that.pruneNode(node.args[0], node);
+            var a1 = that.pruneNode(node.args[1], node);
+            if (node.op === "+") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    return a1;
+                }
+                if (a1.isConstantNode && a1.value === "0") {
+                    return a0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0,a1]);
+            } else if (node.op === "-") {
+                if (a1.isConstantNode && a1.value === "0") {
+                    return a0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0,a1]);
+            } else if (node.op === "*") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    return that.node0;
+                }
+                if (a1.isConstantNode && a1.value === "0") {
+                    return that.node0;
+                }
+                if (a0.isConstantNode && a0.value === "1") {
+                    return a1;
+                }
+                if (a1.isConstantNode && a1.value === "1") {
+                    return a0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, a1]);
+            } else if (node.op === "/") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    return that.node0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, a1]);
+            } 
+        } else if (node.isParenthesisNode) {
+            var c = that.pruneNode(node.content, node);
+            if (c.isParenthesisNode || c.isSymbolNode || c.isConstantNode) {
+                return c;
+            }
+            return new mathjs.expression.node.ParenthesisNode(c);
+        } else if (node.isFunctionNode) {
+            var args = node.args.map((arg) => that.pruneNode(arg, node));
+            if (args.length === 1) {
+                if (args[0].isParenthesisNode) {
+                    args[0] = args[0].content;
+                }
+            }
+            return new mathjs.expression.node.FunctionNode(node.name, args);
+        }
+        return node;
     }
 
     Optimizer.prototype.optimize = function(expr) {

@@ -93,7 +93,7 @@ var Optimizer = require("../src/Optimizer");
             f4: 512,
         });
     });
-    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of constant and variable", function() {
+    it("Optimizer.derivative(fname, variable) generates derivative of constant and variable", function() {
         var opt = new Optimizer();
         var fname = opt.optimize("3");
         var dfname = opt.derivative(fname, "x");
@@ -110,19 +110,19 @@ var Optimizer = require("../src/Optimizer");
         dfname.should.equal(fname + "_dx")
         opt.memo[dfname].should.equal("1");
     });
-    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of sum", function() {
+    it("Optimizer.derivative(fname, variable) generates derivative of sum", function() {
         var opt = new Optimizer();
 
         var fname = opt.optimize("3+(x+y)");
         fname.should.equal("f1");
         var dfname = opt.derivative(fname, "x");
         dfname.should.equal(fname + "_dx")
-        opt.memo[dfname].should.equal("(f0_dx)");
+        opt.memo[dfname].should.equal("f0_dx");
         should.deepEqual(opt.memo, {
             f0: "(x + y)",
-            f0_dx: "(1)",
+            f0_dx: "1",
             f1: "3 + (f0)",
-            f1_dx: "(f0_dx)",
+            f1_dx: "f0_dx",
         });
         var opteval = opt.compile();
         var scope = {
@@ -137,6 +137,50 @@ var Optimizer = require("../src/Optimizer");
             f1_dx: 1,
             x: 31,
             y: 27,
+        });
+    });
+    it("TESTTESTOptimizer.pruneNode(node, parent) returns pruned node tree", function() {
+        var opt = new Optimizer();
+        opt.pruneNode(mathjs.parse("x-0")).toString().should.equal("x");
+        opt.pruneNode(mathjs.parse("0-x")).toString().should.equal("0 - x");
+        opt.pruneNode(mathjs.parse("x+0")).toString().should.equal("x");
+        opt.pruneNode(mathjs.parse("0+x")).toString().should.equal("x");
+        opt.pruneNode(mathjs.parse("0*x")).toString().should.equal("0");
+        opt.pruneNode(mathjs.parse("x*0")).toString().should.equal("0");
+        opt.pruneNode(mathjs.parse("x*1")).toString().should.equal("x");
+        opt.pruneNode(mathjs.parse("1*x")).toString().should.equal("x");
+        opt.pruneNode(mathjs.parse("0/x")).toString().should.equal("0");
+        opt.pruneNode(mathjs.parse("(1*x + y*0)*1+0")).toString().should.equal("x");
+        opt.pruneNode(mathjs.parse("sin(x+0)*1")).toString().should.equal("sin(x)");
+        opt.pruneNode(mathjs.parse("((x+0)*1)")).toString().should.equal("x");
+        opt.pruneNode(mathjs.parse("sin((x-0)*1+y*0)")).toString().should.equal("sin(x)");
+        opt.pruneNode(mathjs.parse("((x)*(y))")).toString().should.equal("(x * y)");
+    });
+    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of sum", function() {
+        var opt = new Optimizer();
+        var fname = opt.optimize("2*x");
+        var dfname = opt.derivative(fname, "x");
+        var fname = opt.optimize("y*3");
+        var dfname = opt.derivative(fname, "y");
+        var fname = opt.optimize("x*y");
+        var dfname = opt.derivative(fname, "x");
+        var dfname = opt.derivative(fname, "y");
+        var fname = opt.optimize("((x+1)*(x+2))");
+        var dfname = opt.derivative(fname, "x");
+        should.deepEqual(opt.memo, {
+            f0: "2 * x",
+            f0_dx: "2",
+            f1: "y * 3",
+            f1_dy: "3",
+            f2: "x * y",
+            f2_dx: "y",
+            f2_dy: "x",
+            f3: "(x + 1)",
+            f3_dx: "1",
+            f4: "(x + 2)",
+            f4_dx: "1",
+            f5: "((f3) * (f4))",
+            f5_dx: "(f3 * f4_dx + f4 * f3_dx)",
         });
     });
 })
