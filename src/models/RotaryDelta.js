@@ -400,7 +400,7 @@ class RotaryDelta extends Model {
         verbose && console.log("train result", JSON.stringify(resultTrain));
         should.deepEqual(undefined, resultTrain.error);
     });
-    it("worldExpressions() returns forward kinematic expressions", function() {
+    it("TESTTESTworldExpressions() returns forward kinematic expressions", function() {
         var verbose = false;
         var rd = new RotaryDelta();
         var wexprs = rd.worldExpressions();
@@ -431,7 +431,6 @@ class RotaryDelta extends Model {
         var exprs = rd.expressions();
         var opt = new Optimizer();
         var fname = opt.optimize(exprs[0]);
-        console.log("fname", fname);
         var root = mathjs.parse(exprs[0]);
         //var de = mathjs.derivative(exprs[0], "e");
         var nodes = 0;
@@ -448,7 +447,5 @@ class RotaryDelta extends Model {
             }
             nodes++;
         });
-        //console.log("nodes", nodes, s);
-        console.log("memo", opt.memo);
     });
 });

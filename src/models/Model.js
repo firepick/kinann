@@ -51,7 +51,6 @@ var Evolver = require("./Evolver");
 
     expressions() {
         return this.$expressions();
-        return this.$expressions().map((expr) => ((eIn) => expr));
     }
 
     worldExpression() {
@@ -233,7 +232,9 @@ var Evolver = require("./Evolver");
     it("expressions() returns worldExpression functions", function() {
         var sub = new SubModel({a:3, b:4});
         var exprs = sub.expressions();
-        exprs.forEach((expr) => should(typeof expr).equal("function"));
-        should.deepEqual(exprs.map((expr) => expr(undefined)), ["abc", "def"]);
+        should.deepEqual(exprs, [
+            "abc",
+            "def",
+        ]);
     });
 });

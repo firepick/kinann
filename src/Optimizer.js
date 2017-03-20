@@ -19,14 +19,15 @@ var mathjs = require("mathjs");
         if (node.isConstantNode) {
             dnode = new mathjs.expression.node.ConstantNode(0);
         } else if (node.isSymbolNode) {
-            console.log("name", node.name, variable);
             if (node.name === variable) {
                 dnode = new mathjs.expression.node.ConstantNode(1);
+            } else if (that.memo[node.name]) {
+                var dname = this.derivative(node.name, variable);
+                dnode = new mathjs.expression.node.SymbolNode(dname);
             } else {
                 dnode = new mathjs.expression.node.ConstantNode(0);
             }
         } else if (node.isParenthesisNode) {
-        console.log("()", node.content.type, node.content);
             dnode = new mathjs.expression.node.ParenthesisNode(
                 that.nodeDerivative(node.content, variable));
         } else if (node.isOperatorNode) {
@@ -114,15 +115,17 @@ var mathjs = require("mathjs");
     Optimizer.prototype.compile = function() {
         var that = this;
         var body = "";
-        for (var i = 0; i < that.findex; i++) {
-            var fname = "f" + i;
+        var keys = Object.keys(that.memo).sort((a,b) => (a.length === b.length) ?  
+            a.localeCompare(b) : (a.length - b.length));
+        for (var i = 0; i < keys.length; i++) {
+            var fname = keys[i];
             var root = mathjs.parse(that.memo[fname]);
             root = root.transform((node, path, parent) => {
                 if (node.isSymbolNode) {
                     node.name = "$." + node.name;
                 } else if (node.isFunctionNode) {
                     node.fn.name = "math." + node.fn.name;
-                } else if (node.isOperatorNode && node.op === "^") { // Javscript doesn't have "^"
+                } else if (node.isOperatorNode && node.op === "^") { // Javascript doesn't have "^"
                     return new mathjs.expression.node.FunctionNode("math.pow", node.args);
                 }
                 return node;

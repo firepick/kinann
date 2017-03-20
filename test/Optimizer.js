@@ -113,9 +113,30 @@ var Optimizer = require("../src/Optimizer");
     it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of sum", function() {
         var opt = new Optimizer();
 
-        var fname = opt.optimize("3+x+y");
+        var fname = opt.optimize("3+(x+y)");
+        fname.should.equal("f1");
         var dfname = opt.derivative(fname, "x");
         dfname.should.equal(fname + "_dx")
-        opt.memo[dfname].should.equal("1");
+        opt.memo[dfname].should.equal("(f0_dx)");
+        should.deepEqual(opt.memo, {
+            f0: "(x + y)",
+            f0_dx: "(1)",
+            f1: "3 + (f0)",
+            f1_dx: "(f0_dx)",
+        });
+        var opteval = opt.compile();
+        var scope = {
+            x: 31,
+            y: 27,
+        };
+        var result = opteval(scope);
+        should.deepEqual(scope, {
+            f0: 58,
+            f0_dx: 1,
+            f1: 61,
+            f1_dx: 1,
+            x: 31,
+            y: 27,
+        });
     });
 })
