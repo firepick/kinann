@@ -195,4 +195,16 @@ var Optimizer = require("../src/Optimizer");
             f5_dx: "(f3 * f4_dx + f4 * f3_dx)",
         });
     });
+    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of quotient", function() {
+        var opt = new Optimizer();
+        var fname = opt.optimize("x/y");
+        var dfname = opt.derivative(fname, "x");
+        var dfname = opt.derivative(fname, "y");
+        should.deepEqual(opt.memo, {
+            f0: "x / y",
+            f1: "y ^ 2", // denominator is optimized
+            f0_dx: "(0 - y) / f1",
+            f0_dy: "x / f1",
+        })
+    });
 })

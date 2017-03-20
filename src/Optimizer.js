@@ -11,6 +11,7 @@ var mathjs = require("mathjs");
         that.memo = {};
         that.node0 = new mathjs.expression.node.ConstantNode(0);
         that.node1 = new mathjs.expression.node.ConstantNode(1);
+        that.node2 = new mathjs.expression.node.ConstantNode(2);
         return that;
     }
 
@@ -58,10 +59,18 @@ var mathjs = require("mathjs");
                 } else {
                     dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0,da1]);
                 }
-            } else if (node.op === "*") {
+            } else if (node.op === "*") { // udv+vdu
+                var vdu = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a1, da0]);
+                var udv = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, da1]);
+                dnode = new mathjs.expression.node.OperatorNode("+", "add", [udv, vdu]);
+            } else if (node.op === "/") { // (vdu-udv)/v^2
                 var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [a1, da0]);
                 var udv = new mathjs.expression.node.OperatorNode("*", "multiply", [a0, da1]);
-                dnode = new mathjs.expression.node.OperatorNode("+", "add", [udv, vdu]);
+                var udvvdu = new mathjs.expression.node.OperatorNode("-", "subtract", [udv, vdu]);
+                var vv = new mathjs.expression.node.OperatorNode("^", "pos", [a1,that.node2]);
+                var vvname = that.optimize(vv.toString());
+                var vvn = new mathjs.expression.node.SymbolNode(vvname);
+                dnode = new mathjs.expression.node.OperatorNode("/", "divide", [udvvdu, vvn]);
             }
         }
         if (dnode == null) {
