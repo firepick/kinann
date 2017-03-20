@@ -33,29 +33,34 @@ var mathjs = require("mathjs");
             dnode = new mathjs.expression.node.ParenthesisNode(
                 that.nodeDerivative(node.content, variable));
         } else if (node.isOperatorNode) {
+            var a0 = node.args[0];
+            var a1 = node.args[1];
+            var da0 = that.nodeDerivative(a0, variable);
+            var da1 = a1 && that.nodeDerivative(a1, variable);
             msg = node.op;
             if (node.op === "+") {
                 if (node.args[0].isConstantNode) {
-                    dnode = that.nodeDerivative(node.args[1], variable);
-                } else if (node.args[1].isConstantNode) {
-                    dnode = that.nodeDerivative(node.args[0], variable);
-                } else if (node.args[0].isSymbolNode && node.args[0].name !== variable) {
-                    dnode = that.nodeDerivative(node.args[1], variable);
-                } else if (node.args[1].isSymbolNode && node.args[1].name !== variable) {
-                    dnode = that.nodeDerivative(node.args[0], variable);
+                    dnode = da1;
+                } else if (a1.isConstantNode) {
+                    dnode = da0;
+                } else if (a0.isSymbolNode && a0.name !== variable) {
+                    dnode = da1;
+                } else if (a1.isSymbolNode && a1.name !== variable) {
+                    dnode = da0;
                 } else {
-                    dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [
-                        that.nodeDerivative(node.args[0], variable),
-                        that.nodeDerivative(node.args[1], variable),
-                    ]);
+                    dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0,da1]);
+                }
+            } else if (node.op === "-") {
+                if (a1.isConstantNode) {
+                    dnode = da0;
+                } else if (a1.isSymbolNode && a1.name !== variable) {
+                    dnode = da0;
+                } else {
+                    dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0,da1]);
                 }
             } else if (node.op === "*") {
-                var u = node.args[0];
-                var du = that.nodeDerivative(u, variable);
-                var v = node.args[1];
-                var dv = that.nodeDerivative(v, variable);
-                var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [v, du]);
-                var udv = new mathjs.expression.node.OperatorNode("*", "multiply", [u, dv]);
+                var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [a1, da0]);
+                var udv = new mathjs.expression.node.OperatorNode("*", "multiply", [a0, da1]);
                 dnode = new mathjs.expression.node.OperatorNode("+", "add", [udv, vdu]);
             }
         }
@@ -98,6 +103,11 @@ var mathjs = require("mathjs");
                 }
                 return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0,a1]);
             } else if (node.op === "-") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    if (a1.isConstantNode) {
+                        return new mathjs.expression.node.ConstantNode(-Number(a1.value));
+                    }
+                }
                 if (a1.isConstantNode && a1.value === "0") {
                     return a0;
                 }

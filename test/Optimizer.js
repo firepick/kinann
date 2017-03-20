@@ -143,6 +143,7 @@ var Optimizer = require("../src/Optimizer");
         var opt = new Optimizer();
         opt.pruneNode(mathjs.parse("x-0")).toString().should.equal("x");
         opt.pruneNode(mathjs.parse("0-x")).toString().should.equal("0 - x");
+        opt.pruneNode(mathjs.parse("0-3")).toString().should.equal("-3");
         opt.pruneNode(mathjs.parse("x+0")).toString().should.equal("x");
         opt.pruneNode(mathjs.parse("0+x")).toString().should.equal("x");
         opt.pruneNode(mathjs.parse("0*x")).toString().should.equal("0");
@@ -156,7 +157,18 @@ var Optimizer = require("../src/Optimizer");
         opt.pruneNode(mathjs.parse("sin((x-0)*1+y*0)")).toString().should.equal("sin(x)");
         opt.pruneNode(mathjs.parse("((x)*(y))")).toString().should.equal("(x * y)");
     });
-    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of sum", function() {
+    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of difference", function() {
+        var opt = new Optimizer();
+        var fname = opt.optimize("x-y");
+        var dfname = opt.derivative(fname, "x");
+        var dfname = opt.derivative(fname, "y");
+        should.deepEqual(opt.memo, {
+            f0: "x - y",
+            f0_dx: "1",
+            f0_dy: "-1",
+        })
+    });
+    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of product", function() {
         var opt = new Optimizer();
         var fname = opt.optimize("2*x");
         var dfname = opt.derivative(fname, "x");
