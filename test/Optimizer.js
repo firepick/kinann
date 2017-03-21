@@ -207,4 +207,18 @@ var Optimizer = require("../src/Optimizer");
             f0_dy: "x / f1",
         })
     });
+    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of constant powers", function() {
+        var opt = new Optimizer();
+        var fname = opt.optimize("(2*x)^3");
+        var dfname = opt.derivative(fname, "x");
+        should.deepEqual(opt.memo, {
+            f0: "(2 * x)",
+            f1: "(f0) ^ 3",
+            f0_dx: "2",
+            f2: "(f0)",
+            f3: "3 * (f2) ^ 2",
+            f1_dx: "f3 * f0_dx",
+        });
+        dfname.should.equal("f1_dx");
+    });
 })

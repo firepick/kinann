@@ -71,6 +71,18 @@ var mathjs = require("mathjs");
                 var vvname = that.optimize(vv.toString());
                 var vvn = new mathjs.expression.node.SymbolNode(vvname);
                 dnode = new mathjs.expression.node.OperatorNode("/", "divide", [udvvdu, vvn]);
+            } else if (node.op === "^") { // udv+vdu
+                if (a1.isConstantNode) {
+                    var k = a1.clone();
+                    var power = new mathjs.expression.node.ConstantNode(Number(a1.value)-1);
+                    var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
+                    var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [k,a0p]);
+                    var prodn = that.optimize(prod.toString());
+                    var prodnn = new mathjs.expression.node.SymbolNode(prodn);
+                    dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
+                }
+                var vdu = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a1, da0]);
+                var udv = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, da1]);
             }
         }
         if (dnode == null) {
