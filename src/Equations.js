@@ -7,6 +7,9 @@ var mathjs = require("mathjs");
         this.symbols = {};
         this.nodes = {};
         this.symgen = 0;
+        this.node0 = new mathjs.expression.node.ConstantNode(0);
+        this.node1 = new mathjs.expression.node.ConstantNode(1);
+        this.node2 = new mathjs.expression.node.ConstantNode(2);
     }
 
     toJSON() {
@@ -26,6 +29,174 @@ var mathjs = require("mathjs");
         this.exprs[expr] = symbol;
         this.symbols[symbol] = expr;
         return symbol;
+    }
+
+    simplify(node) {
+        if (node.isOperatorNode) {
+            var a0 = this.simplify(node.args[0]);
+            var a1 = node.args[1] && this.simplify(node.args[1]);
+            if (node.op === "+") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    return a1;
+                }
+                if (a1.isConstantNode && a1.value === "0") {
+                    return a0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0,a1]);
+            } else if (node.op === "-") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    if (a1) {
+                        return a1.isConstantNode 
+                            ? new mathjs.expression.node.ConstantNode(-Number(a1.value))
+                            : new mathjs.expression.node.OperatorNode("-", "unaryMinus", [a1]);
+                    }
+                }
+                if (node.fn === "subtract") {
+                    if (a1.isConstantNode && a1.value === "0") {
+                        return a0;
+                    }
+                    return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0,a1]);
+                } else if (node.fn === "unaryMinus") {
+                    return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0]);
+                }
+            } else if (node.op === "*") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    return this.node0;
+                }
+                if (a1.isConstantNode && a1.value === "0") {
+                    return this.node0;
+                }
+                if (a0.isConstantNode && a0.value === "1") {
+                    return a1;
+                }
+                if (a1.isConstantNode && a1.value === "1") {
+                    return a0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, a1]);
+            } else if (node.op === "/") {
+                if (a0.isConstantNode && a0.value === "0") {
+                    return this.node0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, a1]);
+            } 
+        } else if (node.isParenthesisNode) {
+            var c = this.simplify(node.content);
+            if (c.isParenthesisNode || c.isSymbolNode || c.isConstantNode) {
+                return c;
+            }
+            return new mathjs.expression.node.ParenthesisNode(c);
+        } else if (node.isFunctionNode) {
+            var args = node.args.map((arg) => this.simplify(arg));
+            if (args.length === 1) {
+                if (args[0].isParenthesisNode) {
+                    args[0] = args[0].content;
+                }
+            }
+            return new mathjs.expression.node.FunctionNode(node.name, args);
+        }
+        return node;
+    }
+
+    nodeDerivative(node, variable) {
+        var dnode = null;
+        var msg = "";
+        if (node.isConstantNode) {
+            dnode = new mathjs.expression.node.ConstantNode(0);
+        } else if (node.isSymbolNode) {
+            if (node.name === variable) {
+                dnode = new mathjs.expression.node.ConstantNode(1);
+            } else if (this.symbols[node.name]) {
+                var dname = this.derivative(node.name, variable);
+                dnode = new mathjs.expression.node.SymbolNode(dname);
+            } else {
+                dnode = new mathjs.expression.node.ConstantNode(0);
+            }
+        } else if (node.isParenthesisNode) {
+            dnode = new mathjs.expression.node.ParenthesisNode(
+                this.nodeDerivative(node.content, variable));
+        } else if (node.isOperatorNode) {
+            var a0 = node.args[0];
+            var a1 = node.args[1];
+            var da0 = this.nodeDerivative(a0, variable);
+            var da1 = a1 && this.nodeDerivative(a1, variable);
+            msg = node.op;
+            if (node.op === "+") {
+                if (node.args[0].isConstantNode) {
+                    dnode = da1;
+                } else if (a1.isConstantNode) {
+                    dnode = da0;
+                } else if (a0.isSymbolNode && a0.name !== variable) {
+                    dnode = da1;
+                } else if (a1.isSymbolNode && a1.name !== variable) {
+                    dnode = da0;
+                } else {
+                    dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0,da1]);
+                }
+            } else if (node.op === "-") {
+                if (a1 == null) {
+                    dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0]);
+                } else if (a1.isConstantNode) {
+                    dnode = da0;
+                } else if (a1.isSymbolNode && a1.name !== variable) {
+                    dnode = da0;
+                } else {
+                    dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0,da1]);
+                }
+            } else if (node.op === "*") { // udv+vdu
+                var vdu = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a1, da0]);
+                var udv = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, da1]);
+                dnode = new mathjs.expression.node.OperatorNode("+", "add", [udv, vdu]);
+            } else if (node.op === "/") { // (vdu-udv)/v^2
+                var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [a1, da0]);
+                var udv = new mathjs.expression.node.OperatorNode("*", "multiply", [a0, da1]);
+                var udvvdu = new mathjs.expression.node.OperatorNode("-", "subtract", [udv, vdu]);
+                var vv = new mathjs.expression.node.OperatorNode("^", "pos", [a1,this.node2]);
+                var vvname = this.optimize(vv.toString());
+                var vvn = new mathjs.expression.node.SymbolNode(vvname);
+                dnode = new mathjs.expression.node.OperatorNode("/", "divide", [udvvdu, vvn]);
+            } else if (node.op === "^") { // udv+vdu
+                if (a1.isConstantNode) {
+                    var k = a1.clone();
+                    var power = new mathjs.expression.node.ConstantNode(Number(a1.value)-1);
+                    var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
+                    var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [k,a0p]);
+                    var prodn = this.optimize(prod.toString());
+                    var prodnn = new mathjs.expression.node.SymbolNode(prodn);
+                    dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
+                }
+                var vdu = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a1, da0]);
+                var udv = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, da1]);
+            }
+        } else if (node.isFunctionNode) {
+            var a0 = node.args[0];
+            var da0 = a0 && this.nodeDerivative(a0, variable);
+            var a1 = node.args[1];
+            var da1 = a1 && this.nodeDerivative(a1, variable);
+            if (node.name === "sin") {
+                var cos = new mathjs.expression.node.FunctionNode("cos", [a0]);
+                var fcos = this.optimize(cos.toString());
+                var fcosn = new mathjs.expression.node.SymbolNode(fcos);
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fcosn, da0]);
+            } else if (node.name === "cos") {
+                var cos = new mathjs.expression.node.FunctionNode("sin", [a0]);
+                var fcos = this.optimize(cos.toString());
+                var fcosn = new mathjs.expression.node.SymbolNode(fcos);
+                var dcos = new mathjs.expression.node.OperatorNode("-", "unaryMinus", [fcosn]);
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [dcos, da0]);
+            } else if (node.name === "sqrt") {
+                var k = new mathjs.expression.node.ConstantNode(1/2);
+                var power = new mathjs.expression.node.ConstantNode(1/2-1);
+                var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
+                var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [k,a0p]);
+                var prodn = this.optimize(prod.toString());
+                var prodnn = new mathjs.expression.node.SymbolNode(prodn);
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
+            }
+        }
+        if (dnode == null) {
+            throw new Error("nodeDerivative does not support: " + node.type + " " + msg);
+        }
+        return dnode;
     }
 
     digest(node) {
@@ -137,5 +308,23 @@ var mathjs = require("mathjs");
         eq.set("gist", gist.toString()).should.equal("gist");
         console.log("gist ms:", new Date() - msStart);
         //console.log("eq", eq.symbols);
+    });
+    it("TESTTESTsimplify(node) returns simplified node tree", function() {
+        var eq = new Equations();
+        eq.simplify(mathjs.parse("x-0")).toString().should.equal("x");
+        eq.simplify(mathjs.parse("0-x")).toString().should.equal("-x");
+        eq.simplify(mathjs.parse("0-3")).toString().should.equal("-3");
+        eq.simplify(mathjs.parse("x+0")).toString().should.equal("x");
+        eq.simplify(mathjs.parse("0+x")).toString().should.equal("x");
+        eq.simplify(mathjs.parse("0*x")).toString().should.equal("0");
+        eq.simplify(mathjs.parse("x*0")).toString().should.equal("0");
+        eq.simplify(mathjs.parse("x*1")).toString().should.equal("x");
+        eq.simplify(mathjs.parse("1*x")).toString().should.equal("x");
+        eq.simplify(mathjs.parse("0/x")).toString().should.equal("0");
+        eq.simplify(mathjs.parse("(1*x + y*0)*1+0")).toString().should.equal("x");
+        eq.simplify(mathjs.parse("sin(x+0)*1")).toString().should.equal("sin(x)");
+        eq.simplify(mathjs.parse("((x+0)*1)")).toString().should.equal("x");
+        eq.simplify(mathjs.parse("sin((x-0)*1+y*0)")).toString().should.equal("sin(x)");
+        eq.simplify(mathjs.parse("((x)*(y))")).toString().should.equal("(x * y)");
     });
 })
