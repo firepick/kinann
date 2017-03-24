@@ -1,6 +1,7 @@
 var should = require("should");
 var mathjs = require("mathjs");
 var Optimizer = require("../src/Optimizer");
+var fs = require("fs");
 
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("Optimizer", function() {
@@ -139,7 +140,7 @@ var Optimizer = require("../src/Optimizer");
             y: 27,
         });
     });
-    it("TESTTESTOptimizer.pruneNode(node, parent) returns pruned node tree", function() {
+    it("Optimizer.pruneNode(node, parent) returns pruned node tree", function() {
         var opt = new Optimizer();
         opt.pruneNode(mathjs.parse("x-0")).toString().should.equal("x");
         opt.pruneNode(mathjs.parse("0-x")).toString().should.equal("0 - x");
@@ -157,7 +158,7 @@ var Optimizer = require("../src/Optimizer");
         opt.pruneNode(mathjs.parse("sin((x-0)*1+y*0)")).toString().should.equal("sin(x)");
         opt.pruneNode(mathjs.parse("((x)*(y))")).toString().should.equal("(x * y)");
     });
-    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of difference", function() {
+    it("Optimizer.derivative(fname, variable) generates derivative of difference", function() {
         var opt = new Optimizer();
         var fname = opt.optimize("x-y");
         var dfname = opt.derivative(fname, "x");
@@ -168,7 +169,7 @@ var Optimizer = require("../src/Optimizer");
             f0_dy: "-1",
         })
     });
-    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of product", function() {
+    it("Optimizer.derivative(fname, variable) generates derivative of product", function() {
         var opt = new Optimizer();
         var fname = opt.optimize("2*x");
         var dfname = opt.derivative(fname, "x");
@@ -195,7 +196,7 @@ var Optimizer = require("../src/Optimizer");
             f5_dx: "(f3 * f4_dx + f4 * f3_dx)",
         });
     });
-    it("TESTTESTOptimizer.derivative(fname, variable) generates derivative of quotient", function() {
+    it("Optimizer.derivative(fname, variable) generates derivative of quotient", function() {
         var opt = new Optimizer();
         var fname = opt.optimize("x/y");
         var dfname = opt.derivative(fname, "x");
@@ -211,14 +212,52 @@ var Optimizer = require("../src/Optimizer");
         var opt = new Optimizer();
         var fname = opt.optimize("(2*x)^3");
         var dfname = opt.derivative(fname, "x");
+        dfname.should.equal("f1_dx");
+        var fname = opt.optimize("sqrt(2*x)");
+        var dfname = opt.derivative(fname, "x");
         should.deepEqual(opt.memo, {
             f0: "(2 * x)",
             f1: "(f0) ^ 3",
-            f0_dx: "2",
             f2: "(f0)",
             f3: "3 * (f2) ^ 2",
+            f4: "sqrt(f2)",
+            f4_dx: "f5 * f2_dx",
+            f5: "0.5 * f2 ^ (-0.5)",
+            f0_dx: "2",
             f1_dx: "f3 * f0_dx",
+            f2_dx: "f0_dx",
         });
-        dfname.should.equal("f1_dx");
     });
+    it("Optimizer.derivative(fname, variable) generates derivative of trigonometric functions", function() {
+        var opt = new Optimizer();
+        var fname = opt.optimize("sin((2*x+1))");
+        var dfname = opt.derivative(fname, "x");
+        dfname.should.equal("f1_dx");
+        var fname = opt.optimize("cos((2*x+1))");
+        var dfname = opt.derivative(fname, "x");
+        should.deepEqual(opt.memo, {
+            f0: "(2 * x + 1)",
+            f1: "sin((f0))",
+            f2: "(f0)",
+            f3: "cos((f2))",
+            f4: "f3",
+            f5: "(f2)",
+            f6: "sin((f5))",
+            f0_dx: "2",
+            f1_dx: "f3 * f0_dx",
+            f2_dx: "f0_dx",
+            f3_dx: "-f6 * f2_dx",
+            f4_dx: "f3_dx",
+        });
+    });
+    it("erivative() works on gist", function() {
+        var gist = fs.readFileSync("test/rotarydeltax.json").toString().replace(/\n/g," ");
+        var opt = new Optimizer();
+        var msStart = new Date();
+        var fname = opt.optimize(gist);
+        //console.log("optimize ms:", new Date() - msStart);
+        var msStart = new Date();
+        var dfname = opt.derivative(fname, "x");
+        //console.log("derivative ms:", new Date() - msStart);
+    })
 })

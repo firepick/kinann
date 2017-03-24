@@ -400,7 +400,7 @@ class RotaryDelta extends Model {
         verbose && console.log("train result", JSON.stringify(resultTrain));
         should.deepEqual(undefined, resultTrain.error);
     });
-    it("TESTTESTworldExpressions() returns forward kinematic expressions", function() {
+    it("worldExpressions() returns forward kinematic expressions", function() {
         var verbose = false;
         var rd = new RotaryDelta();
         var wexprs = rd.worldExpressions();
