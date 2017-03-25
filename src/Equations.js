@@ -6,17 +6,13 @@ var mathjs = require("mathjs");
     constructor (options={}) {
         this.symbolOfExpr = {};
         this.exprOfSymbol = {};
-        this.nodeOfSymbol = {};
+        this.treeOfSymbol = {};
         this.symgen = 0;
         this.simplify = options.simplify || this.fastSimplify;
         this.node0 = new mathjs.expression.node.ConstantNode(0);
-        this.bindNode("0", this.node0); // pre-defined symbol
         this.node1 = new mathjs.expression.node.ConstantNode(1);
-        this.bindNode("1", this.node1); // pre-defined symbol
         this.nodem1 = new mathjs.expression.node.ConstantNode(-1);
-        //this.bindNode("-1", this.nodem1); // pre-defined symbol
         this.node2 = new mathjs.expression.node.ConstantNode(2);
-        //this.bindNode("2", this.node2); // pre-defined symbol
     }
 
     toJSON() {
@@ -31,7 +27,7 @@ var mathjs = require("mathjs");
     }
 
     bindNode(symbol, node) {
-        this.nodeOfSymbol[symbol] = node;
+        this.treeOfSymbol[symbol] = node;
         var expr = node.toString();
         this.symbolOfExpr[expr] == null && (this.symbolOfExpr[expr] = symbol);
         this.exprOfSymbol[symbol] = expr;
@@ -111,7 +107,7 @@ var mathjs = require("mathjs");
         var dexpr = this.exprOfSymbol[dsymbol];
 
         if (dexpr == null) {
-            var node = this.nodeOfSymbol[symbol];
+            var node = this.treeOfSymbol[symbol];
             if (node == null) {
                 if (exprTree.isSymbolNode) {
                     return variable === expr ? "1" : "0"; 
@@ -123,10 +119,20 @@ var mathjs = require("mathjs");
             dexpr = dnode.toString();
             var dexprSymbol = this.digestExpr(dexpr);
             this.exprOfSymbol[dsymbol] = dexprSymbol;
-            this.nodeOfSymbol[dsymbol] = this.nodeOfSymbol[dexprSymbol];
+            this.treeOfSymbol[dsymbol] = this.symbolNode(dexprSymbol); 
         }
 
         return dsymbol;
+    }
+
+    symbolNode(symbol) {
+        if (symbol === "0") {
+            return this.node0;
+        } else if (symbol === "1") {
+            return this.node1;
+        }
+
+        return new mathjs.expression.node.SymbolNode(symbol);
     }
 
     nodeDerivative(node, variable) {
@@ -139,7 +145,7 @@ var mathjs = require("mathjs");
                 dnode = this.node1;
             } else if (this.exprOfSymbol[node.name]) {
                 var dname = this.derivative(node.name, variable);
-                dnode = new mathjs.expression.node.SymbolNode(dname);
+                dnode = this.symbolNode(dname);
             } else {
                 dnode = this.node0;
             }
@@ -184,13 +190,13 @@ var mathjs = require("mathjs");
                 var vduudv = new mathjs.expression.node.OperatorNode("-", "subtract", [vdu, udv]);
                 var vv = new mathjs.expression.node.OperatorNode("^", "pos", [a1,this.node2]);
                 var vvname = this.digestExpr(vv.toString());
-                var vvn = new mathjs.expression.node.SymbolNode(vvname);
+                var vvn = this.symbolNode(vvname);
                 dnode = new mathjs.expression.node.OperatorNode("/", "divide", [vduudv, vvn]);
             } else if (node.op === "^") { // udv+vdu
                 var exponent = a1;
                 var dexponent = da1;
                 if (exponent.isSymbolNode) {
-                    var symNode = this.nodeOfSymbol[exponent.name];
+                    var symNode = this.treeOfSymbol[exponent.name];
                     exponent = symNode || exponent;
                 }
                 if (exponent != a1) {
@@ -201,7 +207,7 @@ var mathjs = require("mathjs");
                     var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
                     var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [exponent,a0p]);
                     var prodn = this.digestExpr(prod.toString());
-                    var prodnn = new mathjs.expression.node.SymbolNode(prodn);
+                    var prodnn = this.symbolNode(prodn);
                     dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
                 } else { // d(u^v) = (u^v)*dv*ln(u) + (u^(g-1))*vdu
                     var uv = node;
@@ -227,12 +233,12 @@ var mathjs = require("mathjs");
             if (node.name === "sin") {
                 var cos = new mathjs.expression.node.FunctionNode("cos", [a0]);
                 var fcos = this.digestExpr(cos.toString());
-                var fcosn = new mathjs.expression.node.SymbolNode(fcos);
+                var fcosn = this.symbolNode(fcos);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fcosn, da0]);
             } else if (node.name === "cos") {
                 var cos = new mathjs.expression.node.FunctionNode("sin", [a0]);
                 var fcos = this.digestExpr(cos.toString());
-                var fcosn = new mathjs.expression.node.SymbolNode(fcos);
+                var fcosn = this.symbolNode(fcos);
                 var dcos = new mathjs.expression.node.OperatorNode("-", "unaryMinus", [fcosn]);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [dcos, da0]);
             } else if (node.name === "sqrt") {
@@ -241,7 +247,7 @@ var mathjs = require("mathjs");
                 var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
                 var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [k,a0p]);
                 var prodn = this.digestExpr(prod.toString());
-                var prodnn = new mathjs.expression.node.SymbolNode(prodn);
+                var prodnn = this.symbolNode(prodn);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
             } else {
                 throw new Error("TBD derivative(" +node.name+ ")");
@@ -255,6 +261,7 @@ var mathjs = require("mathjs");
 
     digestNode(node) {
         if (node.isConstantNode) {
+            return node.value;
             return this.digestExpr(node.value);
         } else if (node.isSymbolNode) {
             return node.name;
@@ -273,6 +280,9 @@ var mathjs = require("mathjs");
 
     digestExpr(simpleExpr) {
         var digestedNode = mathjs.parse(simpleExpr);
+        if (digestedNode.isConstantNode) {
+            return digestedNode.value; // constants are literals
+        }
         var normalizedExpr = digestedNode.toString(); 
         return this.symbolOfExpr[normalizedExpr] || 
             this.bindNode(this.generateSymbol(), digestedNode);
@@ -282,7 +292,8 @@ var mathjs = require("mathjs");
         if (node.isConstantNode) {
             return node;
         } else if (node.isSymbolNode) {
-            return node.name[0] === "_" && this.undigestNode(this.nodeOfSymbol[node.name]) || node;
+            var tree = this.treeOfSymbol[node.name];
+            return node.name[0] === "_" && this.undigestNode(tree) || node;
         } else if (node.isOperatorNode) {
             return new mathjs.expression.node.OperatorNode(node.op, node.fn, 
                 node.args.map((n) => this.undigestNode(n))
@@ -306,21 +317,24 @@ var mathjs = require("mathjs");
         if (typeof expr !== "string") {
             throw new Error("Invalid call to set(symbol, expr): expr must be string");
         }
-        var root = mathjs.parse(expr);
-        var digestedSym = this.digestNode(root);
-        this.bindNode(symbol, this.nodeOfSymbol[digestedSym]);
-        //this.exprOfSymbol[symbol] = digestedSym;
-        this.symbolOfExpr[this.exprOfSymbol[symbol]] = symbol;
+        var tree = mathjs.parse(expr);
+        if (tree.isConstantNode) {
+            this.bindNode(symbol, tree);
+        } else {
+            var digestedSym = this.digestNode(tree);
+            this.bindNode(symbol, this.treeOfSymbol[digestedSym]);
+            this.symbolOfExpr[this.exprOfSymbol[symbol]] = symbol;
+        }
         return symbol;
     }
 
     get(symbol) {
-        var node = this.nodeOfSymbol[symbol];
+        var node = this.treeOfSymbol[symbol];
         if (node == null) {
             return symbol; // undefined symbol is just itself
         }
-
         var tree = this.undigestNode(node);
+        tree = this.simplify(tree);
         if (!tree) {
             throw new Error("undigest(" +symbol+ ") failed:");
         }
@@ -333,7 +347,7 @@ var mathjs = require("mathjs");
         var body = "";
         var isConstant = (name) => '0' <= name[0] && name[0] <= '9' || name[0] === '-';
         symbols.forEach((symbol) => { if (!isConstant(symbol)) {
-            var tree = this.nodeOfSymbol[symbol].cloneDeep(); 
+            var tree = this.treeOfSymbol[symbol].cloneDeep(); 
             tree = tree.transform((node, path, parent) => {
                 if (node.isSymbolNode) {
                     if (!isConstant(node.name)) {
@@ -367,12 +381,13 @@ var mathjs = require("mathjs");
     var fs = require("fs");
     var gist = fs.readFileSync("test/rotarydeltax.json").toString().replace(/\n/g," ");
 
-    it("TESTTESTset(sym,expr) and get(sym) define and retrieve named expressions", function() {
+    it("set(sym,expr) and get(sym) define and retrieve named expressions", function() {
         var root = mathjs.parse("y=m*x+b");
         var eq = new Equations();
 
-        eq.get("0").should.equal("0"); // pre-defined symbol
-        eq.get("1").should.equal("1"); // pre-defined symbol
+        eq.get("0").should.equal("0"); // constant literals are symbols
+        eq.get("1").should.equal("1"); // constant literals are symbols
+        eq.get("123").should.equal("123"); // constant literals are symbols
 
         // if equations are set in dependency order, then symbols will automatically be inserted into get
         eq.set("PI", mathjs.PI).should.equal("PI");
@@ -387,11 +402,10 @@ var mathjs = require("mathjs");
         eq.get("PI").should.equal(""+mathjs.PI);
         eq.get("y").should.equal("mx + b"); 
 
-        // sub-expressions
-        eq.get("_0").should.equal(""+mathjs.PI);
-        eq.get("_1").should.equal("m * x"); 
-        eq.get("_2").should.equal("mx + b"); 
-        eq.get("_3").should.equal("sin(y)"); 
+        // sub-expressions are associated with generated symbols
+        eq.get("_0").should.equal("m * x"); 
+        eq.get("_1").should.equal("mx + b"); 
+        eq.get("_2").should.equal("sin(y)"); 
 
         eq.set("zz", "sin(m*x+PI)/cos((m*x + b)^2)").should.equal("zz");
         eq.get("zz").should.equal("sin(mx + PI) / cos(y ^ 2)"); // note that y is used instead of "m*x+b"
@@ -403,7 +417,7 @@ var mathjs = require("mathjs");
         var eq = new Equations();
         var msStart = new Date();
     });
-    it("TESTTESTfastSimplify(node) returns simplified node tree", function() {
+    it("fastSimplify(node) returns simplified node tree", function() {
         var eq = new Equations();
         eq.fastSimplify(mathjs.parse("x-0")).toString().should.equal("x");
         eq.fastSimplify(mathjs.parse("0-x")).toString().should.equal("-x");
@@ -421,7 +435,7 @@ var mathjs = require("mathjs");
         eq.fastSimplify(mathjs.parse("sin((x-0)*1+y*0)")).toString().should.equal("sin(x)");
         eq.fastSimplify(mathjs.parse("((x)*(y))")).toString().should.equal("(x * y)");
     });
-    it("TESTTESTderivative(expr, variable) generates derivative of constant and variable", function() {
+    it("derivative(expr, variable) generates derivative of constant and variable", function() {
         var eq = new Equations();
 
         // derivative of symbol
@@ -437,46 +451,29 @@ var mathjs = require("mathjs");
         var dsym = eq.derivative("x", "x");
         dsym.should.equal("1"); // pre-defined symbol
     });
-    it("TESTTESTderivative(fname, variable) generates derivative of sum", function() {
+    it("derivative(fname, variable) generates derivative of sum", function() {
         var eq = new Equations();
 
-        eq.set("f1", "3+(x+y)");
+        eq.set("f1", "3*(x+y)");
         var dfname = eq.derivative("f1", "x");
         dfname.should.equal("f1_dx")
-        eq.get(dfname).should.equal("1");
-
-        return; // TODO
-
-        var opteval = eq.compile();
-        console.log("opteval", opteval.toString());
-        var scope = {
-            x: 31,
-            y: 27,
-        };
-        var result = opteval(scope);
-        should.deepEqual(result, {
-            f0: 58,
-            f0_dx: 1,
-            f1: 61,
-            f1_dx: 1,
-            x: 31,
-            y: 27,
-        });
+        eq.get(dfname).should.equal("3");
     });
-    it("TESTTESTderivative(fname, variable) generates derivative of difference", function() {
+    it("derivative(fname, variable) generates derivative of difference", function() {
         var eq = new Equations();
         eq.get(eq.derivative("x-y", "x")).should.equal("1");
         eq.get(eq.derivative("x-y", "y")).should.equal("-1");
         eq.get(eq.derivative("x-4", "y")).should.equal("0");
         eq.get(eq.derivative("4-x", "x")).should.equal("-1");
     });
-    it("TESTTESTEquations.derivative(fname, variable) generates derivative of product", function() {
+    it("Equations.derivative(fname, variable) generates derivative of product", function() {
         var eq = new Equations();
         eq.get(eq.derivative("2*x", "x")).should.equal("2");
         eq.get(eq.derivative("2*x", "y")).should.equal("0");
         eq.get(eq.derivative("y*3", "y")).should.equal("3");
         eq.get(eq.derivative("x*y", "x")).should.equal("y");
         eq.get(eq.derivative("x*y", "y")).should.equal("x");
+        eq.get(eq.derivative("2*x+1", "x")).should.equal("2"); 
         eq.get(eq.derivative("((x+1)*(x+2))", "x")).should.equal("x + 1 + x + 2"); // fastSimplify 
 
         var eq = new Equations({
@@ -484,7 +481,7 @@ var mathjs = require("mathjs");
         });
         eq.get(eq.derivative("((x+1)*(x+2))", "x")).should.equal("2 * x + 3"); // mathjs simplify
     });
-    it("TESTTESTderivative(fname, variable) generates derivative of quotient", function() {
+    it("derivative(fname, variable) generates derivative of quotient", function() {
         var eq = new Equations();
         eq.get(eq.derivative("x/y", "x")).should.equal("y / y ^ 2"); 
         eq.get(eq.derivative("x/y", "y")).should.equal("-x / y ^ 2"); 
@@ -495,24 +492,25 @@ var mathjs = require("mathjs");
         eq.get(eq.derivative("x/y", "x")).should.equal("1 / y"); 
         eq.get(eq.derivative("x/y", "y")).should.equal("-(x / y ^ 2)"); 
     });
-    it("TESTTESTderivative(fname, variable) generates derivative of exponents", function() {
-        var eq = new Equations({
-            simplify: mathjs.simplify, // make it pretty
-        });
+    it("derivative(fname, variable) generates derivative of exponents", function() {
+        var eq = new Equations();
 
-        eq.get(eq.derivative("(2*x)^3", "x")).should.equal("6 * (2 * x) ^ 2"); 
-        eq.get(eq.derivative("sqrt(2*x)", "x")).should.equal("(2 * x) ^ (-1 / 2)"); 
-        //mathjs.derivative("3^sin(2*x)", "x").should.equal("3 ^ sin(2 * x) * cos(2 * x) * 2 * ln(3)"); // invalid symbol in rule: e
+        eq.get(eq.derivative("(2*x)^3", "x")).should.equal("3 * (2 * x) ^ 2 * 2"); 
+        eq.get(eq.derivative("sqrt(2*x)", "x")).should.equal("0.5 * (2 * x) ^ (-0.5) * 2"); 
+        //console.log(mathjs.derivative("3^sin(2*x)", "x")); // mathjs bug
 
         var eq = new Equations();
         eq.get(eq.derivative("3^sin(2*x)", "x")).should.equal("3 ^ sin(2 * x) * cos(2 * x) * 2 * ln(3)"); 
     });
-    it("TESTTESTderivative(fname, variable) generates derivative of trigonometric functions", function() {
+    it("derivative(fname, variable) generates derivative of trigonometric functions", function() {
         var eq = new Equations();
+        eq.get(eq.derivative("2*x+1", "x")).should.equal("2"); 
+        eq.derivative("sin(2*x+1)", "x");
         eq.get(eq.derivative("sin(2*x+1)", "x")).should.equal("cos(2 * x + 1) * 2"); 
         eq.get(eq.derivative("cos(2*x+1)", "x")).should.equal("-sin(2 * x + 1) * 2"); 
     });
-    it("TESTTESTgist computes quickly", function() {
+    it("gist computes quickly", function() {
+        var verbose = false;
         var eq = new Equations();
         var gist = fs.readFileSync("test/rotarydeltax.json").toString().replace(/\n/g," ").toString();
 
@@ -534,22 +532,23 @@ var mathjs = require("mathjs");
         eq.set("gist", gist).should.equal("gist");
         var msElapsed = new Date() - msStart;
         msElapsed.should.below(1000); // typically ~63
-        //console.log("set:", new Date() - msStart);
+        verbose && console.log("set:", new Date() - msStart);
 
         var msStart = new Date();
         var dfname = eq.derivative("gist", "rf");
         var msElapsed = new Date() - msStart;
         msElapsed.should.below(200); // typically ~10ms
-        //console.log("derivative ms:", msElapsed);
+        verbose && console.log("derivative ms:", msElapsed);
     })
-    it("TESTTESTcompile(fname) compiles Javascript memoization function", function() {
-        var eq = new Equations();
-        eq.set("f1", "2*(a+b)+1/(a+b)");
-        eq.set("f2", "a-b");
-        var feval12 = eq.compile(); 
+    it("compile(fname) compiles Javascript memoization function", function() {
         var a = 3;
         var b = 5;
         var scope = {a:a,b:b};
+        var eq = new Equations();
+        eq.set("f1", "2*(a+b)+1/(a+b)");
+        eq.set("f2", "a-b");
+
+        var feval12 = eq.compile(); 
         var scope1 = Object.assign({}, scope);
         feval12(scope1).should.equal(scope1);
         scope1.should.properties({
@@ -560,7 +559,7 @@ var mathjs = require("mathjs");
         });
         should(scope1.f3).equal(undefined);
 
-        // each uccessive ompile() includes new equations
+        // each successive ompile() includes new equations
         eq.set("f3", "floor(exp(a))");
         eq.derivative("f2","a");
         var scope2 = Object.assign({}, scope);
@@ -571,12 +570,12 @@ var mathjs = require("mathjs");
             b: 5,
             f1: 2*(a+b)+1/(a+b),
             f2: a-b,
-            f2_da: 1, // derivative
+            f2_da: 1, // d(a-b)/da
             f3: 20,
         });
         should(scope.f3).equal(undefined);
 
-        // previous compile functions still work the same
+        // previous compile functions are unchanged 
         var scope3 = Object.assign({}, scope);
         feval12(scope3).should.properties({
             a: 3,
