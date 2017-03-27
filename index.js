@@ -6,7 +6,6 @@
     }
 
     ///////////////// class ////////////////////
-    Kinann.Optimizer = require("./src/Optimizer");
     Kinann.Layer = require("./src/Layer");
     Kinann.MapLayer = require("./src/MapLayer");
     Kinann.Network = require("./src/Network");

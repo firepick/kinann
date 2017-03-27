@@ -1,5 +1,6 @@
 var mathjs = require("mathjs");
 var Optimizer = require("../src/Optimizer");
+var Equations = require("../src/Equations");
 var Layer = require("../src/Layer");
 var MapLayer = require("../src/MapLayer");
 var should = require("should");
@@ -51,7 +52,7 @@ var Sequential = require("../src/Sequential");
         var outputs = network.activate([5, 7])
         should.deepEqual(outputs, [19 + 0.1, 43 + 0.2]);
     })
-    it("Network.costExpr(exprIn) returns formula for network cost", function() {
+    it("TESTTESTNetwork.costExpr(exprIn) returns formula for network cost", function() {
         var network = new Sequential(2, [
             new Layer(2, logistic_opts),
             new Layer(2, identity_opts),
@@ -62,6 +63,23 @@ var Sequential = require("../src/Sequential");
             "((w1b0+w1r0c0/(1+exp(-(w0b0+w0r0c0*x0+w0r0c1*x1)))+w1r0c1/(1+exp(-(w0b1+w0r1c0*x0+w0r1c1*x1)))-yt0)^2" +
             "+(w1b1+w1r1c0/(1+exp(-(w0b0+w0r0c0*x0+w0r0c1*x1)))+w1r1c1/(1+exp(-(w0b1+w0r1c0*x0+w0r1c1*x1)))-yt1)^2)/2"
         );
+        network.initialize({ // use fixed weights to guarantee cost value
+            w0b0: 0.01,
+            w0b1: 0.02,
+            w1b0: 0.03,
+            w1b1: 0.04,
+            w0r0c0: 0.05,
+            w0r0c1: 0.03,
+            w0r1c0: 0.07,
+            w0r1c1: 0.08,
+            w1r0c0: 0.09,
+            w1r0c1: 0.10,
+            w1r1c0: 0.11,
+            w1r1c1: 0.12,
+        });
+        var neteval = network.compile();
+        network.activate([3,5], [19, 43.2]);
+        mathjs.round(network.cost(),2).should.equal(1103);
     })
     it("Network.initialize(weights,options) initializes weights", function() {
         var network = new Sequential(2, [new Layer(2, logistic_opts)]);

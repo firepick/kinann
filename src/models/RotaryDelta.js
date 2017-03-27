@@ -197,7 +197,7 @@ class RotaryDelta extends Model {
     var Factory = require("../Factory");
     var Variable = require("../Variable");
     var Example = require("../Example");
-    var Optimizer = require("../Optimizer");
+    var Equations = require("../Equations");
     var rounder = (key,value) => typeof value == "number" ? mathjs.round(value,4) : value;
 
     it("has effector equilateral triangle side length option", function() {
@@ -427,10 +427,11 @@ class RotaryDelta extends Model {
         zexpr.eval(w).should.approximately(xyz[2], tol);
     });
     it("worldExpressions() can be optimized", function() {
+        // TODO
         var rd = new RotaryDelta();
         var exprs = rd.expressions();
-        var opt = new Optimizer();
-        var fname = opt.optimize(exprs[0]);
+        var eq = new Equations();
+        var fname = eq.set("f0", exprs[0]);
         var root = mathjs.parse(exprs[0]);
         //var de = mathjs.derivative(exprs[0], "e");
         var nodes = 0;

@@ -1,5 +1,6 @@
 var mathjs = require("mathjs");
 var Optimizer = require("./Optimizer");
+var Equations = require("./Equations");
 var Layer = require("./Layer");
 var MapLayer = require("./MapLayer");
 var Example = require("./Example");
@@ -110,11 +111,13 @@ var Example = require("./Example");
     Network.prototype.compile = function(exprsIn, options = {}) {
         var that = this;
         that.opt = new Optimizer();
+        that.eq = new Equations();
         var nIn = that.nIn;
         that.nOut = that.layers[that.layers.length - 1].nOut;
         var exprs = that.expressions(exprsIn);
         that.fmemo_outputs = that.opt.optimize(exprs);
-        that.memoActivate = that.opt.compile();
+        that.outputNames = exprs.map((expr,i) => that.eq.set("y"+i, expr));
+        that.memoActivate = that.eq.compile();
         that.scope = Object.create(that.weights);
 
         that.gradExpr = that.gradExpr || that.costGradientExpr(exprsIn, options);
@@ -128,7 +131,9 @@ var Example = require("./Example");
         }
 
         that.fmemo_cost = that.opt.optimize(that.costFunExpr);
+        that.eq.set("cost", that.costFunExpr);
         that.memoPropagate = that.opt.compile();
+        that.memoxPropagate = that.eq.compile();
 
         return that;
     }
@@ -144,12 +149,13 @@ var Example = require("./Example");
         input.map((x, i) => that.scope["x" + i] = that.fNormIn ? that.fNormIn[i](x) : x);
         that.target = target;
         if (target) {
-            target.map((y, i) => that.scope["yt" + i] = y);
+            target.map((yt, i) => that.scope["yt" + i] = yt);
             that.memoPropagate(that.scope);
+            that.memoxPropagate(that.scope);
         } else {
             that.memoActivate(that.scope);
         }
-        return that.fmemo_outputs.map((f, i) => that.scope["y" + i] = that.scope[f]);
+        return that.outputNames.map((y) => that.scope[y]);
     }
 
     Network.prototype.costGradient = function() { // see compile()
@@ -164,15 +170,15 @@ var Example = require("./Example");
 
     Network.prototype.cost = function() { // see compile()
         var that = this;
-        if (that.scope.yt0 == null) {
+        if (that.scope.cost == null) {
             throw new Error("activate(input, target) must be called before costGradient()");
         }
-        return that.scope[that.fmemo_cost];
+        return that.scope.cost;
     }
 
     Network.prototype.propagate = function(learningRate, gradC) { // see compile
         var that = this;
-        if (!that.memoActivate) {
+        if (!that.memoxPropagate) {
             throw new Error("compile() must be called before propagate()");
         }
         gradC = gradC || that.costGradient();

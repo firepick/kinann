@@ -8,18 +8,12 @@ var mathjs = require("mathjs");
         this.exprOfSymbol = {};
         this.treeOfSymbol = {};
         this.symgen = 0;
+        this.symbols = []; // preserve creation order
         this.simplify = options.simplify || this.fastSimplify;
         this.node0 = new mathjs.expression.node.ConstantNode(0);
         this.node1 = new mathjs.expression.node.ConstantNode(1);
         this.nodem1 = new mathjs.expression.node.ConstantNode(-1);
         this.node2 = new mathjs.expression.node.ConstantNode(2);
-    }
-
-    toJSON() {
-        return {
-            type: "Equations",
-            equations: this.exprOfSymbol,
-        }
     }
 
     generateSymbol() {
@@ -31,6 +25,7 @@ var mathjs = require("mathjs");
         var expr = node.toString();
         this.symbolOfExpr[expr] == null && (this.symbolOfExpr[expr] = symbol);
         this.exprOfSymbol[symbol] = expr;
+        this.symbols.push(symbol);
         return symbol;
     }
 
@@ -100,7 +95,14 @@ var mathjs = require("mathjs");
         return node;
     }
 
-    derivative(expr, variable) {
+    derivative(expr, variable="x") {
+        if (typeof variable !== "string") {
+            throw new Error("derivative(expr, variable) requires a string variable");
+        }
+        if (expr instanceof Array) {
+            return expr.map((e) => this.derivative(e, variable));
+        }
+
         var exprTree = mathjs.parse(expr);
         var symbol = this.digestNode(exprTree);
         var dsymbol = symbol + "_d" + variable;
@@ -119,6 +121,7 @@ var mathjs = require("mathjs");
             dexpr = dnode.toString();
             var dexprSymbol = this.digestExpr(dexpr);
             this.exprOfSymbol[dsymbol] = dexprSymbol;
+            this.symbols.push(dsymbol);
             this.treeOfSymbol[dsymbol] = this.symbolNode(dexprSymbol); 
         }
 
@@ -262,12 +265,18 @@ var mathjs = require("mathjs");
     digestNode(node) {
         if (node.isConstantNode) {
             return node.value;
-            return this.digestExpr(node.value);
         } else if (node.isSymbolNode) {
             return node.name;
         } else if (node.isOperatorNode) {
-            var args = node.args.map((arg) => this.digestNode(arg));
-            return this.digestExpr(args.join(node.op));
+            if (node.args.length === 1) {
+                return this.digestExpr("-" + this.digestNode(node.args[0]));
+            } else if (node.args.length > 1) {
+                var args = node.args.map((arg) => this.digestNode(arg));
+                var expr = args.join(node.op);
+                return this.digestExpr(expr);
+            } else {
+                throw new Error("TBD OperatorNode with args:" + node.args.length);
+            }
         } else if (node.isFunctionNode) {
             var args = node.args.map((arg) => this.digestNode(arg));
             return this.digestExpr(node.name + "(" + args.join(",") + ")");
@@ -342,11 +351,9 @@ var mathjs = require("mathjs");
     }
 
     compile() {
-        var symbols = Object.keys(this.exprOfSymbol).sort((a,b) => (a.length === b.length) ?  
-            a.localeCompare(b) : (a.length - b.length));
         var body = "";
         var isConstant = (name) => '0' <= name[0] && name[0] <= '9' || name[0] === '-';
-        symbols.forEach((symbol) => { if (!isConstant(symbol)) {
+        this.symbols.forEach((symbol) => { if (!isConstant(symbol)) {
             var tree = this.treeOfSymbol[symbol].cloneDeep(); 
             tree = tree.transform((node, path, parent) => {
                 if (node.isSymbolNode) {
@@ -367,7 +374,6 @@ var mathjs = require("mathjs");
         return (new Function("math", "return function($) {" + body + "}"))(mathjs);
     }
 
-
 } // CLASS
 
     module.exports = exports.Equations = Equations;
@@ -384,7 +390,9 @@ var mathjs = require("mathjs");
     it("set(sym,expr) and get(sym) define and retrieve named expressions", function() {
         var root = mathjs.parse("y=m*x+b");
         var eq = new Equations();
+        eq.get(eq.set("f", "-(x)")).should.equal("-x");
 
+        var eq = new Equations();
         eq.get("0").should.equal("0"); // constant literals are symbols
         eq.get("1").should.equal("1"); // constant literals are symbols
         eq.get("123").should.equal("123"); // constant literals are symbols
@@ -414,7 +422,6 @@ var mathjs = require("mathjs");
         eq.set("y", "(x+1)/(x-1)").should.equal("y");
         eq.get("y").should.equal("(x + 1) / (x - 1)"); // mathjs puts in parentheses
 
-        var eq = new Equations();
         var msStart = new Date();
     });
     it("fastSimplify(node) returns simplified node tree", function() {
@@ -428,6 +435,7 @@ var mathjs = require("mathjs");
         eq.fastSimplify(mathjs.parse("x*0")).toString().should.equal("0");
         eq.fastSimplify(mathjs.parse("x*1")).toString().should.equal("x");
         eq.fastSimplify(mathjs.parse("1*x")).toString().should.equal("x");
+        eq.fastSimplify(mathjs.parse("-(x)")).toString().should.equal("-x");
         eq.fastSimplify(mathjs.parse("0/x")).toString().should.equal("0");
         eq.fastSimplify(mathjs.parse("(1*x + y*0)*1+0")).toString().should.equal("x");
         eq.fastSimplify(mathjs.parse("sin(x+0)*1")).toString().should.equal("sin(x)");
@@ -584,5 +592,31 @@ var mathjs = require("mathjs");
             f2: a-b,
         });
         should(scope3.f3).equal(undefined);
+
+        var eq = new Equations();
+        eq.set("f1", "sin(x)");
+        eq.set("f2", "sqrt(x)");
+        eq.set("f3", "x^2");
+        eq.set("f4", "-(b)");
+        eq.set("f5", "-(a+b*x)");
+        eq.set("f6", "1+exp(-(a+b*x))");
+        should.deepEqual(eq.derivative(["f1","f2","f3"]), ["f1_dx", "f2_dx", "f3_dx"]);
+        var feval = eq.compile();
+        var x = mathjs.PI/6;
+        var a = 1;
+        var b = 3;
+        feval({x: x, a:a, b:b}).should.properties({
+            f1: mathjs.sin(x),
+            f2: mathjs.sqrt(x),
+            f3: x * x,
+            f4: -(b),
+            f5: -(a+b*x),
+            f6: 1+mathjs.exp(-(a+b*x)),
+            f1_dx: mathjs.cos(x),
+            f2_dx: 0.5/mathjs.sqrt(x),
+            f3_dx: 2*x,
+        });
+    });
+    it("TESTTESTcompile(fname) compiles Javascript memoization function", function() {
     });
 })
