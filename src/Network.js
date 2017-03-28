@@ -1,5 +1,4 @@
 var mathjs = require("mathjs");
-var Optimizer = require("./Optimizer");
 var Equations = require("./Equations");
 var Layer = require("./Layer");
 var MapLayer = require("./MapLayer");
@@ -110,30 +109,25 @@ var Example = require("./Example");
 
     Network.prototype.compile = function(exprsIn, options = {}) {
         var that = this;
-        that.opt = new Optimizer();
         that.eq = new Equations();
         var nIn = that.nIn;
         that.nOut = that.layers[that.layers.length - 1].nOut;
         var exprs = that.expressions(exprsIn);
-        that.fmemo_outputs = that.opt.optimize(exprs);
         that.outputNames = exprs.map((expr,i) => that.eq.set("y"+i, expr));
         that.memoActivate = that.eq.compile();
         that.scope = Object.create(that.weights);
 
         that.gradExpr = that.gradExpr || that.costGradientExpr(exprsIn, options);
+        that.eq.set("cost", that.costFunExpr);
         that.gradFun = {};
         that.fmemo_gradient = {};
         that.keys = Object.keys(that.weights);
         for (var iKey = 0; iKey < that.keys.length; iKey++) {
             var key = that.keys[iKey];
-            var partial = that.gradExpr[key];
-            that.fmemo_gradient[key] = that.opt.optimize(partial);
+            that.fmemo_gradient[key] = that.eq.derivative("cost", key);
         }
 
-        that.fmemo_cost = that.opt.optimize(that.costFunExpr);
-        that.eq.set("cost", that.costFunExpr);
-        that.memoPropagate = that.opt.compile();
-        that.memoxPropagate = that.eq.compile();
+        that.memoPropagate = that.eq.compile();
 
         return that;
     }
@@ -146,12 +140,11 @@ var Example = require("./Example");
         if (!that.memoActivate) {
             throw new Error("compile() before activate()");
         }
-        input.map((x, i) => that.scope["x" + i] = that.fNormIn ? that.fNormIn[i](x) : x);
+        input.forEach((x, i) => that.scope["x" + i] = that.fNormIn ? that.fNormIn[i](x) : x);
         that.target = target;
         if (target) {
-            target.map((yt, i) => that.scope["yt" + i] = yt);
+            target.forEach((yt, i) => that.scope["yt" + i] = yt);
             that.memoPropagate(that.scope);
-            that.memoxPropagate(that.scope);
         } else {
             that.memoActivate(that.scope);
         }
@@ -164,7 +157,7 @@ var Example = require("./Example");
             throw new Error("activate(input, target) must be called before costGradient()");
         }
         var grad = {};
-        that.keys.map((key) => grad[key] = that.scope[that.fmemo_gradient[key]]);
+        that.keys.forEach((key) => grad[key] = that.scope[that.fmemo_gradient[key]]);
         return grad;
     }
 
@@ -178,11 +171,11 @@ var Example = require("./Example");
 
     Network.prototype.propagate = function(learningRate, gradC) { // see compile
         var that = this;
-        if (!that.memoxPropagate) {
+        if (!that.memoPropagate) {
             throw new Error("compile() must be called before propagate()");
         }
         gradC = gradC || that.costGradient();
-        that.keys.map((key) => that.weights[key] -= learningRate * gradC[key])
+        that.keys.forEach((key) => that.weights[key] -= learningRate * gradC[key])
         return that;
     }
 

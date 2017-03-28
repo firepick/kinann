@@ -76,6 +76,14 @@ var mathjs = require("mathjs");
                     return this.node0;
                 }
                 return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, a1]);
+            } else if (node.op === "^") {
+                if (a1.isConstantNode && a1.value === "0") {
+                    return this.node1;
+                }
+                if (a1.isConstantNode && a1.value === "1") {
+                    return a0;
+                }
+                return new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, a1]);
             } 
         } else if (node.isParenthesisNode) {
             var c = this.fastSimplify(node.content);
@@ -166,10 +174,6 @@ var mathjs = require("mathjs");
                     dnode = da1;
                 } else if (a1.isConstantNode) {
                     dnode = da0;
-                } else if (a0.isSymbolNode && a0.name !== variable) {
-                    dnode = da1;
-                } else if (a1.isSymbolNode && a1.name !== variable) {
-                    dnode = da0;
                 } else {
                     dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0,da1]);
                 }
@@ -244,6 +248,28 @@ var mathjs = require("mathjs");
                 var fcosn = this.symbolNode(fcos);
                 var dcos = new mathjs.expression.node.OperatorNode("-", "unaryMinus", [fcosn]);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [dcos, da0]);
+            } else if (node.name === "tan") {
+                var sec = new mathjs.expression.node.FunctionNode("sec", [a0]);
+                var sec2 = new mathjs.expression.node.OperatorNode("^", "pow", [sec, this.node2]);
+                var fsec2 = this.digestExpr(sec2.toString());
+                var fsec2n = this.symbolNode(fsec2);
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fsec2n, da0]);
+            } else if (node.name === "sinh") {
+                var cosh = new mathjs.expression.node.FunctionNode("cosh", [a0]);
+                var fcosh = this.digestExpr(cosh.toString());
+                var fcoshn = this.symbolNode(fcosh);
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fcoshn, da0]);
+            } else if (node.name === "cosh") {
+                var sinh = new mathjs.expression.node.FunctionNode("sinh", [a0]);
+                var fsinh= this.digestExpr(sinh.toString());
+                var fsinhn = this.symbolNode(fsinh);
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fsinhn, da0]);
+            } else if (node.name === "tanh") {
+                var sech = new mathjs.expression.node.FunctionNode("sech", [a0]);
+                var sech2 = new mathjs.expression.node.OperatorNode("^", "pow", [sech, this.node2]);
+                var fsech2 = this.digestExpr(sech2.toString());
+                var fsech2n = this.symbolNode(fsech2);
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fsech2n, da0]);
             } else if (node.name === "sqrt") {
                 var k = new mathjs.expression.node.ConstantNode(1/2);
                 var power = new mathjs.expression.node.ConstantNode(1/2-1);
@@ -252,6 +278,8 @@ var mathjs = require("mathjs");
                 var prodn = this.digestExpr(prod.toString());
                 var prodnn = this.symbolNode(prodn);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
+            } else if (node.name === "exp") { // d(exp(g)) = d(g) * exp(g)
+                dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [da0, a0]);
             } else {
                 throw new Error("TBD derivative(" +node.name+ ")");
             }
@@ -321,10 +349,10 @@ var mathjs = require("mathjs");
     set(symbol, expr) {
         (typeof expr === "number") && (expr = "" + expr);
         if (typeof symbol !== "string") {
-            throw new Error("Invalid call to set(symbol, expr): symbol must be string");
+            throw new Error("Invalid call to set(symbol, expr) => symbol must be string");
         }
         if (typeof expr !== "string") {
-            throw new Error("Invalid call to set(symbol, expr): expr must be string");
+            throw new Error("Invalid call to set(\""+symbol+"\", expr) => expr must be string");
         }
         var tree = mathjs.parse(expr);
         if (tree.isConstantNode) {
@@ -442,6 +470,7 @@ var mathjs = require("mathjs");
         eq.fastSimplify(mathjs.parse("((x+0)*1)")).toString().should.equal("x");
         eq.fastSimplify(mathjs.parse("sin((x-0)*1+y*0)")).toString().should.equal("sin(x)");
         eq.fastSimplify(mathjs.parse("((x)*(y))")).toString().should.equal("(x * y)");
+        eq.fastSimplify(mathjs.parse("((x)*(y))^1")).toString().should.equal("(x * y)");
     });
     it("derivative(expr, variable) generates derivative of constant and variable", function() {
         var eq = new Equations();
@@ -488,6 +517,11 @@ var mathjs = require("mathjs");
             simplify: mathjs.simplify
         });
         eq.get(eq.derivative("((x+1)*(x+2))", "x")).should.equal("2 * x + 3"); // mathjs simplify
+
+        var eq = new Equations();
+        eq.set("cost", "w0b0 + w0r0c0 * x0 + w0r0c1 * x1");
+        var dcost = eq.derivative("cost", "w0b0");
+        eq.get(dcost).should.equal("1");
     });
     it("derivative(fname, variable) generates derivative of quotient", function() {
         var eq = new Equations();
@@ -516,6 +550,15 @@ var mathjs = require("mathjs");
         eq.derivative("sin(2*x+1)", "x");
         eq.get(eq.derivative("sin(2*x+1)", "x")).should.equal("cos(2 * x + 1) * 2"); 
         eq.get(eq.derivative("cos(2*x+1)", "x")).should.equal("-sin(2 * x + 1) * 2"); 
+        eq.get(eq.derivative("tan(2*x+1)", "x")).should.equal("sec(2 * x + 1) ^ 2 * 2"); 
+    });
+    it("derivative(fname, variable) generates derivative of hyperbolic functions", function() {
+        var eq = new Equations();
+        eq.get(eq.derivative("2*x+1", "x")).should.equal("2"); 
+        eq.derivative("sin(2*x+1)", "x");
+        eq.get(eq.derivative("sinh(2*x+1)", "x")).should.equal("cosh(2 * x + 1) * 2"); 
+        eq.get(eq.derivative("cosh(2*x+1)", "x")).should.equal("sinh(2 * x + 1) * 2"); 
+        eq.get(eq.derivative("tanh(2*x+1)", "x")).should.equal("sech(2 * x + 1) ^ 2 * 2"); 
     });
     it("gist computes quickly", function() {
         var verbose = false;
@@ -616,7 +659,5 @@ var mathjs = require("mathjs");
             f2_dx: 0.5/mathjs.sqrt(x),
             f3_dx: 2*x,
         });
-    });
-    it("TESTTESTcompile(fname) compiles Javascript memoization function", function() {
     });
 })

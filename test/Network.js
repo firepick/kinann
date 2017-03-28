@@ -1,5 +1,4 @@
 var mathjs = require("mathjs");
-var Optimizer = require("../src/Optimizer");
 var Equations = require("../src/Equations");
 var Layer = require("../src/Layer");
 var MapLayer = require("../src/MapLayer");
@@ -52,7 +51,7 @@ var Sequential = require("../src/Sequential");
         var outputs = network.activate([5, 7])
         should.deepEqual(outputs, [19 + 0.1, 43 + 0.2]);
     })
-    it("TESTTESTNetwork.costExpr(exprIn) returns formula for network cost", function() {
+    it("Network.costExpr(exprIn) returns formula for network cost", function() {
         var network = new Sequential(2, [
             new Layer(2, logistic_opts),
             new Layer(2, identity_opts),
@@ -194,7 +193,7 @@ var Sequential = require("../src/Sequential");
         network.activate(inputs, [18, 43.2]);
         mathjs.round(network.cost(), 3).should.equal(0.605); // far from target
     })
-    it("Network.costGradient() returns activation cost gradient vector", function() {
+    it("TESTTESTNetwork.costGradient() returns activation cost gradient vector", function() {
         var network = new Sequential(2, [new Layer(2, identity_opts)]);
         var scope = {
             w0b0: 0.1,
