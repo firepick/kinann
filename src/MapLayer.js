@@ -3,10 +3,8 @@ var Layer = require("./Layer");
 
 (function(exports) { class MapLayer extends Layer {
     constructor(fmap, options = {}) {
-        super(options);
+        super(fmap.length, options);
         this.type = "MapLayer";
-        this.id = options.id || 0;
-        this.nOut = fmap.length;
         this.weights = options.weights || {};
         this.fmap = fmap;
     }

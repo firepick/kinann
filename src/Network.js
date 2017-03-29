@@ -4,43 +4,38 @@ var Layer = require("./Layer");
 var MapLayer = require("./MapLayer");
 var Example = require("./Example");
 
-(function(exports) {
-    ////////////////// constructor
-    function Network(nIn) {
-        var that = this;
-        that.nIn = nIn;
-        that.exprIn = Array(nIn).fill().map((e, i) => "x" + i);
-        that.layers = [];
-        that.inputs = Array(nIn).fill().map((x, i) => "x" + i);
-        return that;
+(function(exports) { class Network {
+    constructor(nIn) {
+        this.nIn = nIn;
+        this.exprIn = Array(nIn).fill().map((e, i) => "x" + i);
+        this.layers = [];
+        this.inputs = Array(nIn).fill().map((x, i) => "x" + i);
     }
 
-    Network.prototype.add = function(layer, options = {}) {
-        var that = this;
+    add(layer, options = {}) {
         var idBase = options.idBase || 0;
-        layer.id = idBase + that.layers.length;
-        that.layers.push(layer);
-        that.nOut = layer.nOut;
+        layer.id = idBase + this.layers.length;
+        this.layers.push(layer);
+        this.nOut = layer.nOut;
         return layer;
     }
 
-    Network.prototype.toJSON = function(type) {
-        var that = this;
+    toJSON(type) {
         var obj = {
-            type: that.type || "Network",
-            nIn: that.nIn,
-            nOut: that.nOut,
+            type: this.type || "Network",
+            nIn: this.nIn,
+            nOut: this.nOut,
         }
-        obj.layers = that.layers.map((l) => l.toJSON());
-        that.inStats && (obj.inStats = that.inStats);
-        that.fNormIn && (obj.fNormIn = that.fNormIn.map((f) => f.toString()));
-        that.weights && (obj.weights = that.weights);
-        that.gradExpr && (obj.gradExpr = that.gradExpr);
-        that.costFunExpr && (obj.costFunExpr = that.costFunExpr);
+        obj.layers = this.layers.map((l) => l.toJSON());
+        this.inStats && (obj.inStats = this.inStats);
+        this.fNormIn && (obj.fNormIn = this.fNormIn.map((f) => f.toString()));
+        this.weights && (obj.weights = this.weights);
+        this.gradExpr && (obj.gradExpr = this.gradExpr);
+        this.costFunExpr && (obj.costFunExpr = this.costFunExpr);
         return obj;
     }
 
-    Network.fromJSON = function(json) {
+    static fromJSON(json) {
         var json = typeof json === 'string' ? JSON.parse(json) : json;
         var network = null;
         if (json.type === "Sequential") {
@@ -61,21 +56,19 @@ var Example = require("./Example");
         return network;
     }
 
-    Network.prototype.initialize = function(weights = {}, options = {}) {
-        var that = this;
-        var layers = that.layers;
-        var nIn = that.nIn;
+    initialize(weights = {}, options = {}) {
+        var layers = this.layers;
+        var nIn = this.nIn;
         for (var iLayer = 0; iLayer < layers.length; iLayer++) {
             layers[iLayer].initializeLayer(nIn, weights, options);
             nIn = layers[iLayer].nOut;
         }
-        return that.weights = weights;
+        return this.weights = weights;
     }
 
-    Network.prototype.costExpr = function(exprIn, options = {}) {
-        var that = this;
+    costExpr(exprIn, options = {}) {
         var costExpr = "";
-        var exprs = that.expressions(exprIn);
+        var exprs = this.expressions(exprIn);
         var metric = options.metric || "quadratic";
         if (metric === "quadratic") {
             for (var iOut = 0; iOut < exprs.length; iOut++) {
@@ -89,98 +82,91 @@ var Example = require("./Example");
         return costExpr;
     }
 
-    Network.prototype.costGradientExpr = function(exprIn, options = {}) {
+    costGradientExpr(exprIn, options = {}) {
         // NOTE: computing the cost gradient expression can take 700ms or more
-        var that = this;
-        if (that.weights == null) {
+        if (this.weights == null) {
             throw new Error("initialize() must be called before costGradientExpr()");
         }
-        var costExpr = that.costFunExpr = that.costExpr(exprIn);
-        var weights = that.weights;
+        var costExpr = this.costFunExpr = this.costExpr(exprIn);
+        var weights = this.weights;
         var keys = Object.keys(weights).sort();
         var gradExpr = {};
         for (var iw = 0; iw < keys.length; iw++) {
             var weight = keys[iw];
             gradExpr[weight] = mathjs.derivative(costExpr, weight).toString();
         }
-        that.keys = keys;
-        return that.gradExpr = gradExpr;
+        this.keys = keys;
+        return this.gradExpr = gradExpr;
     }
 
-    Network.prototype.compile = function(exprsIn, options = {}) {
-        var that = this;
-        that.eq = new Equations();
-        var nIn = that.nIn;
-        that.nOut = that.layers[that.layers.length - 1].nOut;
-        var exprs = that.expressions(exprsIn);
-        that.outputNames = exprs.map((expr,i) => that.eq.set("y"+i, expr));
-        that.memoActivate = that.eq.compile();
-        that.scope = Object.create(that.weights);
+    compile(exprsIn, options = {}) {
+        this.eq = new Equations();
+        var nIn = this.nIn;
+        this.nOut = this.layers[this.layers.length - 1].nOut;
+        var exprs = this.expressions(exprsIn);
+        this.outputNames = exprs.map((expr,i) => this.eq.set("y"+i, expr));
+        this.memoActivate = this.eq.compile();
+        this.scope = Object.create(this.weights);
 
-        that.gradExpr = that.gradExpr || that.costGradientExpr(exprsIn, options);
-        that.eq.set("cost", that.costFunExpr);
-        that.gradFun = {};
-        that.fmemo_gradient = {};
-        that.keys = Object.keys(that.weights);
-        for (var iKey = 0; iKey < that.keys.length; iKey++) {
-            var key = that.keys[iKey];
-            that.fmemo_gradient[key] = that.eq.derivative("cost", key);
+        this.gradExpr = this.gradExpr || this.costGradientExpr(exprsIn, options);
+        this.eq.set("cost", this.costFunExpr);
+        this.gradFun = {};
+        this.fmemo_gradient = {};
+        this.keys = Object.keys(this.weights);
+        for (var iKey = 0; iKey < this.keys.length; iKey++) {
+            var key = this.keys[iKey];
+            this.fmemo_gradient[key] = this.eq.derivative("cost", key);
         }
 
-        that.memoPropagate = that.eq.compile();
+        this.memoPropagate = this.eq.compile();
 
-        return that;
+        return this;
     }
 
-    Network.prototype.activate = function(input, target) { // see compile()
-        var that = this;
-        if (input.length !== that.nIn) {
-            throw new Error("activation vector input length expected:"+that.nIn + " actual:"+input.length);
+    activate(input, target) { // see compile()
+        if (input.length !== this.nIn) {
+            throw new Error("activation vector input length expected:"+this.nIn + " actual:"+input.length);
         }
-        if (!that.memoActivate) {
+        if (!this.memoActivate) {
             throw new Error("compile() before activate()");
         }
-        input.forEach((x, i) => that.scope["x" + i] = that.fNormIn ? that.fNormIn[i](x) : x);
-        that.target = target;
+        input.forEach((x, i) => this.scope["x" + i] = this.fNormIn ? this.fNormIn[i](x) : x);
+        this.target = target;
         if (target) {
-            target.forEach((yt, i) => that.scope["yt" + i] = yt);
-            that.memoPropagate(that.scope);
+            target.forEach((yt, i) => this.scope["yt" + i] = yt);
+            this.memoPropagate(this.scope);
         } else {
-            that.memoActivate(that.scope);
+            this.memoActivate(this.scope);
         }
-        return that.outputNames.map((y) => that.scope[y]);
+        return this.outputNames.map((y) => this.scope[y]);
     }
 
-    Network.prototype.costGradient = function() { // see compile()
-        var that = this;
-        if (that.scope.yt0 == null) {
+    costGradient() { // see compile()
+        if (this.scope.yt0 == null) {
             throw new Error("activate(input, target) must be called before costGradient()");
         }
         var grad = {};
-        that.keys.forEach((key) => grad[key] = that.scope[that.fmemo_gradient[key]]);
+        this.keys.forEach((key) => grad[key] = this.scope[this.fmemo_gradient[key]]);
         return grad;
     }
 
-    Network.prototype.cost = function() { // see compile()
-        var that = this;
-        if (that.scope.cost == null) {
+    cost() { // see compile()
+        if (this.scope.cost == null) {
             throw new Error("activate(input, target) must be called before costGradient()");
         }
-        return that.scope.cost;
+        return this.scope.cost;
     }
 
-    Network.prototype.propagate = function(learningRate, gradC) { // see compile
-        var that = this;
-        if (!that.memoPropagate) {
+    propagate(learningRate, gradC) { // see compile
+        if (!this.memoPropagate) {
             throw new Error("compile() must be called before propagate()");
         }
-        gradC = gradC || that.costGradient();
-        that.keys.forEach((key) => that.weights[key] -= learningRate * gradC[key])
-        return that;
+        gradC = gradC || this.costGradient();
+        this.keys.forEach((key) => this.weights[key] -= learningRate * gradC[key])
+        return this;
     }
 
-    Network.exampleStats = function(examples, key = "input") {
-        var that = this;
+    static exampleStats(examples, key = "input") {
         var ex0 = examples[0];
         var n = ex0[key].length;
         var results = ex0[key].map((x) => {
@@ -218,29 +204,26 @@ var Example = require("./Example");
         }
         return results;
     }
-    Network.prototype.expressions = function(exprIn) {
+    expressions(exprIn) {
         throw new Error("Abstract method not implemented: expressions()");
     }
-    Network.prototype.normalizeInput = function(examples, options = {}) {
-        var that = this;
+    normalizeInput(examples, options = {}) {
         var normStats = options.normStats || {
             max: 1,
             min: -1
         };
         var normalizeInput = options.normalizeInput || "mapminmax";
-        that.inStats = Network.exampleStats(examples, "input");
-        return that.fNormIn = MapLayer.mapFun(that.nIn, that.inStats, normStats, normalizeInput);
+        this.inStats = Network.exampleStats(examples, "input");
+        return this.fNormIn = MapLayer.mapFun(this.nIn, this.inStats, normStats, normalizeInput);
     }
-    Network.prototype.train = function(examples, options = {}) {
-        var that = this;
-
-        if (!that.scope) {
+    train(examples, options = {}) {
+        if (!this.scope) {
             throw new Error("compile() network before train()");
         }
 
         var result = {};
 
-        that.fNormIn || that.normalizeInput(examples, options);
+        this.fNormIn || this.normalizeInput(examples, options);
         var nEpochs = options.maxEpochs || Network.MAX_EPOCHS;
         var targetCost = options.targetCost || Network.MIN_COST;
         var learningRate = options.learningRate || Network.LEARNING_RATE;
@@ -264,8 +247,8 @@ var Example = require("./Example");
             Network.LEARNING_RATE_PRESCALE : options.learningRatePreScale;
         for (var iEx = 0; iEx < lrPreScale; iEx++) {
             var example = examples[iEx % examples.length];
-            that.activate(example.input, example.target);
-            var cost = that.cost();
+            this.activate(example.input, example.target);
+            var cost = this.cost();
             if (iEx && prevCost < cost) { // dampen learning rate
                 var costRatio = cost / prevCost;
                 if (costRatio > 3000) {
@@ -287,7 +270,7 @@ var Example = require("./Example");
                 }
                 //console.log("Learning rate prescale:" + iEx, "cost/prevCost:"+cost/prevCost, "new learningRate:" + result.learningRate);
             }
-            that.propagate(result.learningRate);
+            this.propagate(result.learningRate);
             prevCost = cost;
         }
 
@@ -306,26 +289,26 @@ var Example = require("./Example");
             result.maxCost = 0;
             for (var iEx = 0; iEx < examples.length; iEx++) {
                 var example = examples[iEx];
-                that.activate(example.input, example.target);
-                var cost = that.cost();
+                this.activate(example.input, example.target);
+                var cost = this.cost();
                 result.maxCost = mathjs.max(result.maxCost, cost);
                 (cost > targetCost) && (done = false);
-                var gradC = that.costGradient();
+                var gradC = this.costGradient();
                 if (iBatch === 0) {
                     batchGradC = gradC;
                 } else {
-                    for (var ik = that.keys.length; ik-- > 0;) {
-                        var k = that.keys[ik];
+                    for (var ik = this.keys.length; ik-- > 0;) {
+                        var k = this.keys[ik];
                         batchGradC[k] = batchGradC[k] + gradC[k];
                     }
                 }
                 iBatch = (iBatch + 1) % batch;
                 if (iBatch === 0) {
-                    for (var ik = that.keys.length; ik-- > 0;) {
-                        var k = that.keys[ik];
+                    for (var ik = this.keys.length; ik-- > 0;) {
+                        var k = this.keys[ik];
                         batchGradC[k] *= batchScale;
                     }
-                    that.propagate(result.learningRate, batchGradC);
+                    this.propagate(result.learningRate, batchGradC);
                 }
             }
             result.epochs = iEpoch;
@@ -349,10 +332,11 @@ var Example = require("./Example");
 
     ////////////////// class
 
-    Network.MAX_EPOCHS = 500;
-    Network.MIN_COST = 0.00005;
-    Network.LEARNING_RATE = 0.5;
-    Network.LEARNING_RATE_PRESCALE = 8;
+    static get MAX_EPOCHS() { return 500; }
+    static get MIN_COST() { return 0.00005; }
+    static get LEARNING_RATE() { return 0.5; }
+    static get LEARNING_RATE_PRESCALE() { return 8; }
+} //// CLASS
 
     module.exports = exports.Network = Network;
 })(typeof exports === "object" ? exports : (exports = {}));
