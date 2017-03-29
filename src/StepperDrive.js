@@ -1,35 +1,41 @@
-(function(exports) {
-    //// SUPER 
-    function StepperDrive(options={}) {
-        var that = this;
-        that.type = "StepperDrive";
-        Object.assign(that, options);
-        that.minPos = that.minPos == null ? 0 : that.minPos; // minimum position
-        that.maxPos = that.maxPos == null ? 100 : that.maxPos; // maximum position
-        that.mstepPulses = that.mstepPulses || 1;
-        that.steps = that.steps || 200;
-        that.microsteps = that.microsteps || 16;
-        that.gearIn = that.gearIn || 1;
-        that.gearOut = that.gearOut || 1;
+(function(exports) { 
+class StepperDrive {
+    constructor(options={}) {
+        this.type = "StepperDrive";
+        Object.assign(this, options);
+        this.minPos = this.minPos == null ? 0 : this.minPos; // minimum position
+        this.maxPos = this.maxPos == null ? 100 : this.maxPos; // maximum position
+        this.mstepPulses = this.mstepPulses || 1;
+        this.steps = this.steps || 200;
+        this.microsteps = this.microsteps || 16;
+        this.gearIn = this.gearIn || 1;
+        this.gearOut = this.gearOut || 1;
 
-        Object.defineProperty(that, "gearRatio", {
-            get: () => that.gearOut / that.gearIn,
+        Object.defineProperty(this, "gearRatio", {
+            get: () => this.gearOut / this.gearIn,
         });
-        return that;
+        return this;
     }
-    StepperDrive.prototype.toJSON = function() {
-        var that = this;
-        return that;
+    toJSON() {
+        return this;
     }
-    StepperDrive.prototype.toMotorPos = function(axisPos) {
-        var that = this;
-        return isNaN(checkAxisPos(that, axisPos)) ? NaN : axisPos/that.unitTravel;
+    checkAxisPos(axisPos) {
+        return (
+            typeof axisPos === 'number' && 
+            !isNaN(axisPos) && 
+            this.minPos <= axisPos && 
+            axisPos <= this.maxPos 
+            ? axisPos : NaN
+        )
     }
-    StepperDrive.prototype.toAxisPos = function(motorPos) {
-        var that = this;
-        return checkAxisPos(that, motorPos == null ? NaN : that.unitTravel * motorPos);
+
+    toMotorPos(axisPos) {
+        return isNaN(checkAxisPos(this, axisPos)) ? NaN : axisPos/this.unitTravel;
     }
-    StepperDrive.fromJSON = function(json) {
+    toAxisPos(motorPos) {
+        return checkAxisPos(this, motorPos == null ? NaN : this.unitTravel * motorPos);
+    }
+    static fromJSON(json) {
         var json = typeof json === "object" ? json : JSON.parse(json);
         if (json.type === "BeltDrive") {
             return new StepperDrive.BeltDrive(json);
@@ -39,50 +45,32 @@
         }
         return new StepperDrive(json);
     }
+    static get BeltDrive() { return $BeltDrive; }
+    static get ScrewDrive() { return $ScrewDrive; }
+} //// CLASS
 
-    //// CLASS BeltDrive
-    StepperDrive.BeltDrive = function (options = {}) {
-        var that = this;
-        Object.defineProperty(that, "super", {
-            value: Object.getPrototypeOf(Object.getPrototypeOf(that)), // TODO: use ECMAScript 2015 super 
+var $BeltDrive = class extends StepperDrive {
+    constructor(options = {}) {
+        super(options);
+        this.type = "BeltDrive";
+        this.pitch = this.pitch || 2;
+        this.teeth = this.teeth || 16;
+        Object.defineProperty(this, "unitTravel", {
+            get: () =>  (this.mstepPulses * this.teeth * this.pitch) / (this.steps * this.microsteps * this.gearRatio),
         });
-        that.super.constructor.call(that, options);
-        that.type = "BeltDrive";
-        that.pitch = that.pitch || 2;
-        that.teeth = that.teeth || 16;
-        Object.defineProperty(that, "unitTravel", {
-            get: () =>  (that.mstepPulses * that.teeth * that.pitch) / (that.steps * that.microsteps * that.gearRatio),
-        });
-        return that;
     }
-    StepperDrive.BeltDrive.prototype = Object.create(StepperDrive.prototype);
+} //// BeltDrive
 
-    //// CLASS ScrewDrive
-    StepperDrive.ScrewDrive = function (options = {}) {
-        var that = this;
-        Object.defineProperty(that, "super", {
-            value: Object.getPrototypeOf(Object.getPrototypeOf(that)), // TODO: use ECMAScript 2015 super 
+var $ScrewDrive = class extends StepperDrive {
+    constructor(options = {}) {
+        super(options);
+        this.type = "ScrewDrive";
+        this.lead = this.lead || 0.8; // M5 screw pitch
+        Object.defineProperty(this, "unitTravel", {
+            get: () => 1 / (this.steps * (this.microsteps / this.mstepPulses) * this.lead * this.gearRatio),
         });
-        that.super.constructor.call(that, options);
-        that.type = "ScrewDrive";
-        that.lead = that.lead || 0.8; // M5 screw pitch
-        Object.defineProperty(that, "unitTravel", {
-            get: () => 1 / (that.steps * (that.microsteps / that.mstepPulses) * that.lead * that.gearRatio),
-        });
-        return that;
     }
-    StepperDrive.ScrewDrive.prototype = Object.create(StepperDrive.prototype);
-
-    //// PRIVATE
-    checkAxisPos = function(that, axisPos) {
-        return (
-            typeof axisPos === 'number' && 
-            !isNaN(axisPos) && 
-            that.minPos <= axisPos && 
-            axisPos <= that.maxPos 
-            ? axisPos : NaN
-        )
-    }
+} // ScrewDrive
 
     module.exports = exports.StepperDrive = StepperDrive;
 })(typeof exports === "object" ? exports : (exports = {}));
