@@ -1,9 +1,8 @@
 var mathjs = require("mathjs");
 var Variable = require("./Variable");
 
-(function(exports) {
-    ////////////////// constructor
-    Layer = function(nOut = 2, options = {}) {
+(function(exports) { class Layer {
+    constructor(nOut = 2, options = {}) {
         var that = this;
         that.type = "Layer";
         that.id = options.id || 0;
@@ -11,11 +10,11 @@ var Variable = require("./Variable");
         that.activation = options.activation || "identity";
         return that;
     }
-    Layer.prototype.toJSON = function() {
+    toJSON() {
         var that = this;
         return that;
     }
-    Layer.fromJSON = function(json) { // layer factory
+    static fromJSON(json) { // layer factory
         json = typeof json === 'string' ? JSON.parse(json) : json;
         if (json.type === "Layer") {
             return new Layer(json.nOut, json);
@@ -26,7 +25,7 @@ var Variable = require("./Variable");
         }
         return null;
     }
-    Layer.prototype.initializeLayer = function(nIn, weights = {}, options = {}) {
+    initializeLayer(nIn, weights = {}, options = {}) {
         var that = this;
         var xavier = 2 / (nIn + that.nOut);
         var gaussw = Variable.createGaussian(xavier);
@@ -42,7 +41,7 @@ var Variable = require("./Variable");
 
         return weights;
     };
-    Layer.prototype.expressions = function(exprIn) {
+    expressions(exprIn) {
         var that = this;
         var outputs = [];
         if (!exprIn instanceof Array) {
@@ -76,15 +75,16 @@ var Variable = require("./Variable");
     }
 
     /////////////////// class
-    Layer.weight = (layer, row, col) => {
+    static weight(layer, row, col) {
         return col == null ?
             "w" + layer + "b" + row : // offset
             "w" + layer + "r" + row + "c" + col; // matrix weight
     }
 
-    Layer.ACT_LOGISTIC = "logistic"; // activation function is logistic sigmoid
-    Layer.ACT_IDENTITY = "identity"; // activation function is identity
-    Layer.ACT_SOFTMAX = "softmax"; // activation function is soft maximum
+    static get ACT_LOGISTIC() { return "logistic"; } // activation function is logistic sigmoid
+    static get ACT_IDENTITY() { return "identity"; } // activation function is identity
+    static get ACT_SOFTMAX() { return "softmax"; } // activation function is soft maximum
+} //// CLASS
 
     module.exports = exports.Layer = Layer;
 })(typeof exports === "object" ? exports : (exports = {}));
