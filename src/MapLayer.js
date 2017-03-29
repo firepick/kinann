@@ -1,29 +1,27 @@
 var mathjs = require("mathjs");
+var Layer = require("./Layer");
 
-(function(exports) {
-    ////////////////// constructor
-    function MapLayer(fmap, options = {}) {
-        var that = this;
-        that.type = "MapLayer";
-        that.id = options.id || 0;
-        that.nOut = fmap.length;
-        that.weights = options.weights || {};
-        that.fmap = fmap;
-        return that;
+(function(exports) { class MapLayer extends Layer {
+    constructor(fmap, options = {}) {
+        super(options);
+        this.type = "MapLayer";
+        this.id = options.id || 0;
+        this.nOut = fmap.length;
+        this.weights = options.weights || {};
+        this.fmap = fmap;
     }
 
-    MapLayer.prototype.toJSON = function() {
-        var that = this;
+    toJSON() {
         var obj = {
             type: "MapLayer",
-            id: that.id,
-            weights: that.weights,
+            id: this.id,
+            weights: this.weights,
         };
-        that.fmap && (obj.fmap = that.fmap.map((f) => f.toString()));
+        this.fmap && (obj.fmap = this.fmap.map((f) => f.toString()));
         return obj;
     }
 
-    MapLayer.fromJSON = function(json) {
+    static fromJSON(json) {
         var json = typeof json === 'string' ? JSON.parse(json) : json;
         if (json.type !== "MapLayer") {
             return null;
@@ -32,20 +30,18 @@ var mathjs = require("mathjs");
         return new MapLayer(fmap, json);
     }
 
-    MapLayer.prototype.initializeLayer = function(nIn, weights = {}, options = {}) {
-        var that = this;
-        return Object.assign(weights, Object.assign({}, that.weights, weights));
+    initializeLayer(nIn, weights = {}, options = {}) {
+        return Object.assign(weights, Object.assign({}, this.weights, weights));
     }
 
-    MapLayer.prototype.expressions = function(exprIn) {
-        var that = this;
+    expressions (exprIn) {
         if (!exprIn instanceof Array) {
             throw new Error("Expected input expression vector");
         }
-        return that.fmap.map((f, i) => f(exprIn,i));
+        return this.fmap.map((f, i) => f(exprIn,i));
     }
 
-    MapLayer.validateStats = function(stats = {}) {
+    static validateStats(stats = {}) {
         var min = stats.min == null ? -1 : stats.min;
         var max = stats.max == null ? 1 : stats.max;
         return {
@@ -56,7 +52,7 @@ var mathjs = require("mathjs");
         }
     }
 
-    MapLayer.mapExpr = function(n, statsIn, statsOut, fun = "mapidentity") {
+    static mapExpr(n, statsIn, statsOut, fun = "mapidentity") {
         (statsIn instanceof Array) || (statsIn = Array(n).fill(statsIn || {}));
         (statsOut instanceof Array) || (statsOut = Array(n).fill(statsOut || {}));
         var si = statsIn.map((s) => MapLayer.validateStats(s));
@@ -74,7 +70,7 @@ var mathjs = require("mathjs");
         return statsIn.map((f, i) => new Function("eIn", "return " + '"' + mapFun(si[i], so[i], '("+eIn[' + i + ']+")') + '"'));
     }
 
-    MapLayer.mapFun = function(n, statsIn, statsOut, fun = "mapidentity") {
+    static mapFun(n, statsIn, statsOut, fun = "mapidentity") {
         (statsIn instanceof Array) || (statsIn = Array(n).fill(statsIn || {}));
         (statsOut instanceof Array) || (statsOut = Array(n).fill(statsOut || {}));
         var si = statsIn.map((s) => MapLayer.validateStats(s));
@@ -92,11 +88,11 @@ var mathjs = require("mathjs");
         return statsIn.map((f, i) => new Function("x", "return " + mapFun(si[i], so[i], "x")));
     }
 
-    MapLayer.MAPIDENTITY = function(si, so, x) {
+    static MAPIDENTITY(si, so, x) {
         return x;
     }
 
-    MapLayer.MAPSTD = function(si, so, x) {
+    static MAPSTD(si, so, x) {
         var scale = so.std / si.std;
         var body = si.mean ? "(" + x + " - " + si.mean + ")" : x;
         scale != 1 && (body += "*" + scale);
@@ -104,7 +100,7 @@ var mathjs = require("mathjs");
         return body;
     }
 
-    MapLayer.MAPMINMAX = function(si, so, x) {
+    static MAPMINMAX(si, so, x) {
         var dsi = si.max - si.min;
         var dso = so.max - so.min;
         var simean = (si.max + si.min) / 2;
@@ -115,6 +111,7 @@ var mathjs = require("mathjs");
         somean && (body += "+" + somean);
         return body;
     }
+} //// CLASS
 
     module.exports = exports.MapLayer = MapLayer;
 })(typeof exports === "object" ? exports : (exports = {}));
