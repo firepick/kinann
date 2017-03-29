@@ -330,8 +330,6 @@ var Example = require("./Example");
         return result;
     }
 
-    ////////////////// class
-
     static get MAX_EPOCHS() { return 500; }
     static get MIN_COST() { return 0.00005; }
     static get LEARNING_RATE() { return 0.5; }
