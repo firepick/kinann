@@ -1,5 +1,4 @@
-(function(exports) { 
-class StepperDrive {
+(function(exports) { class StepperDrive {
     constructor(options={}) {
         this.type = "StepperDrive";
         Object.assign(this, options);
@@ -20,6 +19,15 @@ class StepperDrive {
         return this;
     }
     checkAxisPos(axisPos) {
+        if (isNaN(axisPos)) {
+            throw new Error("Expected number for axisPos: " + JSON.stringify(axisPos));
+        }
+        if (axisPos < this.minPos) {
+            throw new Error("axisPos " + axisPos + " is lower than minPos:" + this.minPos);
+        }
+        if (this.maxPos < axisPos) {
+            throw new Error("axisPos " + axisPos + " is greater than maxPos:" + this.maxPos);
+        }
         return (
             typeof axisPos === 'number' && 
             !isNaN(axisPos) && 
@@ -30,10 +38,10 @@ class StepperDrive {
     }
 
     toMotorPos(axisPos) {
-        return isNaN(checkAxisPos(this, axisPos)) ? NaN : axisPos/this.unitTravel;
+        return isNaN(this.checkAxisPos(axisPos)) ? NaN : axisPos/this.unitTravel;
     }
     toAxisPos(motorPos) {
-        return checkAxisPos(this, motorPos == null ? NaN : this.unitTravel * motorPos);
+        return this.checkAxisPos(motorPos == null ? NaN : this.unitTravel * motorPos);
     }
     static fromJSON(json) {
         var json = typeof json === "object" ? json : JSON.parse(json);
@@ -47,9 +55,9 @@ class StepperDrive {
     }
     static get BeltDrive() { return $BeltDrive; }
     static get ScrewDrive() { return $ScrewDrive; }
-} //// CLASS
+} //// CLASS StepperDrive
 
-var $BeltDrive = class extends StepperDrive {
+var $BeltDrive = class BeltDrive extends StepperDrive {
     constructor(options = {}) {
         super(options);
         this.type = "BeltDrive";
@@ -61,7 +69,7 @@ var $BeltDrive = class extends StepperDrive {
     }
 } //// BeltDrive
 
-var $ScrewDrive = class extends StepperDrive {
+var $ScrewDrive = class ScrewDrive extends StepperDrive {
     constructor(options = {}) {
         super(options);
         this.type = "ScrewDrive";
@@ -70,7 +78,7 @@ var $ScrewDrive = class extends StepperDrive {
             get: () => 1 / (this.steps * (this.microsteps / this.mstepPulses) * this.lead * this.gearRatio),
         });
     }
-} // ScrewDrive
+} // CLASS ScrewDrive
 
     module.exports = exports.StepperDrive = StepperDrive;
 })(typeof exports === "object" ? exports : (exports = {}));
@@ -94,11 +102,12 @@ var $ScrewDrive = class extends StepperDrive {
             steps: 200, // motor steps per revolution
         });
     });
-    it("BeltDrive.toAxisPos(motorPos) axis position of motor position", function() {
+    it("TESTTESTBeltDrive.toAxisPos(motorPos) axis position of motor position", function() {
         var belt = new BeltDrive();
-        belt.toAxisPos(null).should.NaN();
-        belt.toAxisPos(undefined).should.NaN();
-        belt.toAxisPos(NaN).should.NaN();
+        should.throws(() => belt.toAxisPos(null));
+        should.throws(() => belt.toAxisPos(undefined));
+        should.throws(() => belt.toAxisPos(NaN));
+        should.throws(() => belt.toAxisPos(-1));
 
         belt.toAxisPos(1).should.equal(0.01);
         belt.toAxisPos(200).should.equal(2);
@@ -118,7 +127,6 @@ var $ScrewDrive = class extends StepperDrive {
         belt.toAxisPos(1).should.equal(0.02);
         belt.toAxisPos(200).should.equal(4);
 
-        (belt.toAxisPos(-1)).should.NaN();
         belt.minPos = -1;
         belt.toAxisPos(-1).should.equal(-0.02);
     });
