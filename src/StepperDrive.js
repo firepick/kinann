@@ -102,7 +102,7 @@ var $ScrewDrive = class ScrewDrive extends StepperDrive {
             steps: 200, // motor steps per revolution
         });
     });
-    it("TESTTESTBeltDrive.toAxisPos(motorPos) axis position of motor position", function() {
+    it("BeltDrive.toAxisPos(motorPos) axis position of motor position", function() {
         var belt = new BeltDrive();
         should.throws(() => belt.toAxisPos(null));
         should.throws(() => belt.toAxisPos(undefined));

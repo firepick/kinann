@@ -25,21 +25,21 @@ var mathjs = require("mathjs");
         eq.get("PI").should.equal(""+mathjs.PI);
         eq.set("mx", "m*x").should.equal("mx");
         eq.set("y", "m*x+b").should.equal("y");
-        eq.get("y").should.equal("mx + b");  // not "sin(m*x + b)" !
+        eq.get("y").should.equal("m * x + b");  
         eq.set("z", "sin(m*x+b)").should.equal("z");
-        eq.get("z").should.equal("sin(y)"); // not "sin(m * x + b)" !
+        eq.get("z").should.equal("sin(m * x + b)"); 
 
         // definitions don't change
         eq.get("PI").should.equal(""+mathjs.PI);
-        eq.get("y").should.equal("mx + b"); 
+        eq.get("y").should.equal("m * x + b"); 
 
         // sub-expressions are associated with generated symbols
         eq.get("_0").should.equal("m * x"); 
-        eq.get("_1").should.equal("mx + b"); 
-        eq.get("_2").should.equal("sin(y)"); 
+        eq.get("_1").should.equal("m * x + b"); 
+        eq.get("_2").should.equal("sin(m * x + b)"); 
 
         eq.set("zz", "sin(m*x+PI)/cos((m*x + b)^2)").should.equal("zz");
-        eq.get("zz").should.equal("sin(mx + PI) / cos(y ^ 2)"); // note that y is used instead of "m*x+b"
+        eq.get("zz").should.equal("sin(m * x + PI) / cos(y ^ 2)"); // note that y is used instead of "m*x+b"
 
         var eq = new Equations();
         eq.set("y", "(x+1)/(x-1)").should.equal("y");
@@ -269,5 +269,17 @@ var mathjs = require("mathjs");
         eq.derivative("y","x").should.equal("y_dx");
         var dy = eq.get("y_dx");
         dy.should.equal("slope");
+    });
+    it("TESTTESTsimple example", function() {
+        var eq = new Equations();
+        eq.set("y", "(1-x^2)*x^2");
+//        eq.derivative("y","x");
+        should.deepEqual(eq.exprOfSymbol,{
+            _0: "x ^ 2",
+            _1: "1 - _0",
+            _2: "_1 * _0",
+            y: "_2",
+            //_0_dx: "_4",
+        });
     });
 })

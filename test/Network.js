@@ -193,7 +193,7 @@ var Sequential = require("../src/Sequential");
         network.activate(inputs, [18, 43.2]);
         mathjs.round(network.cost(), 3).should.equal(0.605); // far from target
     })
-    it("TESTTESTNetwork.costGradient() returns activation cost gradient vector", function() {
+    it("Network.costGradient() returns activation cost gradient vector", function() {
         var network = new Sequential(2, [new Layer(2, identity_opts)]);
         var scope = {
             w0b0: 0.1,
