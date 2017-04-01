@@ -44,8 +44,6 @@ var mathjs = require("mathjs");
         var eq = new Equations();
         eq.set("y", "(x+1)/(x-1)").should.equal("y");
         eq.get("y").should.equal("(x + 1) / (x - 1)"); // mathjs puts in parentheses
-
-        var msStart = new Date();
     });
     it("fastSimplify(node) returns simplified node tree", function() {
         var eq = new Equations();
@@ -108,26 +106,23 @@ var mathjs = require("mathjs");
         eq.get(eq.derivative("2*x+1", "x")).should.equal("2"); 
         eq.get(eq.derivative("((x+1)*(x+2))", "x")).should.equal("x + 1 + x + 2"); // fastSimplify 
 
-        var eq = new Equations({
-            simplify: mathjs.simplify
-        });
-        eq.get(eq.derivative("((x+1)*(x+2))", "x")).should.equal("2 * x + 3"); // mathjs simplify
-
         var eq = new Equations();
         eq.set("cost", "w0b0 + w0r0c0 * x0 + w0r0c1 * x1");
         var dcost = eq.derivative("cost", "w0b0");
         eq.get(dcost).should.equal("1");
     });
+    it("you can customize simplify()", function() {
+        var eq = new Equations({
+            simplify: mathjs.simplify
+        });
+        eq.get(eq.derivative("((x+1)*(x+2))", "x")).should.equal("2 * x + 3"); // mathjs simplify
+        eq.get(eq.derivative("x/y", "x")).should.equal("1 / y"); 
+        eq.get(eq.derivative("x/y", "y")).should.equal("-(x / y ^ 2)"); 
+    });
     it("derivative(fname, variable) generates derivative of quotient", function() {
         var eq = new Equations();
         eq.get(eq.derivative("x/y", "x")).should.equal("y / y ^ 2"); 
         eq.get(eq.derivative("x/y", "y")).should.equal("-x / y ^ 2"); 
-
-        var eq = new Equations({
-            simplify: mathjs.simplify,
-        });
-        eq.get(eq.derivative("x/y", "x")).should.equal("1 / y"); 
-        eq.get(eq.derivative("x/y", "y")).should.equal("-(x / y ^ 2)"); 
     });
     it("derivative(fname, variable) generates derivative of exponents", function() {
         var eq = new Equations();
@@ -156,35 +151,40 @@ var mathjs = require("mathjs");
         eq.get(eq.derivative("tanh(2*x+1)", "x")).should.equal("sech(2 * x + 1) ^ 2 * 2"); 
     });
     it("gist computes quickly", function() {
-        var verbose = false;
+        var verbose = true;
         var eq = new Equations();
         var gist = fs.readFileSync("test/rotarydeltax.json").toString().replace(/\n/g," ").toString();
 
         var msStart = new Date();
         var gistTree = mathjs.parse(gist);
         var msElapsed = new Date() - msStart;
+        verbose && console.log("parse:", msElapsed);
         msElapsed.should.below(200); // typically ~17ms
-
-        //var msStart = new Date();
-        //mathjs.simplify(gistTree);
-        //console.log("simplify ms", new Date() - msStart); // typically ~1600ms
+        var msParsed = msElapsed;
 
         var msStart = new Date();
         eq.fastSimplify(gistTree);
         var msElapsed = new Date() - msStart;
-        msElapsed.should.below(100); // typically ~5ms
+        verbose && console.log("fastSimplify:", msElapsed);
+        msElapsed.should.below(msParsed); // typically ~5ms
 
         var msStart = new Date();
         eq.set("gist", gist).should.equal("gist");
         var msElapsed = new Date() - msStart;
-        msElapsed.should.below(1000); // typically ~63
-        verbose && console.log("set:", new Date() - msStart);
+        msElapsed.should.below(3*msParsed); // typically ~63
+        verbose && console.log("set:", msElapsed);
+
+        var msStart = new Date();
+        var gistget = eq.get("gist");
+        var msElapsed = new Date() - msStart;
+        msElapsed.should.below(3*msParsed); // typically ~63
+        verbose && console.log("get:", msElapsed);
 
         var msStart = new Date();
         var dfname = eq.derivative("gist", "rf");
         var msElapsed = new Date() - msStart;
-        msElapsed.should.below(200); // typically ~10ms
-        verbose && console.log("derivative ms:", msElapsed);
+        msElapsed.should.below(msParsed); // typically ~10ms
+        verbose && console.log("derivative rf ms:", msElapsed);
     })
     it("compile(fname) compiles Javascript memoization function", function() {
         var a = 3;
@@ -278,11 +278,13 @@ var mathjs = require("mathjs");
             _0: "x ^ 2",
             _1: "1 - _0",
             _2: "_1 * _0",
-            _3: "2 * x ^ 1",
+            _3: "2 * x",
+            _4: "_0 * _1_dx",
+            _5: "_1 * _0_dx",
             y: "_2",
             _0_dx: "_3",
             _1_dx: "-_0_dx",
-            _2_dx: "_1 * _0_dx + _0 * _1_dx",
+            _2_dx: "_5 + _4",
             y_dx: "_2_dx",
         });
     });

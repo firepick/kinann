@@ -189,18 +189,27 @@ var mathjs = require("mathjs");
                     dnode = new mathjs.expression.node.OperatorNode(node.op, node.fn, [da0,da1]);
                 }
             } else if (node.op === "*") { // udv+vdu
-                var vdu = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a1, da0]);
-                var udv = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, da1]);
-                dnode = new mathjs.expression.node.OperatorNode("+", "add", [udv, vdu]);
+                var vdun = this.digestNode(
+                    new mathjs.expression.node.OperatorNode(node.op, node.fn, [a1, da0]));
+                var udvn = this.digestNode(
+                    new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, da1]));
+                dnode = new mathjs.expression.node.OperatorNode("+", "add", [
+                    this.symbolNode(udvn),
+                    this.symbolNode(vdun),
+                ]);
             } else if (node.op === "/") { // d(u/v) = (vdu-udv)/v^2
                 var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [a1, da0]);
                 var udv = new mathjs.expression.node.OperatorNode("*", "multiply", [a0, da1]);
-                var vduudv = new mathjs.expression.node.OperatorNode("-", "subtract", [vdu, udv]);
+                var vduudv = new mathjs.expression.node.OperatorNode("-", "subtract", [ vdu, udv ]);
+                vduudv = this.fastSimplify(vduudv);
+                var vduudvn = this.digestNode(vduudv);
                 var vv = new mathjs.expression.node.OperatorNode("^", "pos", [a1,this.node2]);
                 var vvname = this.digestNormalizedExpr(vv.toString());
-                var vvn = this.symbolNode(vvname);
-                dnode = new mathjs.expression.node.OperatorNode("/", "divide", [vduudv, vvn]);
-            } else if (node.op === "^") { // udv+vdu
+                dnode = new mathjs.expression.node.OperatorNode("/", "divide", [
+                    this.symbolNode(vduudvn), 
+                    this.symbolNode(vvname),
+                ]);
+            } else if (node.op === "^") { 
                 var exponent = a1;
                 var dexponent = da1;
                 if (exponent.isSymbolNode) {
@@ -214,6 +223,7 @@ var mathjs = require("mathjs");
                     var power = new mathjs.expression.node.ConstantNode(Number(exponent.value)-1);
                     var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
                     var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [exponent,a0p]);
+                    prod = this.fastSimplify(prod);
                     var prodn = this.digestNormalizedExpr(prod.toString());
                     var prodnn = this.symbolNode(prodn);
                     dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
@@ -226,11 +236,16 @@ var mathjs = require("mathjs");
                     var lnu = new mathjs.expression.node.FunctionNode("ln", [u]);
                     var dvlnu = new mathjs.expression.node.OperatorNode("*", "multiply", [dv, lnu]);
                     var uvdvlnu = new mathjs.expression.node.OperatorNode("*", "multiply", [uv, dvlnu]);
+                    var uvdvlnun = this.digestNode(this.fastSimplify(uvdvlnu));
                     var v1 = new mathjs.expression.node.OperatorNode("-", "subtract", [v,this.node1]);
                     var uv1 = new mathjs.expression.node.OperatorNode("^", "pow", [u,v1]);
                     var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [v, du]);
                     var uv1vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [uv1, vdu]);
-                    dnode = new mathjs.expression.node.OperatorNode("+", "add", [uvdvlnu, uv1vdu]);
+                    var uv1vdun = this.digestNode(this.fastSimplify(uv1vdu));
+                    dnode = new mathjs.expression.node.OperatorNode("+", "add", [
+                        this.symbolNode(uvdvlnun), 
+                        this.symbolNode(uv1vdun),
+                    ]);
                 }
             }
         } else if (node.isFunctionNode) {
