@@ -112,25 +112,28 @@ var mathjs = require("mathjs");
         }
 
         var exprTree = mathjs.parse(expr);
-        var symbol = this.digestNode(exprTree);
-        var dsymbol = symbol + "_d" + variable;
+        var digestedSym = this.digestNode(exprTree);
+        var dsymbol = digestedSym + "_d" + variable;
         var dexpr = this.exprOfSymbol[dsymbol];
 
         if (dexpr == null) {
-            var node = this.treeOfSymbol[symbol];
+            var node = this.treeOfSymbol[digestedSym];
             if (node == null) {
                 if (exprTree.isSymbolNode) {
                     return variable === expr ? "1" : "0"; 
                 }
-                throw new Error("Unknown symbol:" + symbol);
+                throw new Error("Unknown symbol:" + digestedSym);
             }
             var dnode = this.nodeDerivative(node, variable);
             dnode = this.fastSimplify(dnode);
             dexpr = dnode.toString();
-            var dexprSymbol = this.digestNormalizedExpr(dexpr);
-            this.exprOfSymbol[dsymbol] = dexprSymbol;
-            this.symbols.push(dsymbol);
-            this.treeOfSymbol[dsymbol] = this.symbolNode(dexprSymbol); 
+            var dexprSymbol = this.digestNormalizedExpr(dexpr, dsymbol);
+            if (dexprSymbol !== dsymbol) { 
+                // bind dsymbol  bindNode doesn't work here)
+                this.exprOfSymbol[dsymbol] = dexprSymbol;
+                this.symbols.push(dsymbol);
+                this.treeOfSymbol[dsymbol] = this.symbolNode(dexprSymbol); 
+            }
         }
 
         return dsymbol;
@@ -320,7 +323,7 @@ var mathjs = require("mathjs");
         return result;
     }
 
-    digestNormalizedExpr(normalizedExpr) {
+    digestNormalizedExpr(normalizedExpr, defaultSymbol) {
         var symbol = this.symbolOfExpr[normalizedExpr];
         if (symbol == null) {
             var digestedNode = mathjs.parse(normalizedExpr);
@@ -329,7 +332,7 @@ var mathjs = require("mathjs");
             } else if (digestedNode.isSymbolNode && digestedNode.name[0] === '_') {
                 return digestedNode.name; // generated symbol
             }
-            symbol = this.generateSymbol();
+            symbol = defaultSymbol || this.generateSymbol();
             this.bindNode(symbol, digestedNode);
         }
         return symbol;
@@ -357,11 +360,12 @@ var mathjs = require("mathjs");
     }
 
     set(symbol, expr) {
-        (typeof expr === "number") && (expr = "" + expr);
         if (typeof symbol !== "string") {
             throw new Error("Invalid call to set(symbol, expr) => symbol must be string");
         }
-        if (typeof expr !== "string") {
+        if (typeof expr === "number") {
+            expr = "" + expr;
+        } else if (typeof expr !== "string") {
             throw new Error("Invalid call to set(\""+symbol+"\", expr) => expr must be string");
         }
         var tree = mathjs.parse(expr);
@@ -369,7 +373,9 @@ var mathjs = require("mathjs");
             this.bindNode(symbol, tree);
         } else {
             var digestedSym = this.digestNode(tree);
-            this.bindNode(symbol, new mathjs.expression.node.SymbolNode(digestedSym));
+            var digestedSymNode = new mathjs.expression.node.SymbolNode(digestedSym);
+            this.bindNode(symbol, digestedSymNode);
+            this.symbolOfExpr[this.exprOfSymbol[digestedSym]] = symbol; // prefer user symbol to generated symbol
         }
         return symbol;
     }
