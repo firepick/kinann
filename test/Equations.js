@@ -173,25 +173,25 @@ var mathjs = require("mathjs");
         eq.fastSimplify(gistTree);
         var msElapsed = new Date() - msStart;
         verbose && console.log("fastSimplify:", msElapsed);
-        msElapsed.should.below(msParsed); // typically ~5ms
+        msElapsed.should.below(1.2*msParsed); // typically ~5ms
 
         var msStart = new Date();
         eq.set("gist", gist).should.equal("gist");
         var msElapsed = new Date() - msStart;
-        msElapsed.should.below(4*msParsed); // ~31
         verbose && console.log("set:", msElapsed);
+        msElapsed.should.below(4*msParsed); // ~31
 
         var msStart = new Date();
         var gistget = eq.get("gist");
         var msElapsed = new Date() - msStart;
-        msElapsed.should.below(3.5*msParsed); // typically ~63
         verbose && console.log("get:", msElapsed);
+        msElapsed.should.below(3.6*msParsed); // typically ~63
 
         var msStart = new Date();
         var dfname = eq.derivative("gist", "rf");
         var msElapsed = new Date() - msStart;
-        msElapsed.should.below(msParsed); // typically ~10ms
         verbose && console.log("derivative rf ms:", msElapsed);
+        msElapsed.should.below(1.3*msParsed); // typically ~10ms
     })
     it("compile(fname) compiles Javascript memoization function", function() {
         var a = 3;
@@ -288,12 +288,12 @@ var mathjs = require("mathjs");
             _1: "1 - _0",
             _2: "_1 * _0",
             _3: "2 * x",
-            //TODO _4: "_0 * _1_dx",
-            //TODO _5: "_1 * _0_dx",
+            _4: "_1 * _0_dx",
+            _5: "_0 * _1_dx",
             y: "_2",
             _0_dx: "_3",
             _1_dx: "-_0_dx",
-            //TODO _2_dx: "_5 + _4",
+            _2_dx: "_4 + _5",
             y_dx: "_2_dx",
         });
     });

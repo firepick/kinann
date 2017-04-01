@@ -146,7 +146,7 @@ var mathjs = require("mathjs");
             var dnode = this.nodeDerivative(node, variable);
             dnode = this.fastSimplify(dnode);
             dexpr = dnode.toString();
-            var dexprSymbol = this.digestNormalizedExpr(dexpr, dsymbol);
+            var dexprSymbol = this.bindNormalizedExpr(dexpr, dsymbol);
             if (dexprSymbol !== dsymbol) { 
                 // bind dsymbol  bindNode doesn't work here)
                 this.exprSymbolMap[dsymbol] = dexprSymbol;
@@ -211,7 +211,7 @@ var mathjs = require("mathjs");
                 var vdu = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a1, da0]);
                 var udv = new mathjs.expression.node.OperatorNode(node.op, node.fn, [a0, da1]);
                 dnode = new mathjs.expression.node.OperatorNode("+", "add", [udv, vdu]);
-                //dnode = this.fastSimplify(dnode);
+                dnode = this.fastSimplify(dnode);
             } else if (node.op === "/") { // d(u/v) = (vdu-udv)/v^2
                 var vdu = new mathjs.expression.node.OperatorNode("*", "multiply", [a1, da0]);
                 var udv = new mathjs.expression.node.OperatorNode("*", "multiply", [a0, da1]);
@@ -219,7 +219,7 @@ var mathjs = require("mathjs");
                 vduudv = this.fastSimplify(vduudv);
                 var vduudvn = this.digestNode(vduudv);
                 var vv = new mathjs.expression.node.OperatorNode("^", "pos", [a1,this.node2]);
-                var vvname = this.digestNormalizedExpr(vv.toString());
+                var vvname = this.bindNormalizedExpr(vv.toString());
                 dnode = new mathjs.expression.node.OperatorNode("/", "divide", [
                     this.symbolNodeOfString(vduudvn), 
                     this.symbolNodeOfString(vvname),
@@ -239,7 +239,7 @@ var mathjs = require("mathjs");
                     var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
                     var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [exponent,a0p]);
                     prod = this.fastSimplify(prod);
-                    var prodn = this.digestNormalizedExpr(prod.toString());
+                    var prodn = this.bindNormalizedExpr(prod.toString());
                     var prodnn = this.symbolNodeOfString(prodn);
                     dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
                 } else { // d(u^v) = (u^v)*dv*ln(u) + (u^(g-1))*vdu
@@ -270,35 +270,35 @@ var mathjs = require("mathjs");
             var da1 = a1 && this.nodeDerivative(a1, variable);
             if (node.name === "sin") {
                 var cos = new mathjs.expression.node.FunctionNode("cos", [a0]);
-                var fcos = this.digestNormalizedExpr(cos.toString());
+                var fcos = this.bindNormalizedExpr(cos.toString());
                 var fcosn = this.symbolNodeOfString(fcos);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fcosn, da0]);
             } else if (node.name === "cos") {
                 var cos = new mathjs.expression.node.FunctionNode("sin", [a0]);
-                var fcos = this.digestNormalizedExpr(cos.toString());
+                var fcos = this.bindNormalizedExpr(cos.toString());
                 var fcosn = this.symbolNodeOfString(fcos);
                 var dcos = new mathjs.expression.node.OperatorNode("-", "unaryMinus", [fcosn]);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [dcos, da0]);
             } else if (node.name === "tan") {
                 var sec = new mathjs.expression.node.FunctionNode("sec", [a0]);
                 var sec2 = new mathjs.expression.node.OperatorNode("^", "pow", [sec, this.node2]);
-                var fsec2 = this.digestNormalizedExpr(sec2.toString());
+                var fsec2 = this.bindNormalizedExpr(sec2.toString());
                 var fsec2n = this.symbolNodeOfString(fsec2);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fsec2n, da0]);
             } else if (node.name === "sinh") {
                 var cosh = new mathjs.expression.node.FunctionNode("cosh", [a0]);
-                var fcosh = this.digestNormalizedExpr(cosh.toString());
+                var fcosh = this.bindNormalizedExpr(cosh.toString());
                 var fcoshn = this.symbolNodeOfString(fcosh);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fcoshn, da0]);
             } else if (node.name === "cosh") {
                 var sinh = new mathjs.expression.node.FunctionNode("sinh", [a0]);
-                var fsinh= this.digestNormalizedExpr(sinh.toString());
+                var fsinh= this.bindNormalizedExpr(sinh.toString());
                 var fsinhn = this.symbolNodeOfString(fsinh);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fsinhn, da0]);
             } else if (node.name === "tanh") {
                 var sech = new mathjs.expression.node.FunctionNode("sech", [a0]);
                 var sech2 = new mathjs.expression.node.OperatorNode("^", "pow", [sech, this.node2]);
-                var fsech2 = this.digestNormalizedExpr(sech2.toString());
+                var fsech2 = this.bindNormalizedExpr(sech2.toString());
                 var fsech2n = this.symbolNodeOfString(fsech2);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [fsech2n, da0]);
             } else if (node.name === "sqrt") {
@@ -306,7 +306,7 @@ var mathjs = require("mathjs");
                 var power = new mathjs.expression.node.ConstantNode(1/2-1);
                 var a0p = new mathjs.expression.node.OperatorNode("^", "pow", [a0,power]);
                 var prod = new mathjs.expression.node.OperatorNode("*", "multiply", [k,a0p]);
-                var prodn = this.digestNormalizedExpr(prod.toString());
+                var prodn = this.bindNormalizedExpr(prod.toString());
                 var prodnn = this.symbolNodeOfString(prodn);
                 dnode = new mathjs.expression.node.OperatorNode("*", "multiply", [prodnn, da0]);
             } else if (node.name === "exp") { // d(exp(g)) = d(g) * exp(g)
@@ -319,7 +319,11 @@ var mathjs = require("mathjs");
             throw new Error("nodeDerivative does not support: " + node.type + " " + msg);
         }
         dnode = this.fastSimplify(dnode);
-        //dnode = this.treeOfSymbol(this.digestNode(dnode));
+        if (dnode.isOperatorNode && dnode.args.length === 2) {
+            var argn = dnode.args.map((arg) => this.digestNode(arg));
+            var args = argn.map((an) => this.symbolNodeOfString(an));
+            dnode = new mathjs.expression.node.OperatorNode(dnode.op, dnode.fn, args);
+        }
         return dnode;
     }
 
@@ -331,20 +335,20 @@ var mathjs = require("mathjs");
             result = node.name;
         } else if (node.isOperatorNode) {
             if (node.args.length === 1) {
-                result = this.digestNormalizedExpr("-" + this.digestNode(node.args[0]));
+                result = this.bindNormalizedExpr(node.op + this.digestNode(node.args[0]));
             } else if (node.args.length > 1) {
                 var args = node.args.map((arg) => this.digestNode(arg));
                 var expr = args.join(" " + node.op + " ");
-                result = this.digestNormalizedExpr(expr);
+                result = this.bindNormalizedExpr(expr);
             } else {
                 throw new Error("TBD OperatorNode with args:" + node.args.length);
             }
         } else if (node.isFunctionNode) {
             var args = node.args.map((arg) => this.digestNode(arg));
-            result = this.digestNormalizedExpr(node.name + "(" + args.join(",") + ")");
+            result = this.bindNormalizedExpr(node.name + "(" + args.join(",") + ")");
         } else if (node.isParenthesisNode) {
             var content = this.digestNode(node.content);
-            result = this.digestNormalizedExpr(content.toString());
+            result = this.bindNormalizedExpr(content.toString());
         } else {
             throw new Error("TBD digestNode("+node.type+")");
         }
@@ -355,7 +359,7 @@ var mathjs = require("mathjs");
         return result;
     }
 
-    digestNormalizedExpr(normalizedExpr, defaultSymbol) {
+    bindNormalizedExpr(normalizedExpr, defaultSymbol) {
         var symbol = this.symbolExprMap[normalizedExpr];
         if (symbol == null) {
             var digestedNode = mathjs.parse(normalizedExpr);
