@@ -431,7 +431,7 @@ class RotaryDelta extends Model {
         var rd = new RotaryDelta();
         var exprs = rd.expressions();
         var eq = new Equations();
-        var fname = eq.set("f0", exprs[0]);
+        var fname = eq.define("f0", exprs[0]);
         var root = mathjs.parse(exprs[0]);
         //var de = mathjs.derivative(exprs[0], "e");
         var nodes = 0;

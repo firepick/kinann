@@ -104,12 +104,12 @@ var Example = require("./Example");
         var nIn = this.nIn;
         this.nOut = this.layers[this.layers.length - 1].nOut;
         var exprs = this.expressions(exprsIn);
-        this.outputNames = exprs.map((expr,i) => this.eq.set("y"+i, expr));
+        this.outputNames = exprs.map((expr,i) => this.eq.define("y"+i, expr));
         this.memoActivate = this.eq.compile();
         this.scope = Object.create(this.weights);
 
         this.gradExpr = this.gradExpr || this.costGradientExpr(exprsIn, options);
-        this.eq.set("cost", this.costFunExpr);
+        this.eq.define("cost", this.costFunExpr);
         this.gradFun = {};
         this.fmemo_gradient = {};
         this.keys = Object.keys(this.weights);

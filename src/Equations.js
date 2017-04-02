@@ -24,6 +24,23 @@ var mathjs = require("mathjs");
         return "_" + this.symgen++;
     }
 
+    unboundSymbols() {
+        var unbound = {};
+        var  traverse = (node) => {
+            if (node.isSymbolNode) {
+                if (this.symbolExprMap[node.name] == null && node.name[0] !== "_") {
+                    unbound[node.name] = true;
+                }
+            } else if (node.isParenthesisNode) {
+                traverse(node.content);
+            } else if (node.isFunctionNode || node.isOperatorNode) {
+                node.args.forEach((arg) => traverse(arg));
+            } 
+        }
+        Object.keys(this.symbolTreeMap).forEach((symbol) => traverse(this.symbolTreeMap[symbol]));
+        return unbound;
+    }
+
     bindNode(symbol, node) {
         this.symbolTreeMap[symbol] = node;
         var expr = node.toString();
@@ -395,14 +412,14 @@ var mathjs = require("mathjs");
         }
     }
 
-    set(symbol, expr) {
+    define(symbol, expr) {
         if (typeof symbol !== "string") {
-            throw new Error("Invalid call to set(symbol, expr) => symbol must be string");
+            throw new Error("Invalid call to define(symbol, expr) => symbol must be string");
         }
         if (typeof expr === "number") {
             expr = "" + expr;
         } else if (typeof expr !== "string") {
-            throw new Error("Invalid call to set(\""+symbol+"\", expr) => expr must be string");
+            throw new Error("Invalid call to define(\""+symbol+"\", expr) => expr must be string");
         }
         var tree = mathjs.parse(expr);
         if (tree.isConstantNode) {
@@ -416,7 +433,17 @@ var mathjs = require("mathjs");
         return symbol;
     }
 
+    set(symbol, expr) {
+        console.log("DEPRECATED: set => define("+symbol+","+expr+")");
+        return this.define(symbol, expr);
+    }
+
     get(symbol) {
+        console.log("DEPRECATED: get => lookup("+symbol+")");
+        return this.lookup(symbol);
+    }
+
+    lookup(symbol) {
         var node = this.symbolTreeMap[symbol];
         if (node == null) {
             return symbol; // undefined symbol is just itself
@@ -461,8 +488,12 @@ var mathjs = require("mathjs");
             body += "\n  $." + symbol + " = " + tree.toString() + ";";
         }});
         body += "\n  return $;\n";
+        var unbound = JSON.stringify(Object.keys(this.unboundSymbols()));
+        var evaleq = "function EvalEquations($) {try{" + 
+            body + 
+            "}catch(err){throw new Error('Verify values for " + unbound + ": '+err.message);}}";
         // use Function to create a function with "math" in its lexical environment
-        return (new Function("math", "return function($) {" + body + "}"))(mathjs);
+        return (new Function("math", "return " + evaleq))(mathjs);
     }
 
 } // CLASS
