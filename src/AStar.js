@@ -76,6 +76,7 @@ var mathjs = require("mathjs");
         }
         hce(graph.START,graph.END).should.equal(1);
         hce(graph.B1,graph.END).should.equal(3);
+        hce(graph.B,graph.B1).should.equal(3);
 
         var closedSet = {};
         var openSet = [graph.START];
@@ -98,6 +99,7 @@ var mathjs = require("mathjs");
                 break;
             }
             closedSet[current.name] = true;
+            current.isClosed = true;
             Object.keys(current.neighbors).forEach((neighborName) => {
                 if (!closedSet[neighborName]) {
                     var distanceToNeighbor = current.neighbors[neighborName];
