@@ -4,7 +4,6 @@ var mathjs = require("mathjs");
     class AStarNode {
         constructor(name) {
             this.name = name;
-            this.from = [];
         }
         score(nameScoreMap) {
             var score = nameScoreMap[this.name];
