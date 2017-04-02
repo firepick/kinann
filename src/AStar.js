@@ -2,19 +2,15 @@ var mathjs = require("mathjs");
 
 (function(exports) { 
     class AStarNode {
-        constructor(name, neighborsOf) {
+        constructor(name) {
             this.name = name;
-            this.neighborsOf = neighborsOf;
             this.from = [];
         }
-        neighbors() {
-            return this.$neighbors || (this.$neighbors = this.neighborsOf(this));
-        }
-        score(fScoreMap) {
-            var score = fScoreMap[this.name];
+        score(nameScoreMap) {
+            var score = nameScoreMap[this.name];
             return score == null ? Number.MAX_SAFE_INTEGER : score;
         }
-        pathTo(goal, estimateCost) {
+        pathTo(goal, estimateCost, neighborsOf) {
             var openSet = [this];
             var fScoreMap = {};
             var gScoreMap = {};
@@ -34,7 +30,7 @@ var mathjs = require("mathjs");
                     return totalPath;
                 }
                 current.isClosed = true;
-                current.neighbors().forEach((neighbor) => {
+                neighborsOf(current).forEach((neighbor) => {
                     if (!neighbor.isClosed) {
                         var tentative_gScore = current.score(gScoreMap) + estimateCost(current, neighbor);
                         if (!neighbor.isOpen) {
@@ -83,21 +79,17 @@ var mathjs = require("mathjs");
             Object.keys(nodeCosts).forEach((name) => {
                 var neighbor = graph[name];
                 if (!neighbor) {
-                    neighbor = graph[name] = new AStarNode(name, neighborsOf);
+                    neighbor = graph[name] = new AStarNode(name);
                 }
                 neighbors.push(neighbor);
             });
             return neighbors;
         }
 
-        graph.START = new AStarNode("START", neighborsOf);
-        graph.END = new AStarNode("END", neighborsOf);
-
         var costHeuristic = (n1, n2) => {
             if (n1 === n2) {
                 return 0;
             }
-            n1.neighbors();
             var nodeCost = costs[n1.name];
             if (nodeCost) {
                 var cost = n2 && nodeCost[n2.name];
@@ -112,11 +104,21 @@ var mathjs = require("mathjs");
             }
             return cost;
         }
-        costHeuristic(graph.START,graph.END).should.equal(1);
-        costHeuristic(graph.B,graph.B1).should.equal(3);
-        costHeuristic(graph.B1,graph.END).should.equal(3);
+        var nodeOfName = (name) => {
+            var node = graph[name];
+            if (node == null) {
+                node = graph[name] = new AStarNode(name);
+            }
+            return node;
+        }
 
-        var path = graph.START.pathTo(graph.END, costHeuristic);
+        var START = nodeOfName("START");
+        var END = nodeOfName("END");
+        var B = nodeOfName("B");
+        costHeuristic(START, END).should.equal(1);
+        costHeuristic(START, B).should.equal(3);
+
+        var path = START.pathTo(END, costHeuristic, neighborsOf);
         console.log("path", path.map((node) => node.name));
     })
 })
