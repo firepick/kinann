@@ -23,6 +23,20 @@ var mathjs = require("mathjs");
                 this.gScore = Number.MAX_SAFE_INTEGER;
             }
         }
+        var costs = {
+            START: {
+                A: 1, // huge hills
+                B: 3, // optimal
+                C: 2, // dead end
+            },
+            A: { A1: 1, A2: 2, },
+            A1: { END: 100, },
+            A2: { END: 50, },
+            B: { B1: 3, },
+            B1: { END: 3, },
+            C: { },
+            END: {},
+        }
         var graph = {
             START: new Node("START", {
                 A: 1, // huge hills
@@ -41,6 +55,20 @@ var mathjs = require("mathjs");
             if (n1 === graph.END) {
                 return 0;
             }
+            var nodeCost = costs[n1.name];
+            if (nodeCost) {
+                var cost = nodeCost[n2.name];
+                if (cost == null) {
+                    cost = Object.keys(nodeCost).reduce(
+                        (acc, name) => mathjs.min(acc, nodeCost[name]),
+                        Number.MAX_SAFE_INTEGER
+                    )
+                }
+            } else {
+                var cost = Number.MAX_SAFE_INTEGER;
+            }
+            return cost;
+
             var edges = Object.keys(n1.neighbors);
             return edges.reduce((acc, edge) => {
                 return mathjs.min(acc, n1.neighbors[edge]);
