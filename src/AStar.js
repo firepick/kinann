@@ -17,11 +17,7 @@ var mathjs = require("mathjs");
         class Node {
             constructor(name, neighborsOf) {
                 this.name = name;
-                if (neighborsOf) {
-                    this.neighborsOf = neighborsOf;
-                } else {
-                    this.isGoal = true;
-                }
+                this.neighborsOf = neighborsOf;
                 this.from = [];
                 this.fScore = Number.MAX_SAFE_INTEGER;
                 this.gScore = Number.MAX_SAFE_INTEGER;
@@ -31,7 +27,6 @@ var mathjs = require("mathjs");
             }
             pathTo(goal) {
                 var openSet = [this];
-                goal.isGoal = true;
                 this.fScore = hce(this,goal);
                 this.gScore = 0;
                 while (openSet.length) {
@@ -80,6 +75,7 @@ var mathjs = require("mathjs");
             B: { B1: 3, },
             B1: { END: 3, },
             C: { },
+            END: { },
         }
         var graph = {};
         function neighborsOf(node) {
@@ -94,10 +90,12 @@ var mathjs = require("mathjs");
             });
             return neighbors;
         }
+
         graph.START = new Node("START", neighborsOf);
         graph.END = new Node("END");
-        var hce = (n1,n2) => {
-            if (n1.isGoal) {
+
+        var hce = (n1, n2, goal) => {
+            if (n1 === n2) {
                 return 0;
             }
             n1.neighbors();
