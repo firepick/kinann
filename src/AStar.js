@@ -57,7 +57,7 @@ var mathjs = require("mathjs");
     var should = require("should");
     var AStarNode = exports.AStarNode;
 
-    it("graph", function() {
+    it("finds shortest path", function() {
         var costs = {
             START: {
                 A: 1, // huge hills
@@ -73,19 +73,12 @@ var mathjs = require("mathjs");
             END: { },
         }
         var graph = {};
-        function neighborsOf(node) {
-            var nodeCosts = costs[node.name];
-            var neighbors = [];
-            Object.keys(nodeCosts).forEach((name) => {
-                var neighbor = graph[name];
-                if (!neighbor) {
-                    neighbor = graph[name] = new AStarNode(name);
-                }
-                neighbors.push(neighbor);
-            });
-            return neighbors;
+        function nodeOfName(name) {
+            return (graph[name] = graph[name] || new AStarNode(name));
         }
-
+        function neighborsOf(node) {
+            return Object.keys(costs[node.name]).map((name) => nodeOfName(name));
+        }
         var costHeuristic = (n1, n2) => {
             if (n1 === n2) {
                 return 0;
@@ -103,13 +96,6 @@ var mathjs = require("mathjs");
                 var cost = Number.MAX_SAFE_INTEGER;
             }
             return cost;
-        }
-        var nodeOfName = (name) => {
-            var node = graph[name];
-            if (node == null) {
-                node = graph[name] = new AStarNode(name);
-            }
-            return node;
         }
 
         var START = nodeOfName("START");
