@@ -29,6 +29,44 @@ var mathjs = require("mathjs");
             neighbors() {
                 return this.$neighbors || (this.$neighbors = neighborsOf(this));
             }
+            pathTo(goal) {
+                var openSet = [this];
+                goal.isGoal = true;
+                this.fScore = hce(this,goal);
+                this.gScore = 0;
+                while (openSet.length) {
+                    openSet.sort((a,b) => a.fScore - b.fScore);
+                    console.log("openSet", openSet.map((node) => node.name));
+                    var current = openSet.shift();
+                    current.isOpen = false;
+                    //console.log("current", current.name, openSet.map((node) => node.name));
+                    if (current.name === "END") {
+                        totalPath = [current];
+                        while (current.cameFrom) {
+                            current = current.cameFrom;
+                            totalPath.push(current);
+                        }
+                        return totalPath;
+                    }
+                    current.isClosed = true;
+                    current.neighbors().forEach((neighbor) => {
+                        if (!neighbor.isClosed) {
+                            var tentative_gScore = current.gScore + hce(current, neighbor);
+                            if (!neighbor.isOpen) {
+                                neighbor.isOpen = true;
+                                openSet.push(neighbor);
+                            } else if (tentative_gScore >= neighbor.gScore) {
+                                neighbor = null;
+                            }
+                            if (neighbor) {
+                                neighbor.cameFrom = current;
+                                neighbor.gScore = tentative_gScore;
+                                neighbor.fScore = hce(neighbor, goal);
+                            }
+                        }
+                    });
+                }
+            }
         }
         var costs = {
             START: {
@@ -81,41 +119,7 @@ var mathjs = require("mathjs");
         hce(graph.B,graph.B1).should.equal(3);
         hce(graph.B1,graph.END).should.equal(3);
 
-        var openSet = [graph.START];
-        graph.START.fScore = hce(graph.START,graph.END);
-        graph.START.gScore = 0;
-        while (openSet.length) {
-            openSet.sort((a,b) => a.fScore - b.fScore);
-            console.log("openSet", openSet.map((node) => node.name));
-            var current = openSet.shift();
-            current.isOpen = false;
-            //console.log("current", current.name, openSet.map((node) => node.name));
-            if (current.name === "END") {
-                totalPath = [current.name];
-                while (current.cameFrom) {
-                    current = current.cameFrom;
-                    totalPath.push(current.name);
-                }
-                console.log("path", totalPath.reverse());
-                break;
-            }
-            current.isClosed = true;
-            current.neighbors().forEach((neighbor) => {
-                if (!neighbor.isClosed) {
-                    var tentative_gScore = current.gScore + hce(current, neighbor);
-                    if (!neighbor.isOpen) {
-                        neighbor.isOpen = true;
-                        openSet.push(neighbor);
-                    } else if (tentative_gScore >= neighbor.gScore) {
-                        neighbor = null;
-                    }
-                    if (neighbor) {
-                        neighbor.cameFrom = current;
-                        neighbor.gScore = tentative_gScore;
-                        neighbor.fScore = hce(neighbor, graph.END);
-                    }
-                }
-            });
-        }
+        var path = graph.START.pathTo(graph.END);
+        console.log("path", path.map((node) => node.name));
     })
 })
