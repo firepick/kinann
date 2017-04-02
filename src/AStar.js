@@ -15,15 +15,19 @@ var mathjs = require("mathjs");
 
     it("graph", function() {
         class Node {
-            constructor(name, fneighbors) {
+            constructor(name, neighborsOf) {
                 this.name = name;
-                this.fneighbors = fneighbors;
+                if (neighborsOf) {
+                    this.neighborsOf = neighborsOf;
+                } else {
+                    this.isGoal = true;
+                }
                 this.from = [];
                 this.fScore = Number.MAX_SAFE_INTEGER;
                 this.gScore = Number.MAX_SAFE_INTEGER;
             }
             neighbors() {
-                return this.$neighbors || (this.$neighbors = fneighbors(this.name));
+                return this.$neighbors || (this.$neighbors = neighborsOf(this));
             }
         }
         var costs = {
@@ -38,25 +42,24 @@ var mathjs = require("mathjs");
             B: { B1: 3, },
             B1: { END: 3, },
             C: { },
-            END: {},
         }
         var graph = {};
-        function fneighbors(name) {
-            var nodeCosts = costs[name];
+        function neighborsOf(node) {
+            var nodeCosts = costs[node.name];
             var neighbors = [];
             Object.keys(nodeCosts).forEach((name) => {
                 var neighbor = graph[name];
                 if (!neighbor) {
-                    neighbor = graph[name] = new Node(name, fneighbors);
+                    neighbor = graph[name] = new Node(name, neighborsOf);
                 }
                 neighbors.push(neighbor);
             });
             return neighbors;
         }
-        graph.START = new Node("START", fneighbors);
-        graph.END = new Node("END", fneighbors);
+        graph.START = new Node("START", neighborsOf);
+        graph.END = new Node("END");
         var hce = (n1,n2) => {
-            if (n1 === graph.END) {
+            if (n1.isGoal) {
                 return 0;
             }
             n1.neighbors();
