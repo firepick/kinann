@@ -15,12 +15,15 @@ var mathjs = require("mathjs");
 
     it("graph", function() {
         class Node {
-            constructor(name, neighbors) {
+            constructor(name, fneighbors) {
                 this.name = name;
-                this.neighbors = neighbors;
+                this.fneighbors = fneighbors;
                 this.from = [];
                 this.fScore = Number.MAX_SAFE_INTEGER;
                 this.gScore = Number.MAX_SAFE_INTEGER;
+            }
+            neighbors() {
+                return this.$neighbors || (this.$neighbors = fneighbors(this.name));
             }
         }
         var costs = {
@@ -37,27 +40,29 @@ var mathjs = require("mathjs");
             C: { },
             END: {},
         }
-        var graph = {
-            START: new Node("START", {
-                A: 1, // huge hills
-                B: 3, // optimal
-                C: 2, // dead end
-            }),
-            A: new Node("A", { A1: 1, A2: 2, }),
-            A1: new Node("A1", { END: 100, }),
-            A2: new Node("A2", { END: 50, }),
-            B: new Node("B", { B1: 3, }),
-            B1: new Node("B1", { END: 3, }),
-            C: new Node("C", { }),
-            END: new Node("END", {}),
+        var graph = {};
+        function fneighbors(name) {
+            var nodeCosts = costs[name];
+            var neighbors = [];
+            Object.keys(nodeCosts).forEach((name) => {
+                var neighbor = graph[name];
+                if (!neighbor) {
+                    neighbor = graph[name] = new Node(name, fneighbors);
+                }
+                neighbors.push(neighbor);
+            });
+            return neighbors;
         }
+        graph.START = new Node("START", fneighbors);
+        graph.END = new Node("END", fneighbors);
         var hce = (n1,n2) => {
             if (n1 === graph.END) {
                 return 0;
             }
+            n1.neighbors();
             var nodeCost = costs[n1.name];
             if (nodeCost) {
-                var cost = nodeCost[n2.name];
+                var cost = n2 && nodeCost[n2.name];
                 if (cost == null) {
                     cost = Object.keys(nodeCost).reduce(
                         (acc, name) => mathjs.min(acc, nodeCost[name]),
@@ -68,19 +73,12 @@ var mathjs = require("mathjs");
                 var cost = Number.MAX_SAFE_INTEGER;
             }
             return cost;
-
-            var edges = Object.keys(n1.neighbors);
-            return edges.reduce((acc, edge) => {
-                return mathjs.min(acc, n1.neighbors[edge]);
-            }, 9999999);
         }
         hce(graph.START,graph.END).should.equal(1);
-        hce(graph.B1,graph.END).should.equal(3);
         hce(graph.B,graph.B1).should.equal(3);
+        hce(graph.B1,graph.END).should.equal(3);
 
-        var closedSet = {};
         var openSet = [graph.START];
-        var cameFrom = {};
         graph.START.fScore = hce(graph.START,graph.END);
         graph.START.gScore = 0;
         while (openSet.length) {
@@ -91,20 +89,17 @@ var mathjs = require("mathjs");
             //console.log("current", current.name, openSet.map((node) => node.name));
             if (current.name === "END") {
                 totalPath = [current.name];
-                while (cameFrom[current.name]) {
-                    current = cameFrom[current.name];
+                while (current.cameFrom) {
+                    current = current.cameFrom;
                     totalPath.push(current.name);
                 }
                 console.log("path", totalPath.reverse());
                 break;
             }
-            closedSet[current.name] = true;
             current.isClosed = true;
-            Object.keys(current.neighbors).forEach((neighborName) => {
-                if (!closedSet[neighborName]) {
-                    var distanceToNeighbor = current.neighbors[neighborName];
-                    var tentative_gScore = current.gScore + distanceToNeighbor;
-                    var neighbor = graph[neighborName];
+            current.neighbors().forEach((neighbor) => {
+                if (!neighbor.isClosed) {
+                    var tentative_gScore = current.gScore + hce(current, neighbor);
                     if (!neighbor.isOpen) {
                         neighbor.isOpen = true;
                         openSet.push(neighbor);
@@ -112,7 +107,7 @@ var mathjs = require("mathjs");
                         neighbor = null;
                     }
                     if (neighbor) {
-                        cameFrom[neighborName] = current;
+                        neighbor.cameFrom = current;
                         neighbor.gScore = tentative_gScore;
                         neighbor.fScore = hce(neighbor, graph.END);
                     }
