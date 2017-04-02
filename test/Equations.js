@@ -297,34 +297,39 @@ var mathjs = require("mathjs");
             y_dx: "_2_dx",
         });
     });
-    it("TESTTESTunbound() returns unbound symbols", function() {
+    it("TESTTESTparameters() returns parameters (i.e., unbound symbols)", function() {
         var eq = new Equations();
         eq.define("s", "u * t + 0.5 * a * t^2");
-        should.deepEqual(eq.unboundSymbols(), {
-            u:true, 
-            t:true, 
-            a:true,
-        });
+        should.deepEqual(eq.parameters(), [ "u", "t", "a", ]);
     });
-    it("TESTTESTphysics", function() {
+    it("an iterator can model the trajectory of a ball toss", function() {
+        var verbose = false;
         var eq = new Equations();
         eq.define("s", "u * t + 0.5 * a * t^2");
         eq.define("v", eq.derivative("s", "t"));
         eq.lookup("s_dt").should.equal("u + 0.5 * a * 2 * t");
         var feval = eq.compile();
-        var scope = {
-            v: 20, // initial velocity  
-            a: -1, // acceleration
-            t: 0, // time
-        }
-        function iterate() {
-            scope.u = scope.v;
-            scope.t++;
-            feval(scope);
-            return scope;
+        function* toss(velocity,acceleration) {
+            var scope = {
+                v:velocity,
+                a:acceleration,
+                t:0,
+                height: 0,
+            }
+            while (scope.height >= 0) {
+                scope.t++;
+                scope.u = scope.v;
+                feval(scope);
+                scope.height += scope.s;
+                yield scope;
+            }
         }
 
-        iterate().should.properties({s:19.5, v:19});
-        iterate().should.properties({s:36, v:17});
+        var ball = toss(20, -1);
+        for (let state of ball) {
+            verbose && console.log("height", state.t, state.height);
+            state.t === 1 && state.should.properties({s:19.5, v:19});
+            state.t === 2 && state.should.properties({s:36, v:17});
+        }
     });
 })
