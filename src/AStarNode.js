@@ -21,7 +21,7 @@ var mathjs = require("mathjs");
                 var current = openSet.shift();
                 current.isOpen = false;
                 if (current === goal) {
-                    totalPath = [current];
+                    var totalPath = [current];
                     while (current.cameFrom) {
                         current = current.cameFrom;
                         totalPath.push(current);
