@@ -3,29 +3,32 @@ var AStarGraph = require("./AStarGraph");
 
 (function(exports) { 
     
-    var _PathNode = class PathNode {
+    class PathNode {
         constructor(position, velocity, acceleration) {
             this.s = position;
             this.v = velocity || Array(position.length).fill(0);
             this.a = acceleration || Array(position.length).fill(0);
         }
     }
+
     class Trajectory extends AStarGraph {
         constructor(options={}) {
             super(options);
             this.dimensions = options.dimensions || 1;
             this.vMax = options.maxVelocity || Array(this.dimensions).fill(10);
-            this.aMax = options.maxAcceleration || Array(this.dimensions).fill(1);
+            this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
             this.jMax = options.maxJerk || Array(this.dimensions).fill(1);
             this.a0 = Array(this.dimensions).fill(0);
+            this.goalDistSquared = this.jMax.reduce((sum, j) => sum + j*j, 0);
             this.nodeMap = {};
         }
         getNode(position, velocity, acceleration) {
-            var node = new _PathNode(position, velocity, acceleration);
+            var node = new PathNode(position, velocity, acceleration);
             var key = JSON.stringify(node);
             return (this.nodeMap[key] = this.nodeMap[key] || node);
         }
         axisAccelerations(node, i) {
+            Trajectory.validateNode(node);
             var av = [];
             var a = node.a[i];
             var v = node.v[i];
@@ -45,7 +48,43 @@ var AStarGraph = require("./AStarGraph");
             }
             return av;
         }
+        static validateNode(node) {
+            if (!(node instanceof PathNode)) {
+                throw new Error("Expected neigbhorsOf(?PathNode?,...)");
+            }
+            return node;
+        }
+        isNearGoal(node, goal) { // a goal is zero-velocity
+            for (var i = 0; i < this.dimensions; i++) {
+                var jMax = this.jMax[i];
+                var ds = goal.s[i] - node.s[i];
+                var v = node.v[i];
+                var dv = 0 - v;
+                var a = node.a[i];
+
+                if (ds < -jMax || jMax < ds) {
+                    return false; // too far
+                }
+                if (v < -jMax || jMax < v) {
+                    return false; // too fast
+                }
+                if (a < -jMax || jMax < a) {
+                    return false; // too jerky
+                }
+                if (v < 0 && ds > 0 || v > 0 && ds < 0) {
+                    return false; // wrong way velocity
+                }
+                if (dv > 0 && a < 0 || dv < 0 && a > 0) {
+                    return false; // wrong way acceleration
+                }
+            }
+            return true;
+        }
         neighborsOf(node, goal) {
+            Trajectory.validateNode(node);
+            if (goal && this.isNearGoal(node, goal)) {
+                return [goal];
+            }
             var da = node.a.map((a,i) => this.axisAccelerations(node, i));
             var apermutations = Trajectory.permutations(da).map((dai) => {
                 var avariation = mathjs.add(node.a,dai);
@@ -55,11 +94,14 @@ var AStarGraph = require("./AStarGraph");
             });
             return apermutations;
         }
-        estimateCost(n1, n2) {
+        distSquared(n1, n2) {
             return mathjs.subtract(n1.s, n2.s).reduce((sum, diff) => sum + diff * diff, 0);
         }
+        estimateCost(n1, n2) {
+            return this.distSquared(n1, n2);
+        }
         static get PathNode() {
-            return _PathNode;
+            return PathNode;
         }
         static permutations(vv) {
             var vvelts = vv.reduce((acc, e) => e == null || !e.length ? 0:(acc+1), 0);
@@ -143,7 +185,7 @@ var AStarGraph = require("./AStarGraph");
         ]);
         should.deepEqual(Trajectory.permutations([[1,2],[],[3,4,5]]), []);
     })
-    it("neighborsOf(node, goal) generates node neighbors towards goal", function() {
+    it("neighborsOf(node) generates node neighbors", function() {
         var trj = new Trajectory({
             dimensions: 2,
         });
@@ -154,5 +196,48 @@ var AStarGraph = require("./AStarGraph");
         neighbors[1].should.equal(trj.getNode([1,2],[0,1],[0,1]));
         neighbors[2].should.equal(trj.getNode([0,2],[-1,1],[-1,1]));
         neighbors[8].should.equal(trj.getNode([0,0],[-1,-1],[-1,-1]));
+    })
+    it("TESTTESTisNearGoal(node, goal) returns true if goal is reachable in one step from node", function() {
+        var trj = new Trajectory({
+            dimensions: 2,
+            maxVelocity: [100,100],
+            maxAcceleration: [2,2],
+            maxJerk: [1,1],
+        });
+        var goal = new PathNode([1,1]);
+        trj.isNearGoal(goal, goal).should.equal(true);
+
+        trj.isNearGoal(trj.getNode([0,0]), goal).should.equal(true);
+        trj.isNearGoal(trj.getNode([2,0]), goal).should.equal(true);
+        trj.isNearGoal(trj.getNode([2,2]), goal).should.equal(true);
+        trj.isNearGoal(trj.getNode([0,2]), goal).should.equal(true);
+
+        trj.isNearGoal(trj.getNode([0,0],[1,1]), goal).should.equal(true); // can stop
+        trj.isNearGoal(trj.getNode([2,2],[-1,-1]), goal).should.equal(true); // can stop
+        trj.isNearGoal(trj.getNode([0,0],[1.1,1.1]), goal).should.equal(false); // too fast
+        trj.isNearGoal(trj.getNode([0,0],[-1.1,-1.1]), goal).should.equal(false); // too fast
+        trj.isNearGoal(trj.getNode([0,0],[1,1],[-1,-1]), goal).should.equal(true); // can decelerate
+        trj.isNearGoal(trj.getNode([2,2],[-1,-1],[1,1]), goal).should.equal(true); // can decelerate
+        trj.isNearGoal(trj.getNode([0,0],[1,1],[-1.1,-1.1]), goal).should.equal(false); // too jerky
+        trj.isNearGoal(trj.getNode([2,2],[1,1],[1.1,1.1]), goal).should.equal(false); // too jerky
+        trj.isNearGoal(trj.getNode([0,0],[-1,-1]), goal).should.equal(false); // wrong velocity direction
+        trj.isNearGoal(trj.getNode([2,2],[1,1]), goal).should.equal(false); // wrong velocity direction
+        trj.isNearGoal(trj.getNode([0,0],[1,1],[1,1]), goal).should.equal(false); // wrong acceleration direction
+        trj.isNearGoal(trj.getNode([2,2],[-1,-1],[-1,-1]), goal).should.equal(false); // wrong acceleration direction
+    })
+    it("neighborsOf(node, goal) generates goal node if near", function() {
+        var trj = new Trajectory({
+            dimensions: 2,
+        });
+        var goal = new PathNode([1,1]);
+        var neighbors = trj.neighborsOf(goal);
+        neighbors.forEach((n) => {
+            var vinverse = mathjs.multiply(-1, n.v);
+            var ninverse = trj.getNode(n.s, vinverse); 
+            var nn = trj.neighborsOf(ninverse, goal);
+            nn.length.should.equal(1, JSON.stringify(n));
+            nn[0].should.equal(goal);
+        });
+        var close = trj.getNode(mathjs.add([0.1,0.1], goal.s), trj.vMax, trj.aMax);
     })
 })
