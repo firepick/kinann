@@ -4,7 +4,7 @@ var mathjs = require("mathjs");
     class AStarGraph {
         constructor(options = {}) {
         }
-        neighborsOf(node) {
+        neighborsOf(node, goal) {
             // NOTE: neighbors can be generated dynamically, but they must be unique
             throw new Error("neighborsOf(node) must be overridden by subclass");
         }
@@ -39,7 +39,7 @@ var mathjs = require("mathjs");
                     return totalPath.reverse();
                 }
                 closedSet[current] = true;
-                this.neighborsOf(current).forEach((neighbor) => {
+                this.neighborsOf(current, goal).forEach((neighbor) => {
                     if (!closedSet[neighbor]) {
                         var tentative_gScore = score(current, gScoreMap) + cost(current, neighbor);
                         if (!openSet[neighbor]) {
@@ -90,7 +90,7 @@ var mathjs = require("mathjs");
                 super(options);
                 this.costs = costs;
             }
-            neighborsOf(node) { 
+            neighborsOf(node, goal) { 
                 return Object.keys(this.costs[node]);
             }
             estimateCost(n1, n2) {
