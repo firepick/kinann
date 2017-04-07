@@ -13,7 +13,7 @@ var mathjs = require("mathjs");
             // NOTE: neighbors can be generated dynamically, but they must be unique
             throw new Error("neighborsOf(node) must be overridden by subclass");
         }
-        cost(node1, node2) {
+        cost(node1, node2, goal) {
             // actual cost 
             throw new Error("cost(node1, node2) must be overridden by subclass");
         }
@@ -50,7 +50,7 @@ var mathjs = require("mathjs");
                 this.closedSet.set(current, true);
                 this.neighborsOf(current, goal).forEach((neighbor) => {
                     if (!this.closedSet.get(neighbor)) {
-                        var tentative_gScore = this.gscore(current) + this.cost(current, neighbor);
+                        var tentative_gScore = this.gscore(current) + this.cost(current, neighbor, goal);
                         if (!this.openMap.get(neighbor)) {
                             this.openMap.set(neighbor, true);
                             openSet.push(neighbor);
@@ -112,7 +112,7 @@ var mathjs = require("mathjs");
             neighborsOf(node, goal) { 
                 return Object.keys(this.costs[node.name]).map((name) => nodes[name]);
             }
-            cost(n1, n2) {
+            cost(n1, n2, goal) {
                 var neighborCost = n2 && this.costs[n1.name][n2.name]; // n2 is a neighbor of n1
                 if (!neighborCost) {
                     throw new Error("cannot compute cost to non-neighbor");
