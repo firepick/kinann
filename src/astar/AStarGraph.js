@@ -29,9 +29,20 @@ var mathjs = require("mathjs");
             var score = this.gScoreMap.get(node);
             return score == null ? Number.MAX_SAFE_INTEGER : score;
         }
+        candidate(openSet) {
+            var fScore = Number.MAX_SAFE_INTEGER;
+            return openSet.reduce((acc,node) => {
+                if (this.fscore(node) <= fScore ) {
+                    fScore = this.fscore(node); 
+                    return node;
+                }
+                return acc;
+            }, null);
+        }
         findPath(start, goal, options) { // Implements A* algorithm
             var openSet = [start];
             var onOpenSet = options.onOpenSet || (()=>true);
+            var onCull = options.onCull || ((node) => null);
             this.fScoreMap.set(start, this.estimateCost(start, goal));
             this.gScoreMap.set(start, 0);
             var pathTo = (node) => {
@@ -42,7 +53,7 @@ var mathjs = require("mathjs");
                 return totalPath.reverse();
             };
             while (openSet.length && onOpenSet(openSet, pathTo)) {
-                var current = openSet.shift();
+                var current = this.candidate(openSet);
                 this.openMap.set(current, false);
                 if (current === goal) {
                     return pathTo(current);
@@ -55,7 +66,7 @@ var mathjs = require("mathjs");
                             this.openMap.set(neighbor, true);
                             openSet.push(neighbor);
                         } else if (tentative_gScore >= this.gscore(neighbor)) {
-                            neighbor = null;
+                            neighbor = onCull(neighbor);
                         }
                         if (neighbor) {
                             this.cameFrom.set(neighbor, current);
@@ -64,7 +75,9 @@ var mathjs = require("mathjs");
                         }
                     }
                 });
-                openSet.sort((a,b) => this.fscore(a) - this.fscore(b));
+                openSet = openSet.reduce(
+                    (acc, node) => (this.openMap.get(node) && acc.push(node), acc),
+                    []);
             }
             return []; // no path
         }
