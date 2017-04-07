@@ -234,12 +234,13 @@ var AStarGraph = require("./AStarGraph");
     });
     it("estimateCost(n1,n2) estimates the cost to move between the given nodes", function() {
         var vmax = 10;
+        var jmax = 1;
 
         var pf = new Pathfinder({
             dimensions: 1,
             maxAcceleration: [5],
             maxVelocity: [vmax],
-            maxJerk: [1],
+            maxJerk: [jmax],
         });
         var goal = new PathNode([-10.1]);
         var node = new PathNode([-10],[-1]);
@@ -253,7 +254,7 @@ var AStarGraph = require("./AStarGraph");
         });
         var n1 = new PathNode([1,3,2]);
         var n2 = new PathNode([3,1,4]);
-        pf.estimateCost(n1,n2).should.equal(2/vmax);
+        pf.estimateCost(n1,n2).should.equal(2/jmax);
     })
     it("getNode(s,v,a) returns unique node with given attributes", function() {
         var pf = new Pathfinder({
@@ -297,8 +298,7 @@ var AStarGraph = require("./AStarGraph");
         });
 
         var goal = new PathNode([-10.1,-10.1]);
-        var node = new PathNode([-10,-10],[1,1]);
-        var node = new PathNode([-10,-10],[1,1]);
+        var node = new PathNode([-10,-10],[-1,-1]);
         var neighbors = pf.neighborsOf(node, goal);
         neighbors.length.should.equal(1);
 
@@ -388,9 +388,10 @@ var AStarGraph = require("./AStarGraph");
         pf.tsdv(-5,5,1).t.should.approximately(5.4, 0.01);
         pf.tsdv(5,-5,1).t.should.approximately(5.4, 0.01);
 
-        pf.tsdv(0,10,1).s.should.approximately(18.6,0.1);
-        pf.tsdv(-11,1,1).s.should.approximately(18.6,0.1);
-        pf.tsdv(10,0,1).s.should.approximately(18.6,0.1);
+        pf.tsdv(0,10,1).s.should.approximately(18.67,0.01);
+        pf.tsdv(1,11,1).s.should.approximately(22.67,0.01);
+        pf.tsdv(-11,-1,1).s.should.approximately(22.67,0.01);
+        pf.tsdv(10,0,1).s.should.approximately(18.67,0.01);
         pf.tsdv(-5,5,1).s.should.approximately(13.87,0.01);
         pf.tsdv(5,-5,1).s.should.approximately(13.87,0.01);
     })
