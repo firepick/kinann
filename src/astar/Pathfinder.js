@@ -19,6 +19,7 @@ var AStarGraph = require("./AStarGraph");
             this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
             this.jMax = options.maxJerk || Array(this.dimensions).fill(1);
             this.a0 = Array(this.dimensions).fill(0);
+            this.round = 3; // force discrete graph space
             this.goalDistSquared = this.jMax.reduce((sum, j) => sum + j*j, 0);
             this.nodeMap = {};
             this.stopTimes = {};
@@ -94,9 +95,9 @@ var AStarGraph = require("./AStarGraph");
             }
             var anewbasis = node.a.map((a,i) => this.axisAccelerations(node, i));
             var apermutations = Pathfinder.permutations(anewbasis).map((anew) => {
-                var avariation = anew;
-                var vvariation = mathjs.add(node.v,avariation);
-                var svariation = mathjs.add(node.s,vvariation);
+                var avariation = mathjs.round(anew, this.round);
+                var vvariation = mathjs.round(mathjs.add(node.v,avariation), this.round);
+                var svariation = mathjs.round(mathjs.add(node.s,vvariation), this.round);
                 return this.getNode(svariation, vvariation, avariation, node);
             });
             return apermutations;
@@ -407,8 +408,9 @@ var AStarGraph = require("./AStarGraph");
         pf.tsdv(5,-5,1).s.should.approximately(13.87,0.01);
     })
     it("TESTTESTpath(start, goal) returns pf to goal", function() {
+        this.timeout(60*1000);
         var verbose = false;
-        function test1(bounds) {
+        function test1(bounds, maxIterations) {
             var pf = new Pathfinder({
                 dimensions: 1,
                 maxVelocity: [20],
@@ -419,20 +421,41 @@ var AStarGraph = require("./AStarGraph");
             var goal = new PathNode([mathjs.round(mathjs.random(-bounds,bounds),3)]);
             //var start = new PathNode([6.7]);
             //var goal = new PathNode([-11.6]);
-            var maxIterations = 2000;
-            //var maxIterations = 50;
             var iterations = 0;
             var msStart = new Date();
             var path = pf.findPath(start, goal, {
                 onOpenSet: (openset) => {
-                    verbose && console.log("openset", openset.length, openset[0], 
-                        "cost", mathjs.round(pf.estimateCost(openset[0], goal), 3)
-                    );
+                    if (verbose) {
+                        var current = pf.candidate(openset);
+                        var path = pf.pathTo(current);
+                        console.log("openset", openset.length, current,
+                            JSON.stringify(mathjs.round(path.map((node) => node.s[0]),1)),
+                            "g:"+path.length,
+                            "h:"+mathjs.round(pf.estimateCost(current, goal), 3)
+                        );
+                    }
+                    //if (verbose && openset.length === 20) {
+                        //var sorted = openset.map((node)=>node).sort((a,b) => pf.fscore(a) - pf.fscore(b));
+                        //sorted.forEach((node,i) => {
+                            //console.log("openset["+i+"]", JSON.stringify(node), "g:"+pf.gscore(node), "f:"+pf.fscore(node));
+                        //})
+                    //}
                     return ++iterations < maxIterations;
+                },
+                onCull: (node, gscore_new, gscore_existing) => {
+                    if (verbose) {
+                        console.log("culling", JSON.stringify(node), gscore_new, gscore_existing);
+                    }
+                    return null;
                 },
             });
             var msElapsed = new Date() - msStart;
-            verbose && path.forEach((n) => console.log(n,
+            path.reduce((acc,n) => { // velocity should not switch directions
+                acc < 0 && n.v[0].should.not.above(0);
+                acc > 0 && n.v[0].should.not.below(0);
+                acc = n.v[0];
+            }, 0);
+            verbose &&path.forEach((n) => console.log(n,
                 "cost", mathjs.round(pf.estimateCost(n, goal), 3)
             ));
             console.log("path", JSON.stringify(start), "=>", JSON.stringify(goal), iterations, msElapsed+"ms", path.length+"nodes");
@@ -440,8 +463,8 @@ var AStarGraph = require("./AStarGraph");
             msElapsed.should.below(500);
             path.length === 0 && console.log("FAIL: no path");
         }
-        for (var i = 0; i < 1; i++) {
-            test1(30);
+        for (var i = 0; i < 100; i++) {
+            test1(100, 1000);
         }
     })
 })

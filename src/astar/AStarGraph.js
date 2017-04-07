@@ -23,40 +23,52 @@ var mathjs = require("mathjs");
         }
         fscore(node) {
             var score = this.fScoreMap.get(node);
-            return score == null ? Number.MAX_SAFE_INTEGER : score;
+            return score == null ? Number.MAX_SAFE_INTEGER : mathjs.min(Number.MAX_SAFE_INTEGER,score);
         }
         gscore(node) {
             var score = this.gScoreMap.get(node);
-            return score == null ? Number.MAX_SAFE_INTEGER : score;
+            return score == null ? Number.MAX_SAFE_INTEGER : mathjs.min(Number.MAX_SAFE_INTEGER,score);
         }
         candidate(openSet) {
             var fScore = Number.MAX_SAFE_INTEGER;
-            return openSet.reduce((acc,node) => {
+            var result = openSet.reduce((acc,node) => {
+                var f = this.fscore(node);
+                if (f == null) {
+                    throw new Error("fscore null for node:" + JSON.stringify(node));
+                }
                 if (this.fscore(node) <= fScore ) {
                     fScore = this.fscore(node); 
                     return node;
                 }
                 return acc;
             }, null);
+            if (result == null) {
+                throw new Error("candidate FAIL:" + JSON.stringify(openSet));
+            }
+
+            return result;
+        }
+        pathTo(node) {
+            var totalPath = [node];
+            while ((node = this.cameFrom.get(node))) {
+                totalPath.push(node);
+            }
+            return totalPath.reverse();
         }
         findPath(start, goal, options) { // Implements A* algorithm
             var openSet = [start];
             var onOpenSet = options.onOpenSet || (()=>true);
-            var onCull = options.onCull || ((node) => null);
+            var onCull = options.onCull || ((node,gscore_new,gscore_existing) => null);
             this.fScoreMap.set(start, this.estimateCost(start, goal));
             this.gScoreMap.set(start, 0);
-            var pathTo = (node) => {
-                var totalPath = [node];
-                while ((node = this.cameFrom.get(node))) {
-                    totalPath.push(node);
-                }
-                return totalPath.reverse();
-            };
-            while (openSet.length && onOpenSet(openSet, pathTo)) {
+            while (openSet.length && onOpenSet(openSet)) {
                 var current = this.candidate(openSet);
+                if (current == null || typeof current != "object") {
+                    throw new Error("bad candidate " + current + JSON.stringify(openSet));
+                }
                 this.openMap.set(current, false);
                 if (current === goal) {
-                    return pathTo(current);
+                    return this.pathTo(current);
                 }
                 this.closedSet.set(current, true);
                 this.neighborsOf(current, goal).forEach((neighbor) => {
@@ -66,12 +78,12 @@ var mathjs = require("mathjs");
                             this.openMap.set(neighbor, true);
                             openSet.push(neighbor);
                         } else if (tentative_gScore >= this.gscore(neighbor)) {
-                            neighbor = onCull(neighbor);
+                            neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
                         }
                         if (neighbor) {
                             this.cameFrom.set(neighbor, current);
                             this.gScoreMap.set(neighbor, tentative_gScore);
-                            this.fScoreMap.set(neighbor, this.estimateCost(neighbor, goal));
+                            this.fScoreMap.set(neighbor, this.gscore(neighbor) + this.estimateCost(neighbor, goal));
                         }
                     }
                 });
@@ -97,7 +109,7 @@ var mathjs = require("mathjs");
     }
 
     it("AStarGraph subclass finds shortest path", function() {
-        var verbose = false;
+        var verbose = true;
         // define a simple graph with weighted transitions between named nodes
         var nodeCosts = {
             START: {
@@ -161,12 +173,22 @@ var mathjs = require("mathjs");
         // find shortest path. If provided, onOpenSet() can be used
         // to trace each iteration or halt search by returning false
         var options = {
-            onOpenSet: (openSet) => verbose && 
-                console.log("openSet", JSON.stringify(openSet.map((node) => node.name)),
-                    "gcost", graph.gscore(openSet[0]),
-                    "fcost", graph.fscore(openSet[0])
-                    ) 
-                || true,
+            onOpenSet: (openSet) => {
+                if (verbose) {
+                    var current = graph.candidate(openSet);
+                    console.log("openSet", JSON.stringify(openSet.map((node) => node.name)),
+                        "gcost", graph.gscore(current),
+                        "fcost", graph.fscore(current)
+                        ); 
+                }
+                return true;
+            },
+            onCull: (node, gscore_new, gscore_existing) => {
+                if (verbose) {
+                    console.log("culling", JSON.stringify(node), gscore_new, gscore_existing);
+                }
+                return null;
+            },
         };
         var path = graph.findPath(START, END, options); 
         should.deepEqual(path.map((n) => n.name), ["START","B","B1","END"]);
