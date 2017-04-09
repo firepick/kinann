@@ -56,13 +56,13 @@ var mathjs = require("mathjs");
             return totalPath.reverse();
         }
         findPath(start, goal, options) { // Implements A* algorithm
-            var openSet = [start];
+            this.openSet = [start];
             var onOpenSet = options.onOpenSet || (()=>true);
             var onCull = options.onCull || ((node,gscore_new,gscore_existing) => null);
             this.fScoreMap.set(start, this.estimateCost(start, goal));
             this.gScoreMap.set(start, 0);
-            while (openSet.length && onOpenSet(openSet)) {
-                var current = this.candidate(openSet);
+            while (this.openSet.length && onOpenSet(this.openSet)) {
+                var current = this.candidate(this.openSet);
                 if (current === goal) {
                     return this.pathTo(current);
                 }
@@ -78,7 +78,7 @@ var mathjs = require("mathjs");
                             }
                             if (neighbor) {
                                 this.openMap.set(neighbor, true);
-                                openSet.push(neighbor);
+                                this.openSet.push(neighbor);
                             }
                         } else if (tentative_gScore >= this.gscore(neighbor)) {
                             neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
@@ -95,7 +95,7 @@ var mathjs = require("mathjs");
                         }
                     }
                 });
-                openSet = openSet.reduce(
+                this.openSet = this.openSet.reduce(
                     (acc, node) => (this.openMap.get(node) && acc.push(node), acc),
                     []);
             }
@@ -117,7 +117,7 @@ var mathjs = require("mathjs");
     }
 
     it("AStarGraph subclass finds shortest path", function() {
-        var verbose = true;
+        var verbose = 0;
         // define a simple graph with weighted transitions between named nodes
         var nodeCosts = {
             START: {
@@ -153,6 +153,9 @@ var mathjs = require("mathjs");
                 return neighborCost;
             }
             estimateCost(n1, n2) {
+                if (n1 === n2) {
+                    return 0;
+                }
                 var neighborCost = n2 && this.costs[n1.name][n2.name]; // n2 is a neighbor of n1
                 var minNeighborCost = () => { // n2 is not a neighbor of n1
                     // compute cost as minimum cost of n1 to its neighbors

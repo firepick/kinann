@@ -21,7 +21,7 @@
     };
     Kinann.astar = {
         AStarGraph: require("./src/astar/AStarGraph"),
-        PathFinder: require("./src/astar/Pathfinder"),
+        PathFactory: require("./src/astar/PathFactory"),
     };
 
     module.exports = exports.Kinann = Kinann;
