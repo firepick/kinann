@@ -63,27 +63,35 @@ var mathjs = require("mathjs");
             this.gScoreMap.set(start, 0);
             while (openSet.length && onOpenSet(openSet)) {
                 var current = this.candidate(openSet);
-                if (current == null || typeof current != "object") {
-                    throw new Error("bad candidate " + current + JSON.stringify(openSet));
-                }
-                this.openMap.set(current, false);
                 if (current === goal) {
                     return this.pathTo(current);
                 }
+                this.openMap.set(current, false);
                 this.closedSet.set(current, true);
                 this.neighborsOf(current, goal).forEach((neighbor) => {
                     if (!this.closedSet.get(neighbor)) {
                         var tentative_gScore = this.gscore(current) + this.cost(current, neighbor, goal);
                         if (!this.openMap.get(neighbor)) {
-                            this.openMap.set(neighbor, true);
-                            openSet.push(neighbor);
+                            var h = this.estimateCost(neighbor, goal);
+                            if (h === Number.MAX_SAFE_INTEGER) {
+                                neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
+                            }
+                            if (neighbor) {
+                                this.openMap.set(neighbor, true);
+                                openSet.push(neighbor);
+                            }
                         } else if (tentative_gScore >= this.gscore(neighbor)) {
                             neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
+                        } else {
+                            var h = this.estimateCost(neighbor, goal);
+                            if (h === Number.MAX_SAFE_INTEGER) {
+                                neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
+                            }
                         }
                         if (neighbor) {
                             this.cameFrom.set(neighbor, current);
                             this.gScoreMap.set(neighbor, tentative_gScore);
-                            this.fScoreMap.set(neighbor, this.gscore(neighbor) + this.estimateCost(neighbor, goal));
+                            this.fScoreMap.set(neighbor, this.gscore(neighbor) + h);
                         }
                     }
                 });

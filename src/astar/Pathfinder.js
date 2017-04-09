@@ -8,6 +8,9 @@ var AStarGraph = require("./AStarGraph");
             this.s = position;
             this.v = velocity || Array(position.length).fill(0);
             this.a = acceleration || Array(position.length).fill(0);
+            Object.defineProperty(this, "key", {
+                value: JSON.stringify(this)
+            });
         }
     }
 
@@ -17,36 +20,60 @@ var AStarGraph = require("./AStarGraph");
             this.dimensions = options.dimensions || 1;
             this.vMax = options.maxVelocity || Array(this.dimensions).fill(10);
             this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
-            this.jMax = options.maxJerk || Array(this.dimensions).fill(1);
+            this.jMin = options.minJerk || Array(this.dimensions).fill(0.1);
+            this.jerkScale = 1; // fraction of path length
+            this.jMax = this.aMax; // initial value
             this.a0 = Array(this.dimensions).fill(0);
-            this.round = 3; // force discrete graph space
-            this.goalDistSquared = this.jMax.reduce((sum, j) => sum + j*j, 0);
+            this.round = 2; // force discrete graph space
             this.nodeMap = {};
+            this.neighbors = new WeakMap();
             this.stopTimes = {};
+            this.stats = {
+                lookupTotal: 0,
+                lookupHit: 0,
+                tsdv: 0,
+                neighborsOf: 0,
+            };
         }
-        getNode(position, velocity, acceleration) {
+        svaToNode(position, velocity, acceleration) {
             var node = new PathNode(position, velocity, acceleration);
-            var key = JSON.stringify(node);
-            return (this.nodeMap[key] = this.nodeMap[key] || node);
+            return this.lookupNode(node);
         }
-        axisAccelerations(node, i) {
-            Pathfinder.validateNode(node);
+        lookupNode(node) {
+            var key = node.key; 
+            var result = this.nodeMap[key];
+            this.stats.lookupTotal++;
+            if (result) {
+                this.stats.lookupHit++;
+            } else {
+                result = this.nodeMap[key] = node;
+            }
+            return result;
+        }
+        axisAccelerations(node, i, dsgoal) {
             var av = [];
-            var a = node.a[i];
-            var v = node.v[i];
-            var vMax = this.vMax[i];
+            var ai = node.a[i];
+            var vi = node.v[i];
             var aMax = this.aMax[i];
+            var aMin = -aMax;
             var jMax = this.jMax[i];
-            var aplus = a + jMax;
-            var aminus = a - jMax;
-            if (a < aMax && -vMax <= v+aplus && v+aplus <= vMax) {
-                av.push(mathjs.min(aMax, a+jMax));
+            var aplus = ai + jMax;
+            var aminus = ai - jMax;
+            var vplus = vi + aplus;
+            var vminus = vi + aminus;
+            var vMax = this.vMax[i];
+            var vMin = -vMax;
+            var ds = dsgoal < 0 ? -dsgoal : dsgoal;
+            vMax = ds < vMax ? ds : vMax; // prevent overshoot
+            vMin = vMin < -ds ? -ds : vMin; // prevent overshoot
+            if (ai < aMax && vMin <= vplus && vplus <= vMax) {
+                av.push(aMax < aplus ? aMax : aplus);
             }
-            if (-vMax <= a+v && -vMax <= a+v && a+v <= vMax) {
-                av.push(a);
+            if (vMin <= ai+vi && vMin <= ai+vi && ai+vi <= vMax) {
+                av.push(ai);
             }
-            if (-aMax < a && -vMax <= v+aminus && v+aminus <= vMax) {
-                av.push(mathjs.max(-aMax, a-jMax));
+            if (aMin < ai && vMin <= vminus && vminus <= vMax) {
+                av.push(aMin > aminus ? aMin : aminus);
             }
             return av;
         }
@@ -56,32 +83,53 @@ var AStarGraph = require("./AStarGraph");
             }
             return node;
         }
+        findPath(start, goal, options) { // Implements A* algorithm
+            start = this.svaToNode(
+                mathjs.round(start.s, this.round),
+                mathjs.round(start.v, this.round),
+                mathjs.round(start.a, this.round)
+            );
+            goal = this.svaToNode(
+                mathjs.round(goal.s, this.round),
+                mathjs.round(goal.v, this.round),
+                mathjs.round(goal.a, this.round)
+            );
+            var ds = mathjs.abs(mathjs.subtract(goal.s, start.s));
+            var jerk = mathjs.round(mathjs.divide(ds, this.jerkScale), this.round);
+            this.jMax = jerk.map((j,i) => mathjs.min(this.aMax[i], mathjs.max(j, this.jMin[i])));
+            this.neighbors = new WeakMap();
+            return super.findPath(start, goal, options);
+        }
         isGoalNeighbor(node, goal) { // a goal is zero-velocity
+            var verbose = false;
+
             for (var i = 0; i < this.dimensions; i++) {
                 var jMax = this.jMax[i];
                 var ds = goal.s[i] - node.s[i];
-                var v = node.v[i];
-                var dv = 0 - v;
-                var a = node.a[i];
-                var verbose = false;
 
                 if (ds < -jMax || jMax < ds) {
                     verbose && console.log("too far", ds,  JSON.stringify(node));
                     return false; // too far
                 }
-                if (v < -jMax || jMax < v) {
+
+                var vi = node.v[i];
+                if (vi < -jMax || jMax < vi) {
                     verbose && console.log("too fast", JSON.stringify(node));
                     return false; // too fast
                 }
-                if (a < -jMax || jMax < a) {
-                    verbose && console.log("too jerky", JSON.stringify(node));
-                    return false; // too jerky
-                }
-                if (v < 0 && ds > 0 || v > 0 && ds < 0) {
+                if (vi < 0 && ds > 0 || vi > 0 && ds < 0) {
                     verbose && console.log("wrong way velocity", JSON.stringify(node));
                     return false; // wrong way velocity
                 }
-                if (dv > 0 && a < -jMax || dv < 0 && a > jMax) { // allow 2 * jerk acceleration when stopping
+
+                var ai = node.a[i];
+                if (ai < -jMax || jMax < ai) {
+                    verbose && console.log("too jerky", JSON.stringify(node));
+                    return false; // too jerky
+                }
+
+                var dv = 0 - vi;
+                if (dv > 0 && ai < -jMax || dv < 0 && ai > jMax) { // allow 2 * jerk acceleration when stopping
                     verbose && console.log("wrong way acceleration", JSON.stringify(node));
                     return false; // wrong way acceleration
                 }
@@ -89,24 +137,28 @@ var AStarGraph = require("./AStarGraph");
             return true;
         }
         neighborsOf(node, goal) {
-            Pathfinder.validateNode(node);
+            this.stats.neighborsOf++;
             if (goal && this.isGoalNeighbor(node, goal)) {
                 return [goal];
             }
-            var anewbasis = node.a.map((a,i) => this.axisAccelerations(node, i));
+            var anewbasis = node.a.map((a,i) => this.axisAccelerations(node, i, goal.s[i]-node.s[i]));
             var apermutations = Pathfinder.permutations(anewbasis).map((anew) => {
-                var avariation = mathjs.round(anew, this.round);
-                var vvariation = mathjs.round(mathjs.add(node.v,avariation), this.round);
-                var svariation = mathjs.round(mathjs.add(node.s,vvariation), this.round);
-                return this.getNode(svariation, vvariation, avariation, node);
+                var avariation = anew;
+                // Minimize number of states by applying acceleration variations immediately 
+                // to velocity and position.
+                var vvariation = mathjs.add(node.v,avariation);
+                var svariation = mathjs.add(node.s,vvariation);
+
+                return this.svaToNode(svariation, vvariation, avariation);
             });
             return apermutations;
         }
         cost(n1, n2, goal) {
-            return 1;
+            return n1 === n2 ? 0 : 1;
         }
         tsdv(v1, v2, jerk) { // time and distance for change in velocity
             if (v1 === v2) {
+            this.stats.tsdv++;
                 return {
                     t: 0,
                     s: 0,
@@ -135,9 +187,9 @@ var AStarGraph = require("./AStarGraph");
             if (v2 < v1) {
                 return this.tsdv(v2, v1, jerk);
             }
+            this.stats.tsdv++;
             var dv = v2 - v1;
             var t = -0.5 + mathjs.sqrt(0.25 + 2 * dv / jerk); // dv = jerk * t * (t + 1) / 2
-            //var s = t * (v1 + jerk * t * ( t / 6 + 0.5*jerk));
             var s = t * (jerk * t * ( t / 6 + 0.5*jerk));
             return {
                 t: t,
@@ -153,18 +205,14 @@ var AStarGraph = require("./AStarGraph");
                 var dvi = v2 - v1;
                 var dsi = ds[i];
 
-                if (dsi === 0 && v2 !== v1) {
-                    n1.culled = "velocity change without moving";
-                    return Number.MAX_SAFE_INTEGER; // can't changing velocity without moving
-                }
+                //if (dsi === 0 && v2 !== v1) {
+                    //n1.culled = "velocity change without moving";
+                    //return Number.MAX_SAFE_INTEGER; // can't changing velocity without moving
+                //}
                 var dsiabs = mathjs.abs(dsi);
                 if (dsiabs > this.jMax[i] && mathjs.abs(n1.v[i]) > dsiabs) {
                     n1.culled = "too fast";
                     return Number.MAX_SAFE_INTEGER; // too fast
-                }
-                if (v1 === 0 && n1.a[i] || v2 === 0 && n2.a[i]) {
-                    n1.culled = "stopping mid path";
-                    return Number.MAX_SAFE_INTEGER; // no stopping
                 }
                 var scruise = dsiabs - ts.s;
                 if (v1 < 0 && dsi > 0 || v1 > 0 && dsi < 0) {
@@ -182,7 +230,8 @@ var AStarGraph = require("./AStarGraph");
                 }
                 return ts.t + scruise / mathjs.abs(v1);
             });
-            return mathjs.max(t);
+            var result = mathjs.max(t);
+            return result;
         }
         static get PathNode() {
             return PathNode;
@@ -251,12 +300,12 @@ var AStarGraph = require("./AStarGraph");
         var n2 = new PathNode([3,1,4]);
         pf.estimateCost(n1,n2).should.equal(1);
     })
-    it("getNode(s,v,a) returns unique node with given attributes", function() {
+    it("svaToNode(s,v,a) returns unique node with given attributes", function() {
         var pf = new Pathfinder({
             dimensions: 2,
         });
-        var n1 = pf.getNode([1,2],[3,4],[5,6]);
-        var n2 = pf.getNode([1,2],[3,4],[5,6]);
+        var n1 = pf.svaToNode([1,2],[3,4],[5,6]);
+        var n2 = pf.svaToNode([1,2],[3,4],[5,6]);
         n1.should.equal(n2);
         n1.should.instanceOf(PathNode);
     })
@@ -267,16 +316,16 @@ var AStarGraph = require("./AStarGraph");
             maxAcceleration: [4, 5],
             maxJerk: [1, 2],
         });
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[0,0],[0,1]), 0), [1,0,-1]);
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[0,0],[1,1]), 0), [2,1,0]);
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[0,0],[4,1]), 0), [4,3]);
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[0,0],[-4,1]), 0), [-3,-4]);
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[10,0],[0,0]), 0), [0,-1]);
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[-10,0],[0,0]), 0), [1,0]);
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[10,0],[1,0]), 0), [0]);
-        should.deepEqual(pf.axisAccelerations(pf.getNode([0,0],[-10,0],[-2,0]), 0), []);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[0,1]), 0), [1,0,-1]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[1,1]), 0), [2,1,0]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[4,1]), 0), [4,3]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[-4,1]), 0), [-3,-4]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[0,0]), 0), [0,-1]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[0,0]), 0), [1,0]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[1,0]), 0), [0]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[-2,0]), 0), []);
     })
-    it("permutations(vv) generates permutations", function() {
+    it("TESTTESTpermutations(vv) generates permutations", function() {
         should.deepEqual(Pathfinder.permutations([[1,2],[3,4,5]]), [
             [1,3],
             [2,3],
@@ -286,6 +335,12 @@ var AStarGraph = require("./AStarGraph");
             [2,5],
         ]);
         should.deepEqual(Pathfinder.permutations([[1,2],[],[3,4,5]]), []);
+        var msStart = new Date();
+        for (var i = 0; i<1000; i++) {
+            Pathfinder.permutations([[1,2],[3,4,5]]);
+        }
+        var msElapsed = new Date() - msStart;
+        msElapsed.should.below(60); // ~0.04ms
     })
     it("neighborsOf(node) generates node neighbors", function() {
         var pf = new Pathfinder({
@@ -300,22 +355,22 @@ var AStarGraph = require("./AStarGraph");
         var start = new PathNode([1,1]);
         var neighbors = pf.neighborsOf(start);
         neighbors.length.should.equal(9);
-        neighbors[0].should.equal(pf.getNode([2,2],[1,1],[1,1]));
-        neighbors[1].should.equal(pf.getNode([1,2],[0,1],[0,1]));
-        neighbors[2].should.equal(pf.getNode([0,2],[-1,1],[-1,1]));
-        neighbors[8].should.equal(pf.getNode([0,0],[-1,-1],[-1,-1]));
+        neighbors[0].should.equal(pf.svaToNode([2,2],[1,1],[1,1]));
+        neighbors[1].should.equal(pf.svaToNode([1,2],[0,1],[0,1]));
+        neighbors[2].should.equal(pf.svaToNode([0,2],[-1,1],[-1,1]));
+        neighbors[8].should.equal(pf.svaToNode([0,0],[-1,-1],[-1,-1]));
 
         var node = new PathNode([1,1],[1,1],[1,1]);
         var neighbors = pf.neighborsOf(node);
-        neighbors[0].should.equal(pf.getNode([4,4],[3,3],[2,2]));
-        neighbors[1].should.equal(pf.getNode([3,4],[2,3],[1,2]));
-        neighbors[2].should.equal(pf.getNode([2,4],[1,3],[0,2]));
-        neighbors[3].should.equal(pf.getNode([4,3],[3,2],[2,1]));
-        neighbors[4].should.equal(pf.getNode([3,3],[2,2],[1,1]));
-        neighbors[5].should.equal(pf.getNode([2,3],[1,2],[0,1]));
-        neighbors[6].should.equal(pf.getNode([4,2],[3,1],[2,0]));
-        neighbors[7].should.equal(pf.getNode([3,2],[2,1],[1,0]));
-        neighbors[8].should.equal(pf.getNode([2,2],[1,1],[0,0]));
+        neighbors[0].should.equal(pf.svaToNode([4,4],[3,3],[2,2]));
+        neighbors[1].should.equal(pf.svaToNode([3,4],[2,3],[1,2]));
+        neighbors[2].should.equal(pf.svaToNode([2,4],[1,3],[0,2]));
+        neighbors[3].should.equal(pf.svaToNode([4,3],[3,2],[2,1]));
+        neighbors[4].should.equal(pf.svaToNode([3,3],[2,2],[1,1]));
+        neighbors[5].should.equal(pf.svaToNode([2,3],[1,2],[0,1]));
+        neighbors[6].should.equal(pf.svaToNode([4,2],[3,1],[2,0]));
+        neighbors[7].should.equal(pf.svaToNode([3,2],[2,1],[1,0]));
+        neighbors[8].should.equal(pf.svaToNode([2,2],[1,1],[0,0]));
         neighbors.length.should.equal(9);
 
     })
@@ -334,23 +389,23 @@ var AStarGraph = require("./AStarGraph");
         var goal = new PathNode([1,1]);
         pf.isGoalNeighbor(goal, goal).should.equal(true);
 
-        pf.isGoalNeighbor(pf.getNode([0,0]), goal).should.equal(true);
-        pf.isGoalNeighbor(pf.getNode([2,0]), goal).should.equal(true);
-        pf.isGoalNeighbor(pf.getNode([2,2]), goal).should.equal(true);
-        pf.isGoalNeighbor(pf.getNode([0,2]), goal).should.equal(true);
+        pf.isGoalNeighbor(pf.svaToNode([0,0]), goal).should.equal(true);
+        pf.isGoalNeighbor(pf.svaToNode([2,0]), goal).should.equal(true);
+        pf.isGoalNeighbor(pf.svaToNode([2,2]), goal).should.equal(true);
+        pf.isGoalNeighbor(pf.svaToNode([0,2]), goal).should.equal(true);
 
-        pf.isGoalNeighbor(pf.getNode([0,0],[1,1]), goal).should.equal(true); // can stop
-        pf.isGoalNeighbor(pf.getNode([2,2],[-1,-1]), goal).should.equal(true); // can stop
-        pf.isGoalNeighbor(pf.getNode([0,0],[1.1,1.1]), goal).should.equal(false); // too fast
-        pf.isGoalNeighbor(pf.getNode([0,0],[-1.1,-1.1]), goal).should.equal(false); // too fast
-        pf.isGoalNeighbor(pf.getNode([0,0],[1,1],[-1,-1]), goal).should.equal(true); // can decelerate
-        pf.isGoalNeighbor(pf.getNode([2,2],[-1,-1],[1,1]), goal).should.equal(true); // can decelerate
-        pf.isGoalNeighbor(pf.getNode([0,0],[1,1],[-1.1,-1.1]), goal).should.equal(false); // too jerky
-        pf.isGoalNeighbor(pf.getNode([2,2],[1,1],[1.1,1.1]), goal).should.equal(false); // too jerky
-        pf.isGoalNeighbor(pf.getNode([0,0],[-1,-1]), goal).should.equal(false); // wrong velocity direction
-        pf.isGoalNeighbor(pf.getNode([2,2],[1,1]), goal).should.equal(false); // wrong velocity direction
-        pf.isGoalNeighbor(pf.getNode([0,0],[1,1],[2,2]), goal).should.equal(false); // wrong acceleration direction
-        pf.isGoalNeighbor(pf.getNode([2,2],[-1,-1],[-2,-2]), goal).should.equal(false); // wrong acceleration direction
+        pf.isGoalNeighbor(pf.svaToNode([0,0],[1,1]), goal).should.equal(true); // can stop
+        pf.isGoalNeighbor(pf.svaToNode([2,2],[-1,-1]), goal).should.equal(true); // can stop
+        pf.isGoalNeighbor(pf.svaToNode([0,0],[1.1,1.1]), goal).should.equal(false); // too fast
+        pf.isGoalNeighbor(pf.svaToNode([0,0],[-1.1,-1.1]), goal).should.equal(false); // too fast
+        pf.isGoalNeighbor(pf.svaToNode([0,0],[1,1],[-1,-1]), goal).should.equal(true); // can decelerate
+        pf.isGoalNeighbor(pf.svaToNode([2,2],[-1,-1],[1,1]), goal).should.equal(true); // can decelerate
+        pf.isGoalNeighbor(pf.svaToNode([0,0],[1,1],[-1.1,-1.1]), goal).should.equal(false); // too jerky
+        pf.isGoalNeighbor(pf.svaToNode([2,2],[1,1],[1.1,1.1]), goal).should.equal(false); // too jerky
+        pf.isGoalNeighbor(pf.svaToNode([0,0],[-1,-1]), goal).should.equal(false); // wrong velocity direction
+        pf.isGoalNeighbor(pf.svaToNode([2,2],[1,1]), goal).should.equal(false); // wrong velocity direction
+        pf.isGoalNeighbor(pf.svaToNode([0,0],[1,1],[2,2]), goal).should.equal(false); // wrong acceleration direction
+        pf.isGoalNeighbor(pf.svaToNode([2,2],[-1,-1],[-2,-2]), goal).should.equal(false); // wrong acceleration direction
 
         var pf = new Pathfinder({
             dimensions: 1,
@@ -368,22 +423,29 @@ var AStarGraph = require("./AStarGraph");
             return acc || isNear;
         }, false).should.equal(true); // at least one neighbor must be near goal
     })
-    it("neighborsOf(node, goal) generates goal node if near", function() {
+    it("TESTTESTneighborsOf(node, goal) generates goal node if near", function() {
         var pf = new Pathfinder({
             dimensions: 2,
         });
         var goal = new PathNode([1,1]);
-        var neighbors = pf.neighborsOf(goal);
+        var neighbors = pf.neighborsOf(goal, goal);
         neighbors.forEach((n) => {
             var vinverse = mathjs.multiply(-1, n.v);
-            var ninverse = pf.getNode(n.s, vinverse); 
+            var ninverse = pf.svaToNode(n.s, vinverse); 
             var nn = pf.neighborsOf(ninverse, goal);
             nn.length.should.equal(1, JSON.stringify(n));
             nn[0].should.equal(goal);
         });
-        var close = pf.getNode(mathjs.add([0.1,0.1], goal.s), pf.vMax, pf.aMax);
+        var close = pf.svaToNode(mathjs.add([0.1,0.1], goal.s), pf.vMax, pf.aMax);
+        msStart = new Date();
+
+        for (var i=0; i<100; i++) {
+            var neighbors = pf.neighborsOf(goal, goal);
+        }
+        msElapsed = new Date() - msStart;
+        msElapsed.should.below(40); // neighborsOf is a CPU hog @ >0.1ms
     })
-    it("tsdv(v1,v2,jerk) estimates velocity transition time", function() {
+    it("TESTTESTtsdv(v1,v2,jerk) estimates velocity transition time", function() {
         var jerk = 1;
         var pf = new Pathfinder();
 
@@ -406,44 +468,49 @@ var AStarGraph = require("./AStarGraph");
         pf.tsdv(10,0,1).s.should.approximately(18.67,0.01);
         pf.tsdv(-5,5,1).s.should.approximately(13.87,0.01);
         pf.tsdv(5,-5,1).s.should.approximately(13.87,0.01);
+
+        var msStart = new Date();
+        for (var i=0; i<10000; i++) {
+            pf.tsdv(5,-5,1);
+        }
+        var msElapsed = new Date() - msStart;
+        msElapsed.should.below(10);
     })
-    it("TESTTESTpath(start, goal) returns pf to goal", function() {
+    it("TESTTESTfindPath(start, goal) finds 1D acceleration path", function() {
         this.timeout(60*1000);
-        var verbose = false;
-        function test1(bounds, maxIterations) {
+        var verbose = 0;
+        function test1(maxIterations, startPos, goalPos) {
             var pf = new Pathfinder({
                 dimensions: 1,
                 maxVelocity: [20],
                 maxAcceleration: [5],
-                maxJerk: [1],
             });
-            var start = new PathNode([mathjs.round(mathjs.random(-bounds,bounds),3)]);
-            var goal = new PathNode([mathjs.round(mathjs.random(-bounds,bounds),3)]);
-            //var start = new PathNode([6.7]);
-            //var goal = new PathNode([-11.6]);
+            var start = new PathNode([startPos]);
+            var goal = new PathNode([goalPos]);
             var iterations = 0;
             var msStart = new Date();
             var path = pf.findPath(start, goal, {
                 onOpenSet: (openset) => {
-                    if (verbose) {
+                    if (verbose>2) {
                         var current = pf.candidate(openset);
                         var path = pf.pathTo(current);
-                        console.log("openset", openset.length, current,
-                            JSON.stringify(mathjs.round(path.map((node) => node.s[0]),1)),
+                        console.log("openset:"+openset.length, 
+                            "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),2)),
+                            JSON.stringify(current),
                             "g:"+path.length,
-                            "h:"+mathjs.round(pf.estimateCost(current, goal), 3)
+                            "h:"+mathjs.round(pf.estimateCost(current, goal), pf.round)
                         );
                     }
-                    //if (verbose && openset.length === 20) {
-                        //var sorted = openset.map((node)=>node).sort((a,b) => pf.fscore(a) - pf.fscore(b));
-                        //sorted.forEach((node,i) => {
-                            //console.log("openset["+i+"]", JSON.stringify(node), "g:"+pf.gscore(node), "f:"+pf.fscore(node));
-                        //})
-                    //}
+                    if (verbose>2 && openset.length === 20) {
+                        var sorted = openset.map((node)=>node).sort((a,b) => pf.fscore(a) - pf.fscore(b));
+                        sorted.forEach((node,i) => {
+                            console.log("openset["+i+"]", JSON.stringify(node), "g:"+pf.gscore(node), "f:"+pf.fscore(node));
+                        })
+                    }
                     return ++iterations < maxIterations;
                 },
                 onCull: (node, gscore_new, gscore_existing) => {
-                    if (verbose) {
+                    if (verbose>2) {
                         console.log("culling", JSON.stringify(node), gscore_new, gscore_existing);
                     }
                     return null;
@@ -455,16 +522,34 @@ var AStarGraph = require("./AStarGraph");
                 acc > 0 && n.v[0].should.not.below(0);
                 acc = n.v[0];
             }, 0);
-            verbose &&path.forEach((n) => console.log(n,
-                "cost", mathjs.round(pf.estimateCost(n, goal), 3)
+            verbose>1 && path.forEach((n) => console.log(n,
+                "cost", mathjs.round(pf.estimateCost(n, goal), pf.round)
             ));
-            console.log("path", JSON.stringify(start), "=>", JSON.stringify(goal), iterations, msElapsed+"ms", path.length+"nodes");
+            verbose>0 && console.log(
+                JSON.stringify([start.s[0],goal.s[0]]),
+                (verbose>1 ? "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),1)):""),
+                "iter:"+iterations, 
+                msElapsed+"ms", 
+                "path:"+path.length,
+                (verbose>1 ? "jerk:"+JSON.stringify(pf.jMax):""), 
+                "lookup:"+pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
+                "neighborsOf:"+pf.stats.neighborsOf,
+                "");
             path.length.should.above(0);
-            msElapsed.should.below(500);
             path.length === 0 && console.log("FAIL: no path");
+            return msElapsed;
         }
-        for (var i = 0; i < 100; i++) {
-            test1(100, 1000);
+        var msElapsedTotal = 0;
+        var nTests = 20;
+        nTests === 1 && (verbose = 2);
+        for (var i = 0; i < nTests; i++) {
+            var bounds = 300;
+            var maxIterations = 400;
+            var startPos = mathjs.random(-bounds,bounds);
+            var goalPos = mathjs.random(-bounds,bounds);
+            msElapsedTotal += test1(maxIterations, startPos, goalPos);
         }
+        (msElapsedTotal/nTests).should.below(20);
+        nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
     })
 })
