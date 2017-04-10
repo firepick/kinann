@@ -71,7 +71,16 @@ var mathjs = require("mathjs");
                 this.neighborsOf(current, goal).forEach((neighbor) => {
                     if (!this.closedSet.get(neighbor)) {
                         var tentative_gScore = this.gscore(current) + this.cost(current, neighbor, goal);
-                        if (!this.openMap.get(neighbor)) {
+                        if (this.openMap.get(neighbor)) {
+                            if (tentative_gScore >= this.gscore(neighbor)) {
+                                neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
+                            } else {
+                                var h = this.estimateCost(neighbor, goal);
+                                if (h === Number.MAX_SAFE_INTEGER) {
+                                    neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
+                                }
+                            }
+                        } else {
                             var h = this.estimateCost(neighbor, goal);
                             if (h === Number.MAX_SAFE_INTEGER) {
                                 neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
@@ -79,13 +88,6 @@ var mathjs = require("mathjs");
                             if (neighbor) {
                                 this.openMap.set(neighbor, true);
                                 this.openSet.push(neighbor);
-                            }
-                        } else if (tentative_gScore >= this.gscore(neighbor)) {
-                            neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
-                        } else {
-                            var h = this.estimateCost(neighbor, goal);
-                            if (h === Number.MAX_SAFE_INTEGER) {
-                                neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
                             }
                         }
                         if (neighbor) {
