@@ -3,14 +3,6 @@ var mathjs = require("mathjs");
 (function(exports) { 
     class AStarGraph {
         constructor(options = {}) {
-            this.clear();
-        }
-        clear() {
-            this.openMap = new WeakMap();
-            this.closedSet = new WeakMap();
-            this.fScoreMap = new WeakMap();
-            this.gScoreMap = new WeakMap();
-            this.cameFromMap = new WeakMap();
         }
         neighborsOf(node, goal) {
             // NOTE: neighbors can be generated dynamically, but they must be unique
@@ -24,37 +16,35 @@ var mathjs = require("mathjs");
             // estimatedCost must be admissible (i.e., less than or equal to actual cost)
             throw new Error("estimateCost(node1, goal) must be overridden by subclass");
         }
-        cameFrom(node, value) { // override for performance
+        cameFrom(node, value) {
             if (value == null) {
-                return this.cameFromMap.get(node);
+                return node.cameFrom;
             }
-            return this.cameFromMap.set(node, value);
+            return node.cameFrom = value;
         }
-        isOpen(node, value) { // override for performance
+        isOpen(node, value) {
             if (value == null) {
-                return this.openMap.get(node);
+                return node.isOpen;
             }
-            return this.openMap.set(node, value);
+            return node.isOpen = value;
         }
-        isClosed(node, value) { // override for performance
+        isClosed(node, value) {
             if (value == null) {
-                return this.closedSet.get(node);
+                return node.isClosed;
             }
-            return this.closedSet.set(node, value);
+            return node.isClosed = value;
         }
-        fscore(node,value) { // override for performance
+        fscore(node, value) {
             if (value == null) {
-                var score = this.fScoreMap.get(node);
-                return score == null ? Number.MAX_SAFE_INTEGER : mathjs.min(Number.MAX_SAFE_INTEGER,score);
+                return node.f == null ? Number.MAX_SAFE_INTEGER : node.f;
             }
-            return this.fScoreMap.set(node, value);
+            node.f = value;
         }
-        gscore(node,value) { // override for performance
+        gscore(node, value) {
             if (value == null) {
-                var score = this.gScoreMap.get(node);
-                return score == null ? Number.MAX_SAFE_INTEGER : mathjs.min(Number.MAX_SAFE_INTEGER,score);
+                return node.g == null ? Number.MAX_SAFE_INTEGER : node.g;
             }
-            return this.gScoreMap.set(node, value);
+            node.g = value;
         }
         candidate(openSet) {
             var fScore = Number.MAX_SAFE_INTEGER;
@@ -83,7 +73,6 @@ var mathjs = require("mathjs");
             return totalPath.reverse();
         }
         findPath(start, goal, options) { // Implements A* algorithm
-            this.clear();
             this.openSet = [start];
             var onOpenSet = options.onOpenSet || (()=>true);
             var onCull = options.onCull || ((node,gscore_new,gscore_existing) => null);

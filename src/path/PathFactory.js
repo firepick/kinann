@@ -1,43 +1,9 @@
 var mathjs = require("mathjs");
 var AStarGraph = require("./AStarGraph");
+var PathNode = require("./PathNode");
 
 (function(exports) { 
     
-    class PathNode {
-        constructor(position, velocity, acceleration) {
-            this.s = position;
-            this.v = velocity || Array(position.length).fill(0);
-            this.a = acceleration || Array(position.length).fill(0);
-            Object.defineProperty(this, "key", {
-                value: JSON.stringify(this)
-            });
-            Object.defineProperty(this, "cameFrom", {
-                value: null, // estimated cost
-                writable: true,
-            });
-            Object.defineProperty(this, "isOpen", {
-                value: null, // estimated cost
-                writable: true,
-            });
-            Object.defineProperty(this, "isClosed", {
-                value: null, // estimated cost
-                writable: true,
-            });
-            Object.defineProperty(this, "f", {
-                value: null, // estimated cost
-                writable: true,
-            });
-            Object.defineProperty(this, "g", {
-                value: null, // estimated cost
-                writable: true,
-            });
-            Object.defineProperty(this, "h", {
-                value: null, // estimated cost
-                writable: true,
-            });
-        }
-    }
-
     class PathFactory extends AStarGraph {
         constructor(options={}) {
             super(options);
@@ -58,36 +24,6 @@ var AStarGraph = require("./AStarGraph");
                 tsdv: 0,
                 neighborsOf: 0,
             };
-        }
-        cameFrom(node, value) {
-            if (value == null) {
-                return node.cameFrom;
-            }
-            return node.cameFrom = value;
-        }
-        isOpen(node, value) {
-            if (value == null) {
-                return node.isOpen;
-            }
-            return node.isOpen = value;
-        }
-        isClosed(node, value) {
-            if (value == null) {
-                return node.isClosed;
-            }
-            return node.isClosed = value;
-        }
-        fscore(node, value) {
-            if (value == null) {
-                return node.f == null ? Number.MAX_SAFE_INTEGER : node.f;
-            }
-            node.f = value;
-        }
-        gscore(node, value) {
-            if (value == null) {
-                return node.g == null ? Number.MAX_SAFE_INTEGER : node.g;
-            }
-            node.g = value;
         }
         svaToNode(position, velocity, acceleration) {
             var node = new PathNode(position, velocity, acceleration);
@@ -342,7 +278,6 @@ var AStarGraph = require("./AStarGraph");
 (typeof describe === 'function') && describe("PathFactory", function() {
     var should = require("should");
     var PathFactory = exports.PathFactory;
-    var PathNode = PathFactory.PathNode;
 
     it("PathFactory(options) is the constructor", function() {
     })
