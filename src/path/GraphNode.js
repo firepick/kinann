@@ -5,26 +5,38 @@ var AStarGraph = require("./AStarGraph");
     class GraphNode {
         constructor(props) {
             props != null && Object.assign(this, props);
-            Object.defineProperty(this, "$cameFrom", {
-                value: null, // estimated cost
+            Object.defineProperty(this, "cameFrom", {
+                value: null, 
                 writable: true,
             });
-            Object.defineProperty(this, "$isOpen", {
-                value: null, // estimated cost
+            Object.defineProperty(this, "isOpen", {
+                value: null,
                 writable: true,
             });
-            Object.defineProperty(this, "$isClosed", {
-                value: null, // estimated cost
+            Object.defineProperty(this, "isClosed", {
+                value: null, 
                 writable: true,
             });
             Object.defineProperty(this, "$f", {
-                value: null, // estimated cost
+                value: null, 
                 writable: true,
             });
             Object.defineProperty(this, "$g", {
-                value: null, // estimated cost
+                value: null,
                 writable: true,
             });
+        }
+        get fscore() {
+            return this.$f == null ? Number.MAX_SAFE_INTEGER : this.$f;
+        }
+        set fscore(value) {
+            this.$f = value;
+        }
+        get gscore() {
+            return this.$g == null ? Number.MAX_SAFE_INTEGER : this.$g;
+        }
+        set gscore(value) {
+            this.$g = value;
         }
     }
 

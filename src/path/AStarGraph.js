@@ -17,45 +17,11 @@ var GraphNode = require("./GraphNode");
             // estimatedCost must be admissible (i.e., less than or equal to actual cost)
             throw new Error("estimateCost(node1, goal) must be overridden by subclass");
         }
-        cameFrom(node, value) {
-            if (value == null) {
-                return node.$cameFrom;
-            }
-            return node.$cameFrom = value;
-        }
-        isOpen(node, value) {
-            if (value == null) {
-                return node.$isOpen;
-            }
-            return node.$isOpen = value;
-        }
-        isClosed(node, value) {
-            if (value == null) {
-                return node.$isClosed;
-            }
-            return node.$isClosed = value;
-        }
-        fscore(node, value) {
-            if (value == null) {
-                return node.$f == null ? Number.MAX_SAFE_INTEGER : node.$f;
-            }
-            node.$f = value;
-        }
-        gscore(node, value) {
-            if (value == null) {
-                return node.$g == null ? Number.MAX_SAFE_INTEGER : node.$g;
-            }
-            node.$g = value;
-        }
         candidate(openSet) {
             var fScore = Number.MAX_SAFE_INTEGER;
             var result = openSet.reduce((acc,node) => {
-                var f = this.fscore(node);
-                if (f == null) {
-                    throw new Error("fscore null for node:" + JSON.stringify(node));
-                }
-                if (this.fscore(node) <= fScore ) {
-                    fScore = this.fscore(node); 
+                if (node.fscore <= fScore ) {
+                    fScore = node.fscore;
                     return node;
                 }
                 return acc;
@@ -68,7 +34,7 @@ var GraphNode = require("./GraphNode");
         }
         pathTo(node) {
             var totalPath = [node];
-            while ((node = this.cameFrom(node))) {
+            while ((node = node.cameFrom)) {
                 totalPath.push(node);
             }
             return totalPath.reverse();
@@ -76,37 +42,36 @@ var GraphNode = require("./GraphNode");
         findPath(start, goal, options) { // Implements A* algorithm
             this.openSet = [start];
             var onOpenSet = options.onOpenSet || (()=>true);
-            var onCull = options.onCull || ((node,gscore_new,gscore_existing) => null);
-            this.fscore(start, this.estimateCost(start, goal));
-            this.gscore(start, 0);
+            var onCull = options.onCull || ((node,gscore_new) => null);
+            start.fscore = this.estimateCost(start, goal);
+            start.gscore = 0;
             while (this.openSet.length && onOpenSet(this.openSet)) {
                 var current = this.candidate(this.openSet);
                 if (current === goal) {
                     return this.pathTo(current);
                 }
-                this.isOpen(current, false);
-                this.isClosed(current, true);
+                current.isOpen = false;
+                current.isClosed = true;
                 for (var neighbor of this.neighborsOf(current, goal)) {
-                    if (!this.isClosed(neighbor)) {
-                        var tentative_gScore = this.gscore(current) + this.cost(current, neighbor);
-                        if (this.isOpen(neighbor)) {
-                            if (tentative_gScore >= this.gscore(neighbor)) {
-                                neighbor = onCull(neighbor, tentative_gScore, this.gscore(neighbor));
+                    if (!neighbor.isClosed) {
+                        var tentative_gScore = current.gscore + this.cost(current, neighbor);
+                        if (neighbor.isOpen) {
+                            if (tentative_gScore >= neighbor.gscore) {
+                                neighbor = onCull(neighbor, tentative_gScore);
                             }
                         } else {
-                            this.isOpen(neighbor, true);
+                            neighbor.isOpen = true;
                             this.openSet.push(neighbor);
                         }
                         if (neighbor) {
-                            var h = this.estimateCost(neighbor, goal);
-                            this.cameFrom(neighbor, current);
-                            this.gscore(neighbor, tentative_gScore);
-                            this.fscore(neighbor, this.gscore(neighbor) + h);
+                            neighbor.cameFrom = current;
+                            neighbor.gscore = tentative_gScore;
+                            neighbor.fscore = neighbor.gscore + this.estimateCost(neighbor, goal);
                         }
                     }
                 };
                 this.openSet = this.openSet.reduce(
-                    (acc, node) => (this.isOpen(node) && acc.push(node), acc),
+                    (acc, node) => (node.isOpen && acc.push(node), acc),
                     []);
             }
             return []; // no path
@@ -198,9 +163,9 @@ var GraphNode = require("./GraphNode");
                 }
                 return true;
             },
-            onCull: (node, gscore_new, gscore_existing) => {
+            onCull: (node, gscore_new) => {
                 if (verbose) {
-                    console.log("culling", JSON.stringify(node), gscore_new, gscore_existing);
+                    console.log("culling", JSON.stringify(node), gscore_new, node.gscore);
                 }
                 return null;
             },

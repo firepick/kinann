@@ -509,9 +509,9 @@ var PathNode = require("./PathNode");
                     }
                     return ++iterations < maxIterations;
                 },
-                onCull: (node, gscore_new, gscore_existing) => {
+                onCull: (node, gscore_new) => {
                     if (verbose>2) {
-                        console.log("culling", JSON.stringify(node), gscore_new, gscore_existing);
+                        console.log("culling", JSON.stringify(node), gscore_new, node.gscore);
                     }
                     return null;
                 },
@@ -647,9 +647,9 @@ var PathNode = require("./PathNode");
                     }
                     return ++iterations < maxIterations;
                 },
-                onCull: (node, gscore_new, gscore_existing) => {
+                onCull: (node, gscore_new) => {
                     if (verbose>3) {
-                        console.log("culling", JSON.stringify(node), gscore_new, gscore_existing);
+                        console.log("culling", JSON.stringify(node), gscore_new);
                     }
                     return null;
                 },
