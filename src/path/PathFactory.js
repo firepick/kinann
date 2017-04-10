@@ -11,6 +11,30 @@ var AStarGraph = require("./AStarGraph");
             Object.defineProperty(this, "key", {
                 value: JSON.stringify(this)
             });
+            Object.defineProperty(this, "cameFrom", {
+                value: null, // estimated cost
+                writable: true,
+            });
+            Object.defineProperty(this, "isOpen", {
+                value: null, // estimated cost
+                writable: true,
+            });
+            Object.defineProperty(this, "isClosed", {
+                value: null, // estimated cost
+                writable: true,
+            });
+            Object.defineProperty(this, "f", {
+                value: null, // estimated cost
+                writable: true,
+            });
+            Object.defineProperty(this, "g", {
+                value: null, // estimated cost
+                writable: true,
+            });
+            Object.defineProperty(this, "h", {
+                value: null, // estimated cost
+                writable: true,
+            });
         }
     }
 
@@ -34,6 +58,36 @@ var AStarGraph = require("./AStarGraph");
                 tsdv: 0,
                 neighborsOf: 0,
             };
+        }
+        cameFrom(node, value) {
+            if (value == null) {
+                return node.cameFrom;
+            }
+            return node.cameFrom = value;
+        }
+        isOpen(node, value) {
+            if (value == null) {
+                return node.isOpen;
+            }
+            return node.isOpen = value;
+        }
+        isClosed(node, value) {
+            if (value == null) {
+                return node.isClosed;
+            }
+            return node.isClosed = value;
+        }
+        fscore(node, value) {
+            if (value == null) {
+                return node.f == null ? Number.MAX_SAFE_INTEGER : node.f;
+            }
+            node.f = value;
+        }
+        gscore(node, value) {
+            if (value == null) {
+                return node.g == null ? Number.MAX_SAFE_INTEGER : node.g;
+            }
+            node.g = value;
         }
         svaToNode(position, velocity, acceleration) {
             var node = new PathNode(position, velocity, acceleration);
@@ -161,18 +215,19 @@ var AStarGraph = require("./AStarGraph");
                 return [goal];
             }
             var anewbasis = node.a.map((a,i) => this.axisAccelerations(node, i, goal.s[i]-node.s[i]));
-            var apermutations = PathFactory.permutations(anewbasis).map((anew) => {
+            var neighbors = PathFactory.permutations(anewbasis).reduce((acc,anew) => {
                 var avariation = anew;
                 // Minimize number of states by applying acceleration variations immediately 
                 // to velocity and position.
                 var vvariation = mathjs.add(node.v,avariation);
                 var svariation = mathjs.add(node.s,vvariation);
-
-                return this.svaToNode(svariation, vvariation, avariation);
-            });
-            return apermutations;
+                var neighbor = this.svaToNode(svariation, vvariation, avariation);
+                this.estimateCost(neighbor, goal) < Number.MAX_SAFE_INTEGER && acc.push(neighbor);
+                return acc;
+            }, []);
+            return neighbors;
         }
-        cost(n1, n2, goal) {
+        cost(n1, n2) {
             return n1 === n2 ? 0 : 1;
         }
         tsdv(v1, v2, jerk) { // time and distance for change in velocity
@@ -215,42 +270,44 @@ var AStarGraph = require("./AStarGraph");
                 s: s,
             }
         }
-        estimateCost(n1, n2) {
-            var ds = mathjs.subtract(n2.s, n1.s);
-            var vts = n1.v.map((v1, i) => this.tsdv(v1, n2.v[i], this.jMax[i]));
+        estimateCost(n1, goal) {
+            if (n1.h) {
+                return n1.h;
+            }
+            var ds = mathjs.subtract(goal.s, n1.s);
+            var vts = n1.v.map((v1, i) => this.tsdv(v1, goal.v[i], this.jMax[i]));
             var t = vts.map((ts,i) => { // transition time + cruise time
                 var v1 = n1.v[i];
-                var v2 = n2.v[i];
+                var v2 = goal.v[i];
                 var dvi = v2 - v1;
                 var dsi = ds[i];
 
                 //if (dsi === 0 && v2 !== v1) {
                     //n1.culled = "velocity change without moving";
-                    //return Number.MAX_SAFE_INTEGER; // can't changing velocity without moving
+                    //return n1.h = Number.MAX_SAFE_INTEGER; // can't changing velocity without moving
                 //}
                 var dsiabs = mathjs.abs(dsi);
                 if (dsiabs > this.jMax[i] && mathjs.abs(n1.v[i]) > dsiabs) {
                     n1.culled = "too fast";
-                    return Number.MAX_SAFE_INTEGER; // too fast
+                    return n1.h = Number.MAX_SAFE_INTEGER; // too fast
                 }
                 var scruise = dsiabs - ts.s;
                 if (v1 < 0 && dsi > 0 || v1 > 0 && dsi < 0) {
                     scruise += mathjs.abs(v1); // backtrack penalty (not exact)
                 }
                 if (scruise <= 0) {
-                    return ts.t;
+                    return n1.h = ts.t;
                 }
                 if (v1 == 0) {
                     if (v2 === 0) {
-                        return 1; // admissible but not accurate
+                        return n1.h = 1; // admissible but not accurate
                     } else {
-                        return scruise / v2;
+                        return n1.h = scruise / v2;
                     }
                 }
-                return ts.t + scruise / mathjs.abs(v1);
+                return n1.h = ts.t + scruise / mathjs.abs(v1);
             });
-            var result = mathjs.sum(t);
-            return result;
+            return n1.h = mathjs.sum(t);
         }
         static get PathNode() {
             return PathNode;
@@ -556,6 +613,60 @@ var AStarGraph = require("./AStarGraph");
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
         nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
     })
+    it("iAxisAccelerations(node,i,dsgoal) generates axis acceleration iterator", function() {
+        var pf = new PathFactory({
+            dimensions: 2,
+            maxVelocity: [10, 100],
+            maxAcceleration: [1, 2],
+        });
+        function testAxisAcceleration(s,v,a, dsgoal, expected) {
+            should.deepEqual(Array.from(pf.iAxisAccelerations(pf.svaToNode(s,v,a), 0, dsgoal)), expected);
+        }
+        var dsgoal = 10; // forward to goal
+        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [1,0,-1]);
+        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [1,0]);
+        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, [4,3]);
+        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-3,-4]);
+        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, [0,-1]);
+        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [1,0]);
+        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, [0]);
+        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
+
+        var dsgoal = -10; // backward to goal
+        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [-1,0,1]);
+        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [0,1]);
+        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, [3,4]);
+        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-4,-3]);
+        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, [-1,0]);
+        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [0,1]);
+        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, [0]);
+        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
+
+        var dsgoal = 1; // near goal
+        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [1,0,-1]);
+        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [1,0]);
+        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, []); // overshoot cull
+        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-3,-4]);
+        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, []); // overshoot cull
+        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [1,0]);
+        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, []); // overshoot cull
+        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
+    })
+    it("axisAccelerations(node, i) returns possible neighbor accelerations", function() {
+        var pf = new PathFactory({
+            dimensions: 2,
+            maxVelocity: [10, 100],
+            maxAcceleration: [1, 2],
+        });
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[0,1]), 0), [1,0,-1]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[1,1]), 0), [1,0]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[4,1]), 0), [4,3]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[-4,1]), 0), [-3,-4]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[0,0]), 0), [0,-1]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[0,0]), 0), [1,0]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[1,0]), 0), [0]);
+        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[-2,0]), 0), []);
+    })
     it("findPath(start, goal) finds 2D acceleration path", function() {
         this.timeout(60*1000);
         var verbose = 0;
@@ -566,7 +677,7 @@ var AStarGraph = require("./AStarGraph");
                 maxAcceleration: [5,5,5],
             });
             var start = new PathNode([0,-10,-10]);
-            var goal = new PathNode([15,15,-10.8]);
+            var goal = new PathNode([15,35.1,-10.8]);
             var iterations = 0;
             var msStart = new Date();
             var path = pf.findPath(start, goal, {
@@ -624,66 +735,12 @@ var AStarGraph = require("./AStarGraph");
         nTests === 1 && (verbose = 2);
         for (var i = 0; i < nTests; i++) {
             var bounds = 300;
-            var maxIterations = 500;
+            var maxIterations = 900;
             var startPos = mathjs.random(-bounds,bounds);
             var goalPos = mathjs.random(-bounds,bounds);
             msElapsedTotal += test1(maxIterations, startPos, goalPos);
         }
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
         nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
-    })
-    it("iAxisAccelerations(node,i,dsgoal) generates axis acceleration iterator", function() {
-        var pf = new PathFactory({
-            dimensions: 2,
-            maxVelocity: [10, 100],
-            maxAcceleration: [1, 2],
-        });
-        function testAxisAcceleration(s,v,a, dsgoal, expected) {
-            should.deepEqual(Array.from(pf.iAxisAccelerations(pf.svaToNode(s,v,a), 0, dsgoal)), expected);
-        }
-        var dsgoal = 10; // forward to goal
-        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [1,0,-1]);
-        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, [4,3]);
-        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-3,-4]);
-        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, [0,-1]);
-        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, [0]);
-        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
-
-        var dsgoal = -10; // backward to goal
-        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [-1,0,1]);
-        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [0,1]);
-        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, [3,4]);
-        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-4,-3]);
-        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, [-1,0]);
-        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [0,1]);
-        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, [0]);
-        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
-
-        var dsgoal = 1; // near goal
-        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [1,0,-1]);
-        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, []); // overshoot cull
-        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-3,-4]);
-        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, []); // overshoot cull
-        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, []); // overshoot cull
-        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
-    })
-    it("axisAccelerations(node, i) returns possible neighbor accelerations", function() {
-        var pf = new PathFactory({
-            dimensions: 2,
-            maxVelocity: [10, 100],
-            maxAcceleration: [1, 2],
-        });
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[0,1]), 0), [1,0,-1]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[1,1]), 0), [1,0]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[4,1]), 0), [4,3]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[-4,1]), 0), [-3,-4]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[0,0]), 0), [0,-1]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[0,0]), 0), [1,0]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[1,0]), 0), [0]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[-2,0]), 0), []);
     })
 })
