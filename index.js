@@ -19,9 +19,9 @@
     Kinann.models = {
         RotaryDelta: require("./src/models/RotaryDelta"),
     };
-    Kinann.astar = {
-        AStarGraph: require("./src/astar/AStarGraph"),
-        PathFactory: require("./src/astar/PathFactory"),
+    Kinann.path = {
+        AStarGraph: require("./src/path/AStarGraph"),
+        PathFactory: require("./src/path/PathFactory"),
     };
 
     module.exports = exports.Kinann = Kinann;
