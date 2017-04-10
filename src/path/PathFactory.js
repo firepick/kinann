@@ -151,6 +151,18 @@ var PathNode = require("./PathNode");
                 return [goal];
             }
             var anewbasis = node.a.map((a,i) => this.axisAccelerations(node, i, goal.s[i]-node.s[i]));
+            function * iNeighbors(pf, anewbasis) {
+                for (var anew of PathFactory.permutations(anewbasis)) {
+                    var avariation = anew;
+                    var vvariation = mathjs.add(node.v,avariation); // instantaneous acceleration
+                    var svariation = mathjs.add(node.s,vvariation); // instantaneous acceleration
+                    var neighbor = pf.svaToNode(svariation, vvariation, avariation);
+                    if (pf.estimateCost(neighbor, goal) < Number.MAX_SAFE_INTEGER) {
+                        yield(neighbor);
+                    }
+                }
+            }
+            return iNeighbors(this, anewbasis);
             var neighbors = PathFactory.permutations(anewbasis).reduce((acc,anew) => {
                 var avariation = anew;
                 // Minimize number of states by applying acceleration variations immediately 
@@ -335,7 +347,7 @@ var PathNode = require("./PathNode");
         var msElapsed = new Date() - msStart;
         msElapsed.should.below(60); // ~0.04ms
     })
-    it("neighborsOf(node) generates node neighbors", function() {
+    it("neighborsOf(node) iterates over node neighbors", function() {
         var pf = new PathFactory({
             dimensions: 2,
             maxVelocity: [10,10],
@@ -344,18 +356,18 @@ var PathNode = require("./PathNode");
 
         var goal = new PathNode([-10.1,-10.1]);
         var node = new PathNode([-10,-10],[-1,-1]);
-        var neighbors = pf.neighborsOf(node, goal);
+        var neighbors = Array.from(pf.neighborsOf(node, goal));
         neighbors.length.should.equal(1);
 
         var start = new PathNode([1,1]);
-        var neighbors = pf.neighborsOf(start, goal);
+        var neighbors = Array.from(pf.neighborsOf(start, goal));
         neighbors.length.should.equal(9);
         neighbors[0].should.equal(pf.svaToNode([0,0],[-1,-1],[-1,-1]));
         neighbors[1].should.equal(pf.svaToNode([1,0],[0,-1],[0,-1]));
         neighbors[2].should.equal(pf.svaToNode([2,0],[1,-1],[1,-1]));
 
         var node = new PathNode([1,1],[1,1],[1,1]);
-        var neighbors = pf.neighborsOf(node, goal);
+        var neighbors = Array.from(pf.neighborsOf(node, goal));
         neighbors.length.should.equal(4);
         neighbors[0].should.equal(pf.svaToNode([2,2],[1,1],[0,0]));
         neighbors[1].should.equal(pf.svaToNode([3,2],[2,1],[1,0]));
@@ -404,7 +416,7 @@ var PathNode = require("./PathNode");
         var goal = new PathNode([-7.5]);
         var start = new PathNode([-8.6]);
         pf.isGoalNeighbor(start, goal).should.equal(false); 
-        var neighbors = pf.neighborsOf(start, goal);
+        var neighbors = Array.from(pf.neighborsOf(start, goal));
         neighbors.reduce((acc, neighbor) => {
             var isNear = pf.isGoalNeighbor(neighbor, goal);
             verbose && console.log("neighbor", JSON.stringify(neighbor), isNear);
@@ -416,11 +428,11 @@ var PathNode = require("./PathNode");
             dimensions: 2,
         });
         var goal = new PathNode([1,1]);
-        var neighbors = pf.neighborsOf(goal, goal);
+        var neighbors = Array.from(pf.neighborsOf(goal, goal));
         neighbors.forEach((n) => {
             var vinverse = mathjs.multiply(-1, n.v);
             var ninverse = pf.svaToNode(n.s, vinverse); 
-            var nn = pf.neighborsOf(ninverse, goal);
+            var nn = Array.from(pf.neighborsOf(ninverse, goal));
             nn.length.should.equal(1, JSON.stringify(n));
             nn[0].should.equal(goal);
         });
@@ -428,7 +440,7 @@ var PathNode = require("./PathNode");
         msStart = new Date();
 
         for (var i=0; i<100; i++) {
-            var neighbors = pf.neighborsOf(goal, goal);
+            var neighbors = Array.from(pf.neighborsOf(goal, goal));
         }
         msElapsed = new Date() - msStart;
         msElapsed.should.below(40); // neighborsOf is a CPU hog @ >0.1ms

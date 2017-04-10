@@ -1,4 +1,5 @@
 var mathjs = require("mathjs");
+var GraphNode = require("./GraphNode");
 
 (function(exports) { 
     class AStarGraph {
@@ -18,33 +19,33 @@ var mathjs = require("mathjs");
         }
         cameFrom(node, value) {
             if (value == null) {
-                return node.cameFrom;
+                return node.$cameFrom;
             }
-            return node.cameFrom = value;
+            return node.$cameFrom = value;
         }
         isOpen(node, value) {
             if (value == null) {
-                return node.isOpen;
+                return node.$isOpen;
             }
-            return node.isOpen = value;
+            return node.$isOpen = value;
         }
         isClosed(node, value) {
             if (value == null) {
-                return node.isClosed;
+                return node.$isClosed;
             }
-            return node.isClosed = value;
+            return node.$isClosed = value;
         }
         fscore(node, value) {
             if (value == null) {
-                return node.f == null ? Number.MAX_SAFE_INTEGER : node.f;
+                return node.$f == null ? Number.MAX_SAFE_INTEGER : node.$f;
             }
-            node.f = value;
+            node.$f = value;
         }
         gscore(node, value) {
             if (value == null) {
-                return node.g == null ? Number.MAX_SAFE_INTEGER : node.g;
+                return node.$g == null ? Number.MAX_SAFE_INTEGER : node.$g;
             }
-            node.g = value;
+            node.$g = value;
         }
         candidate(openSet) {
             var fScore = Number.MAX_SAFE_INTEGER;
@@ -85,7 +86,7 @@ var mathjs = require("mathjs");
                 }
                 this.isOpen(current, false);
                 this.isClosed(current, true);
-                this.neighborsOf(current, goal).forEach((neighbor) => {
+                for (var neighbor of this.neighborsOf(current, goal)) {
                     if (!this.isClosed(neighbor)) {
                         var tentative_gScore = this.gscore(current) + this.cost(current, neighbor);
                         if (this.isOpen(neighbor)) {
@@ -103,7 +104,7 @@ var mathjs = require("mathjs");
                             this.fscore(neighbor, this.gscore(neighbor) + h);
                         }
                     }
-                });
+                };
                 this.openSet = this.openSet.reduce(
                     (acc, node) => (this.isOpen(node) && acc.push(node), acc),
                     []);
@@ -118,12 +119,6 @@ var mathjs = require("mathjs");
 (typeof describe === 'function') && describe("AStarGraph", function() {
     var should = require("should");
     var AStarGraph = exports.AStarGraph;
-
-    class TestNode {
-        constructor(name) {
-            this.name = name;
-        }
-    }
 
     it("AStarGraph subclass finds shortest path", function() {
         var verbose = 0;
@@ -143,7 +138,7 @@ var mathjs = require("mathjs");
             END: { },
         }
         var nodes = {};
-        Object.keys(nodeCosts).forEach((name) => nodes[name] = new TestNode(name));
+        Object.keys(nodeCosts).forEach((name) => nodes[name] = new GraphNode({name:name}));
 
         // extends AStarGrap with appropriate
         class TestGraph extends AStarGraph {
