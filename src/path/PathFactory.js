@@ -598,13 +598,13 @@ var PathNode = require("./PathNode");
         var nTests = 1;
         nTests === 1 && (verbose = 2);
         for (var i = 0; i < nTests; i++) {
-            var start = new PathNode([0,-10,-10]);
-            var goal = new PathNode([15,35.1,-10.8]);
+            var start = new PathNode([0,-10,30]);
+            var goal = new PathNode([15,45.1,-10.8]);
             var pf = new PathFactory({
                 dimensions: 3,
                 maxVelocity: [20,20,20],
                 maxAcceleration: [5,5,5],
-                maxIterations: 900,
+                maxIterations: 5000,
             });
             msElapsedTotal += testFindPath(pf, start, goal, verbose);
         }

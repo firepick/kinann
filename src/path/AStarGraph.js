@@ -5,6 +5,8 @@ var GraphNode = require("./GraphNode");
     class AStarGraph {
         constructor(options = {}) {
             this.maxIterations = options.maxIterations || 10000;
+            this.fastOpenSize = options.fastOpenSize || 8;
+            this.stats = {};
         }
         neighborsOf(node, goal) {
             // NOTE: neighbors can be generated dynamically, but they must be unique
@@ -18,17 +20,37 @@ var GraphNode = require("./GraphNode");
             // estimatedCost must be admissible (i.e., less than or equal to actual cost)
             throw new Error("estimateCost(node1, goal) must be overridden by subclass");
         }
-        findMin(openSet) {
+        findMinOpen() {
             var fScore = Number.MAX_SAFE_INTEGER;
-            var result = openSet.reduce((acc,node) => {
-                if (node.fscore <= fScore ) {
+            var result = this.fastOpen.reduce((acc,node) => {
+                if (node.isOpen && node.fscore <= fScore ) {
                     fScore = node.fscore;
                     return node;
                 }
                 return acc;
             }, null);
             if (result == null) {
-                throw new Error("findMin FAIL:" + JSON.stringify(openSet));
+                this.stats.findPath.sort++;
+                this.slowOpen.sort((a,b) => b.fscore - a.fscore);
+                this.fastOpenMax = 0;
+                this.fastOpen = [];
+                var node;
+                while (this.fastOpen.length < this.fastOpenSize && (node = this.slowOpen.pop())) {
+                    if (node.isOpen) {
+                        this.fastOpenMax = node.fscore;
+                        this.fastOpen.push(node);
+                    }
+                }
+                var result = this.fastOpen.reduce((acc,node) => {
+                    if (node.isOpen && node.fscore <= fScore ) {
+                        fScore = node.fscore;
+                        return node;
+                    }
+                    return acc;
+                }, null);
+                if (result == null) {
+                    throw new Error("findMinOpen FAIL:"+this.fastOpen.length+" "+this.slowOpen.length);
+                }
             }
 
             return result;
@@ -40,25 +62,30 @@ var GraphNode = require("./GraphNode");
             }
             return totalPath.reverse();
         }
-        findPath(start, goal, options) { // Implements A* algorithm
+        findPath(start, goal, options) { 
+            // Implements A* algorithm
             var msStart = new Date();
-            this.openSet = [start];
+            this.fastOpen = [start];
+            this.slowOpen = [];
             var onCurrent = options.onCurrent || ((node)=>true);
             var onCull = options.onCull || ((node,gscore_new) => null);
             start.fscore = this.estimateCost(start, goal);
             start.gscore = 0;
-            var stats = {
+            start.isOpen = true;
+            var stats = this.stats.findPath = {
                 iter: 0,
                 nodes: 0,
-                unshift: 0,
-                unshiftf: 0,
-                push: 0,
-                pushf: Number.MAX_SAFE_INTEGER,
+                fast: 0,
+                slow: 0,
+                sort: 0,
             };
-            stats.push = 0;
             var path = [];
-            while (this.openSet.length && stats.iter++ < this.maxIterations) {
-                var current = this.findMin(this.openSet);
+            this.fastOpenMax = start.fscore;
+            while (stats.iter++ < this.maxIterations) {
+                var current = this.findMinOpen();
+                if (current == null) {
+                    break;
+                }
                 if (!onCurrent(current)) {
                     break;
                 }
@@ -82,24 +109,21 @@ var GraphNode = require("./GraphNode");
                     neighbor.gscore = tentative_gScore;
                     neighbor.fscore = neighbor.gscore + this.estimateCost(neighbor, goal);
                     if (!neighbor.isOpen) {
-                        if (this.openSet.length === 0 || neighbor.fscore < this.openSet[0].fscore) {
-                            this.openSet.unshift(neighbor);
-                            stats.unshift++;
-                            stats.unshiftf = mathjs.max(stats.unshiftf, neighbor.fscore);
-                        } else {
-                            this.openSet.push(neighbor);
-                            stats.push++;
-                            stats.pushf = mathjs.min(stats.pushf, neighbor.fscore);
-                        }
                         neighbor.isOpen = true;
+                        if (this.fastOpen.length === 0 || neighbor.fscore < this.fastOpenMax) {
+                            this.fastOpen.push(neighbor);
+                            this.fastOpenMax = mathjs.max(this.fastOpenMax, neighbor.fscore);
+                            stats.fast++;
+                        } else {
+                            this.slowOpen.push(neighbor);
+                            stats.slow++;
+                        }
                     }
                 }
-                this.openSet = this.openSet.reduce(
-                    (acc, node) => (node.isOpen && node.fscore < Number.MAX_SAFE_INTEGER && acc.push(node), acc),
-                    []);
             }
             stats.ms = new Date() - msStart;
-            stats.open = this.openSet.length;
+            stats.fastOpen = this.fastOpen.length;
+            stats.slowOpen = this.slowOpen.length;
             stats.path = path.length;
             return {
                 path: path,
@@ -200,7 +224,7 @@ var GraphNode = require("./GraphNode");
         var path = graph.findPath(START, END, options).path; 
         should.deepEqual(path.map((n) => n.name), ["START","B","B1","END"]);
     })
-    it("TESTTESTpush() is faster than unshift", function() {
+    it("TESTTESTpush/pop are faster than unshift/shift", function() {
         var start = {color: "purple"};
         var msStart = new Date();
         for (var i=0; i<100; i++) {
@@ -226,9 +250,6 @@ var GraphNode = require("./GraphNode");
             }
         }
         var msElapsedUnshift = new Date() - msStart;
-
-        //console.log("push", msElapsedPush);
-        //console.log("unshift", msElapsedUnshift);
-        msElapsedPush.should.below(msElapsedUnshift/3);
+        msElapsedPush.should.below(msElapsedUnshift/2);
     })
 })
