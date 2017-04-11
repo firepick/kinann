@@ -504,7 +504,7 @@ var PathNode = require("./PathNode");
                     if (verbose>2 && openset.length === 20) {
                         var sorted = openset.map((node)=>node).sort((a,b) => pf.fscore(a) - pf.fscore(b));
                         sorted.forEach((node,i) => {
-                            console.log("openset["+i+"]", JSON.stringify(node), "g:"+pf.gscore(node), "f:"+pf.fscore(node));
+                            console.log("openset["+i+"]", JSON.stringify(node), "g:"+node.gscore, "f:"+node.fscore);
                         })
                     }
                     return ++iterations < maxIterations;
@@ -526,10 +526,10 @@ var PathNode = require("./PathNode");
                 "path["+i+"]:", JSON.stringify({s: mathjs.round(n.s,pf.round),v:n.v,a:n.a}),
                 "h:"+mathjs.round(pf.estimateCost(n, goal), pf.round)
             ));
-            verbose>1 && pf.openSet.sort((a,b) => pf.fscore(a) - pf.fscore(b))
+            verbose>1 && pf.openSet.sort((a,b) => a.fscore - b.fscore)
                 .forEach((n,i) => console.log(
                     "openSet["+i+"]:", JSON.stringify({s: mathjs.round(n.s,pf.round),v:n.v,a:n.a}),
-                    "f:"+mathjs.round(pf.fscore(n), pf.round),
+                    "f:"+mathjs.round(n.fscore, pf.round),
                     "h:"+mathjs.round(pf.estimateCost(n, goal), pf.round),
                     ""
             ));
@@ -542,6 +542,7 @@ var PathNode = require("./PathNode");
                 (verbose>1 ? "jerk:"+JSON.stringify(pf.jMax):""), 
                 "lookup:"+pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
                 "nOf:"+pf.stats.neighborsOf,
+                "open:", pf.openSet.length,
                 "");
             path.length.should.above(0);
             path.length === 0 && console.log("FAIL: no path");
@@ -640,9 +641,9 @@ var PathNode = require("./PathNode");
                         );
                     }
                     if (verbose>3 && openset.length === 20) {
-                        var sorted = openset.map((node)=>node).sort((a,b) => pf.fscore(a) - pf.fscore(b));
+                        var sorted = openset.map((node)=>node).sort((a,b) => n.fscore - b.fscore);
                         sorted.forEach((node,i) => {
-                            console.log("openset["+i+"]", JSON.stringify(node), "g:"+pf.gscore(node), "f:"+pf.fscore(node));
+                            console.log("openset["+i+"]", JSON.stringify(node), "g:"+pf.gscore(node), "f:"+node.fscore);
                         })
                     }
                     return ++iterations < maxIterations;
@@ -672,6 +673,7 @@ var PathNode = require("./PathNode");
                 (verbose>1 ? "jerk:"+JSON.stringify(pf.jMax):""), 
                 "lookup:"+pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
                 "neighborsOf:"+pf.stats.neighborsOf,
+                "open:", pf.openSet.length,
                 "");
             path.length.should.above(0);
             path.length === 0 && console.log("FAIL: no path");

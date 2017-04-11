@@ -21,6 +21,6 @@ var GraphNode = require("./GraphNode");
     module.exports = exports.PathNode = PathNode;
 })(typeof exports === "object" ? exports : (exports = {}));
 
-(typeof describe === 'function') && describe("PathFactory", function() {
+(typeof describe === 'function') && describe("PathNode", function() {
     var should = require("should");
 })

@@ -70,9 +70,14 @@ var GraphNode = require("./GraphNode");
                         }
                     }
                 };
-                this.openSet = this.openSet.reduce(
-                    (acc, node) => (node.isOpen && acc.push(node), acc),
-                    []);
+                var osl = this.openSet.length;
+                if (current === this.openSet[osl-1]) {
+                    this.openSet.pop();
+                } else {
+                    this.openSet = this.openSet.reduce(
+                        (acc, node) => (node.isOpen && node.fscore < Number.MAX_SAFE_INTEGER && acc.push(node), acc),
+                        []);
+                }
             }
             return []; // no path
         }
