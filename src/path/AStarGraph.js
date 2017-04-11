@@ -17,7 +17,7 @@ var GraphNode = require("./GraphNode");
             // estimatedCost must be admissible (i.e., less than or equal to actual cost)
             throw new Error("estimateCost(node1, goal) must be overridden by subclass");
         }
-        candidate(openSet) {
+        extractMin(openSet) {
             var fScore = Number.MAX_SAFE_INTEGER;
             var result = openSet.reduce((acc,node) => {
                 if (node.fscore <= fScore ) {
@@ -27,7 +27,7 @@ var GraphNode = require("./GraphNode");
                 return acc;
             }, null);
             if (result == null) {
-                throw new Error("candidate FAIL:" + JSON.stringify(openSet));
+                throw new Error("extractMin FAIL:" + JSON.stringify(openSet));
             }
 
             return result;
@@ -41,12 +41,15 @@ var GraphNode = require("./GraphNode");
         }
         findPath(start, goal, options) { // Implements A* algorithm
             this.openSet = [start];
-            var onOpenSet = options.onOpenSet || (()=>true);
+            var onCurrent = options.onCurrent || ((node)=>true);
             var onCull = options.onCull || ((node,gscore_new) => null);
             start.fscore = this.estimateCost(start, goal);
             start.gscore = 0;
-            while (this.openSet.length && onOpenSet(this.openSet)) {
-                var current = this.candidate(this.openSet);
+            while (this.openSet.length) {
+                var current = this.extractMin(this.openSet);
+                if (!onCurrent(current)) {
+                    break;
+                }
                 if (current === goal) {
                     return this.pathTo(current);
                 }
@@ -155,20 +158,17 @@ var GraphNode = require("./GraphNode");
         graph.cost(A2, END).should.equal(50);
         graph.estimateCost(A2, END).should.equal(50);
 
-        // find shortest path. If provided, onOpenSet() can be used
-        // to trace each iteration or halt search by returning false
         var options = {
-            onOpenSet: (openSet) => {
+            onCurrent: (current) => { // called whenever current node changes
                 if (verbose) {
-                    var current = graph.candidate(openSet);
-                    console.log("openSet", JSON.stringify(openSet.map((node) => node.name)),
-                        "gcost", graph.gscore(current),
-                        "fcost", graph.fscore(current)
-                        ); 
+                    console.log(JSON.stringify(current),
+                        "f:"+current.fscore,
+                        "g:"+current.gscore,
+                        ""); 
                 }
                 return true;
             },
-            onCull: (node, gscore_new) => {
+            onCull: (node, gscore_new) => { // called whenever a node is rejected
                 if (verbose) {
                     console.log("culling", JSON.stringify(node), gscore_new, node.gscore);
                 }

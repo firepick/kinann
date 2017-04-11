@@ -490,22 +490,15 @@ var PathNode = require("./PathNode");
             var iterations = 0;
             var msStart = new Date();
             var path = pf.findPath(start, goal, {
-                onOpenSet: (openset) => {
+                onCurrent: (current) => {
                     if (verbose>2) {
-                        var current = pf.candidate(openset);
                         var path = pf.pathTo(current);
-                        console.log("openset:"+openset.length, 
+                        console.log("openset:"+pf.openSet.length, 
                             "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),2)),
                             JSON.stringify(current),
                             "g:"+path.length,
                             "h:"+mathjs.round(pf.estimateCost(current, goal), pf.round)
                         );
-                    }
-                    if (verbose>2 && openset.length === 20) {
-                        var sorted = openset.map((node)=>node).sort((a,b) => pf.fscore(a) - pf.fscore(b));
-                        sorted.forEach((node,i) => {
-                            console.log("openset["+i+"]", JSON.stringify(node), "g:"+node.gscore, "f:"+node.fscore);
-                        })
                     }
                     return ++iterations < maxIterations;
                 },
@@ -525,13 +518,6 @@ var PathNode = require("./PathNode");
             verbose>1 && path.forEach((n,i) => console.log(
                 "path["+i+"]:", JSON.stringify({s: mathjs.round(n.s,pf.round),v:n.v,a:n.a}),
                 "h:"+mathjs.round(pf.estimateCost(n, goal), pf.round)
-            ));
-            verbose>1 && pf.openSet.sort((a,b) => a.fscore - b.fscore)
-                .forEach((n,i) => console.log(
-                    "openSet["+i+"]:", JSON.stringify({s: mathjs.round(n.s,pf.round),v:n.v,a:n.a}),
-                    "f:"+mathjs.round(n.fscore, pf.round),
-                    "h:"+mathjs.round(pf.estimateCost(n, goal), pf.round),
-                    ""
             ));
             verbose>0 && console.log(
                 JSON.stringify(mathjs.round([start.s[0],goal.s[0]],pf.round)),
@@ -629,22 +615,15 @@ var PathNode = require("./PathNode");
             var iterations = 0;
             var msStart = new Date();
             var path = pf.findPath(start, goal, {
-                onOpenSet: (openset) => {
+                onCurrent: (current) => {
                     if (verbose>2) {
-                        var current = pf.candidate(openset);
                         var path = pf.pathTo(current);
-                        console.log("openset:"+openset.length, 
+                        console.log("openset:"+pf.openSet.length, 
                             "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),2)),
                             JSON.stringify(current),
                             "g:"+path.length,
                             "h:"+mathjs.round(pf.estimateCost(current, goal), pf.round)
                         );
-                    }
-                    if (verbose>3 && openset.length === 20) {
-                        var sorted = openset.map((node)=>node).sort((a,b) => n.fscore - b.fscore);
-                        sorted.forEach((node,i) => {
-                            console.log("openset["+i+"]", JSON.stringify(node), "g:"+pf.gscore(node), "f:"+node.fscore);
-                        })
                     }
                     return ++iterations < maxIterations;
                 },
@@ -672,8 +651,8 @@ var PathNode = require("./PathNode");
                 "path:"+path.length,
                 (verbose>1 ? "jerk:"+JSON.stringify(pf.jMax):""), 
                 "lookup:"+pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
-                "neighborsOf:"+pf.stats.neighborsOf,
-                "open:", pf.openSet.length,
+                "nOf:"+pf.stats.neighborsOf,
+                "open:"+pf.openSet.length,
                 "");
             path.length.should.above(0);
             path.length === 0 && console.log("FAIL: no path");
