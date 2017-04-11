@@ -4,6 +4,7 @@ var GraphNode = require("./GraphNode");
 (function(exports) { 
     class AStarGraph {
         constructor(options = {}) {
+            this.maxIterations = options.maxIterations || 10000;
         }
         neighborsOf(node, goal) {
             // NOTE: neighbors can be generated dynamically, but they must be unique
@@ -17,7 +18,7 @@ var GraphNode = require("./GraphNode");
             // estimatedCost must be admissible (i.e., less than or equal to actual cost)
             throw new Error("estimateCost(node1, goal) must be overridden by subclass");
         }
-        extractMin(openSet) {
+        findMin(openSet) {
             var fScore = Number.MAX_SAFE_INTEGER;
             var result = openSet.reduce((acc,node) => {
                 if (node.fscore <= fScore ) {
@@ -27,7 +28,7 @@ var GraphNode = require("./GraphNode");
                 return acc;
             }, null);
             if (result == null) {
-                throw new Error("extractMin FAIL:" + JSON.stringify(openSet));
+                throw new Error("findMin FAIL:" + JSON.stringify(openSet));
             }
 
             return result;
@@ -40,49 +41,60 @@ var GraphNode = require("./GraphNode");
             return totalPath.reverse();
         }
         findPath(start, goal, options) { // Implements A* algorithm
+            var stats = {};
+            stats.iter = 0;
+            stats.nodes = 0;
+            var msStart = new Date();
             this.openSet = [start];
             var onCurrent = options.onCurrent || ((node)=>true);
             var onCull = options.onCull || ((node,gscore_new) => null);
             start.fscore = this.estimateCost(start, goal);
             start.gscore = 0;
-            while (this.openSet.length) {
-                var current = this.extractMin(this.openSet);
+            var path = [];
+            while (this.openSet.length && stats.iter++ < this.maxIterations) {
+                var current = this.findMin(this.openSet);
                 if (!onCurrent(current)) {
                     break;
                 }
                 if (current === goal) {
-                    return this.pathTo(current);
+                    path = this.pathTo(current);
+                    break;
                 }
                 current.isOpen = false;
                 current.isClosed = true;
                 for (var neighbor of this.neighborsOf(current, goal)) {
-                    if (!neighbor.isClosed) {
-                        var tentative_gScore = current.gscore + this.cost(current, neighbor);
-                        if (neighbor.isOpen) {
-                            if (tentative_gScore >= neighbor.gscore) {
-                                neighbor = onCull(neighbor, tentative_gScore);
-                            }
+                    stats.nodes++;
+                    if (neighbor.isClosed) {
+                        continue;
+                    }
+                    var tentative_gScore = current.gscore + this.cost(current, neighbor);
+                    if (neighbor.isOpen && tentative_gScore >= neighbor.gscore) {
+                        onCull(neighbor, tentative_gScore);
+                        continue;
+                    }
+                    neighbor.cameFrom = current;
+                    neighbor.gscore = tentative_gScore;
+                    neighbor.fscore = neighbor.gscore + this.estimateCost(neighbor, goal);
+                    if (!neighbor.isOpen) {
+                        if (this.openSet.length === 0 || neighbor.fscore < this.openSet[0].fscore) {
+                            this.openSet.unshift(neighbor);
                         } else {
-                            neighbor.isOpen = true;
                             this.openSet.push(neighbor);
                         }
-                        if (neighbor) {
-                            neighbor.cameFrom = current;
-                            neighbor.gscore = tentative_gScore;
-                            neighbor.fscore = neighbor.gscore + this.estimateCost(neighbor, goal);
-                        }
+                        neighbor.isOpen = true;
                     }
-                };
-                var osl = this.openSet.length;
-                if (current === this.openSet[osl-1]) {
-                    this.openSet.pop();
-                } else {
-                    this.openSet = this.openSet.reduce(
-                        (acc, node) => (node.isOpen && node.fscore < Number.MAX_SAFE_INTEGER && acc.push(node), acc),
-                        []);
                 }
+                this.openSet = this.openSet.reduce(
+                    (acc, node) => (node.isOpen && node.fscore < Number.MAX_SAFE_INTEGER && acc.push(node), acc),
+                    []);
             }
-            return []; // no path
+            stats.ms = new Date() - msStart;
+            stats.open = this.openSet.length;
+            stats.path = path.length;
+            return {
+                path: path,
+                stats: stats,
+            }
         }
     }
 
@@ -175,7 +187,7 @@ var GraphNode = require("./GraphNode");
                 return null;
             },
         };
-        var path = graph.findPath(START, END, options); 
+        var path = graph.findPath(START, END, options).path; 
         should.deepEqual(path.map((n) => n.name), ["START","B","B1","END"]);
     })
 })

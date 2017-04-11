@@ -26,6 +26,12 @@ var AStarGraph = require("./AStarGraph");
                 writable: true,
             });
         }
+        toJSON() {
+            var obj = Object.assign({}, this);
+            this.$f != null && (obj.f = this.$f);
+            this.$g != null && (obj.g = this.$g);
+            return obj;
+        }
         get fscore() {
             return this.$f == null ? Number.MAX_SAFE_INTEGER : this.$f;
         }

@@ -25,6 +25,19 @@ var PathNode = require("./PathNode");
                 neighborsOf: 0,
             };
         }
+        stats() {
+            return {
+                start: JSON.stringify(start.s),
+                goal: JSON.stringify(goal.s),
+                iter: iterations, 
+                ms: msElapsed, 
+                path: path.length,
+                jerk: JSON.stringify(pf.jMax), 
+                lookup: pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
+                nOf: pf.stats.neighborsOf,
+                open: pf.openSet.length,
+            }
+        }
         svaToNode(position, velocity, acceleration) {
             var node = new PathNode(position, velocity, acceleration);
             return this.lookupNode(node);
@@ -92,7 +105,7 @@ var PathNode = require("./PathNode");
             }
             return node;
         }
-        findPath(start, goal, options) { // Implements A* algorithm
+        findPath(start, goal, options) { 
             start = this.svaToNode(
                 mathjs.round(start.s, this.round),
                 mathjs.round(start.v, this.round),
@@ -107,7 +120,11 @@ var PathNode = require("./PathNode");
             var jerk = mathjs.round(mathjs.divide(ds, this.jerkScale), this.round);
             this.jMax = jerk.map((j,i) => mathjs.min(this.aMax[i], mathjs.max(j, this.jMin[i])));
             this.neighbors = new WeakMap();
-            return super.findPath(start, goal, options);
+            var result = super.findPath(start, goal, options);
+            result.stats.start = start.s;
+            result.stats.goal = goal.s;
+
+            return result;
         }
         isGoalNeighbor(node, goal) { // a goal is zero-velocity
             var verbose = false;
@@ -291,6 +308,40 @@ var PathNode = require("./PathNode");
     var should = require("should");
     var PathFactory = exports.PathFactory;
 
+    function testFindPath(pf, start, goal, verbose) {
+        var result = pf.findPath(start, goal, {
+            onCurrent: (current) => {
+                if (verbose>2) {
+                    var path = pf.pathTo(current);
+                    console.log("openset:"+pf.openSet.length, 
+                        "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),2)),
+                        JSON.stringify(current),
+                        "g:"+path.length,
+                        "h:"+mathjs.round(pf.estimateCost(current, goal), pf.round)
+                    );
+                }
+                return true;
+            },
+            onCull: (node, gscore_new) => {
+                if (verbose>3) {
+                    console.log("culling", JSON.stringify(node), gscore_new);
+                }
+                return null;
+            },
+        });
+        var path = result.path;
+        path.reduce((acc,n) => { // velocity should not switch directions
+            acc < 0 && n.v[0].should.not.above(0);
+            acc > 0 && n.v[0].should.not.below(0);
+            acc = n.v[0];
+        }, 0);
+        verbose>1 && path.forEach((n,i) => console.log("path["+i+"]", JSON.stringify(n)));
+        verbose>0 && console.log("findPath", JSON.stringify(result.stats));
+        path.length.should.above(0);
+        path.length === 0 && console.log("FAIL: no path");
+        return result.stats.ms;
+    }
+
     it("PathFactory(options) is the constructor", function() {
     })
     it("PathNode(name, pos, velocity) is the constructor", function() {
@@ -362,14 +413,14 @@ var PathNode = require("./PathNode");
         var start = new PathNode([1,1]);
         var neighbors = Array.from(pf.neighborsOf(start, goal));
         neighbors.length.should.equal(9);
-        neighbors[0].should.equal(pf.svaToNode([0,0],[-1,-1],[-1,-1]));
+        neighbors[0].should.equal(pf.svaToNode([0,0],[-1,-1],[-1,-1])); // closest to goal
         neighbors[1].should.equal(pf.svaToNode([1,0],[0,-1],[0,-1]));
         neighbors[2].should.equal(pf.svaToNode([2,0],[1,-1],[1,-1]));
 
         var node = new PathNode([1,1],[1,1],[1,1]);
         var neighbors = Array.from(pf.neighborsOf(node, goal));
         neighbors.length.should.equal(4);
-        neighbors[0].should.equal(pf.svaToNode([2,2],[1,1],[0,0]));
+        neighbors[0].should.equal(pf.svaToNode([2,2],[1,1],[0,0])); // closest to goal
         neighbors[1].should.equal(pf.svaToNode([3,2],[2,1],[1,0]));
         neighbors[2].should.equal(pf.svaToNode([2,3],[1,2],[0,1]));
         neighbors[3].should.equal(pf.svaToNode([3,3],[2,2],[1,1]));
@@ -476,77 +527,6 @@ var PathNode = require("./PathNode");
         var msElapsed = new Date() - msStart;
         msElapsed.should.below(20);
     })
-    it("findPath(start, goal) finds 1D acceleration path", function() {
-        this.timeout(60*1000);
-        var verbose = 0;
-        function test1(maxIterations, startPos, goalPos) {
-            var pf = new PathFactory({
-                dimensions: 1,
-                maxVelocity: [20],
-                maxAcceleration: [5],
-            });
-            var start = new PathNode([startPos]);
-            var goal = new PathNode([goalPos]);
-            var iterations = 0;
-            var msStart = new Date();
-            var path = pf.findPath(start, goal, {
-                onCurrent: (current) => {
-                    if (verbose>2) {
-                        var path = pf.pathTo(current);
-                        console.log("openset:"+pf.openSet.length, 
-                            "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),2)),
-                            JSON.stringify(current),
-                            "g:"+path.length,
-                            "h:"+mathjs.round(pf.estimateCost(current, goal), pf.round)
-                        );
-                    }
-                    return ++iterations < maxIterations;
-                },
-                onCull: (node, gscore_new) => {
-                    if (verbose>2) {
-                        console.log("culling", JSON.stringify(node), gscore_new, node.gscore);
-                    }
-                    return null;
-                },
-            });
-            var msElapsed = new Date() - msStart;
-            path.reduce((acc,n) => { // velocity should not switch directions
-                acc < 0 && n.v[0].should.not.above(0);
-                acc > 0 && n.v[0].should.not.below(0);
-                acc = n.v[0];
-            }, 0);
-            verbose>1 && path.forEach((n,i) => console.log(
-                "path["+i+"]:", JSON.stringify({s: mathjs.round(n.s,pf.round),v:n.v,a:n.a}),
-                "h:"+mathjs.round(pf.estimateCost(n, goal), pf.round)
-            ));
-            verbose>0 && console.log(
-                JSON.stringify(mathjs.round([start.s[0],goal.s[0]],pf.round)),
-                (verbose>1 ? "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),1)):""),
-                "iter:"+iterations, 
-                msElapsed+"ms", 
-                "path:"+path.length,
-                (verbose>1 ? "jerk:"+JSON.stringify(pf.jMax):""), 
-                "lookup:"+pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
-                "nOf:"+pf.stats.neighborsOf,
-                "open:", pf.openSet.length,
-                "");
-            path.length.should.above(0);
-            path.length === 0 && console.log("FAIL: no path");
-            return msElapsed;
-        }
-        var msElapsedTotal = 0;
-        var nTests = 20;
-        nTests === 1 && (verbose = 2);
-        for (var i = 0; i < nTests; i++) {
-            var bounds = 300;
-            var maxIterations = 400;
-            var startPos = mathjs.random(-bounds,bounds);
-            var goalPos = mathjs.random(-bounds,bounds);
-            msElapsedTotal += test1(maxIterations, startPos, goalPos);
-        }
-        nTests>1 && (msElapsedTotal/nTests).should.below(20);
-        nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
-    })
     it("iAxisAccelerations(node,i,dsgoal) generates axis acceleration iterator", function() {
         var pf = new PathFactory({
             dimensions: 2,
@@ -601,72 +581,45 @@ var PathNode = require("./PathNode");
         should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[1,0]), 0), [0]);
         should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[-2,0]), 0), []);
     })
-    it("findPath(start, goal) finds 2D acceleration path", function() {
+    it("TESTTESTfindPath(start, goal) finds 1D acceleration path", function() {
         this.timeout(60*1000);
         var verbose = 0;
-        function test1(maxIterations, startPos, goalPos) {
+        var msElapsedTotal = 0;
+        var nTests = 20;
+        nTests === 1 && (verbose = 2);
+        for (var i = 0; i < nTests; i++) {
+            var bounds = 300;
+            var startPos = mathjs.random(-bounds,bounds);
+            var goalPos = mathjs.random(-bounds,bounds);
+            var start = new PathNode([startPos]);
+            var goal = new PathNode([goalPos]);
             var pf = new PathFactory({
-                dimensions: 3,
-                maxVelocity: [20,20,20],
-                maxAcceleration: [5,5,5],
+                dimensions: 1,
+                maxVelocity: [20],
+                maxAcceleration: [5],
+                maxIterations: 400,
             });
-            var start = new PathNode([0,-10,-10]);
-            var goal = new PathNode([15,35.1,-10.8]);
-            var iterations = 0;
-            var msStart = new Date();
-            var path = pf.findPath(start, goal, {
-                onCurrent: (current) => {
-                    if (verbose>2) {
-                        var path = pf.pathTo(current);
-                        console.log("openset:"+pf.openSet.length, 
-                            "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),2)),
-                            JSON.stringify(current),
-                            "g:"+path.length,
-                            "h:"+mathjs.round(pf.estimateCost(current, goal), pf.round)
-                        );
-                    }
-                    return ++iterations < maxIterations;
-                },
-                onCull: (node, gscore_new) => {
-                    if (verbose>3) {
-                        console.log("culling", JSON.stringify(node), gscore_new);
-                    }
-                    return null;
-                },
-            });
-            var msElapsed = new Date() - msStart;
-            path.reduce((acc,n) => { // velocity should not switch directions
-                acc < 0 && n.v[0].should.not.above(0);
-                acc > 0 && n.v[0].should.not.below(0);
-                acc = n.v[0];
-            }, 0);
-            verbose>1 && path.forEach((n) => console.log(n,
-                "cost", mathjs.round(pf.estimateCost(n, goal), pf.round)
-            ));
-            verbose>0 && console.log(
-                JSON.stringify([start.s[0],goal.s[0]]),
-                (verbose>1 ? "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),1)):""),
-                "iter:"+iterations, 
-                msElapsed+"ms", 
-                "path:"+path.length,
-                (verbose>1 ? "jerk:"+JSON.stringify(pf.jMax):""), 
-                "lookup:"+pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
-                "nOf:"+pf.stats.neighborsOf,
-                "open:"+pf.openSet.length,
-                "");
-            path.length.should.above(0);
-            path.length === 0 && console.log("FAIL: no path");
-            return msElapsed;
+            msElapsedTotal += testFindPath(pf, start, goal, verbose);
         }
+        nTests>1 && (msElapsedTotal/nTests).should.below(20);
+        nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
+    })
+    it("TESTTESTfindPath(start, goal) finds 2D acceleration path", function() {
+        this.timeout(60*1000);
+        var verbose = 0;
         var msElapsedTotal = 0;
         var nTests = 1;
         nTests === 1 && (verbose = 2);
         for (var i = 0; i < nTests; i++) {
-            var bounds = 300;
-            var maxIterations = 900;
-            var startPos = mathjs.random(-bounds,bounds);
-            var goalPos = mathjs.random(-bounds,bounds);
-            msElapsedTotal += test1(maxIterations, startPos, goalPos);
+            var start = new PathNode([0,-10,-10]);
+            var goal = new PathNode([15,35.1,-10.8]);
+            var pf = new PathFactory({
+                dimensions: 3,
+                maxVelocity: [20,20,20],
+                maxAcceleration: [5,5,5],
+                maxIterations: 900,
+            });
+            msElapsedTotal += testFindPath(pf, start, goal, verbose);
         }
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
         nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
