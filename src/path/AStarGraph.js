@@ -41,15 +41,21 @@ var GraphNode = require("./GraphNode");
             return totalPath.reverse();
         }
         findPath(start, goal, options) { // Implements A* algorithm
-            var stats = {};
-            stats.iter = 0;
-            stats.nodes = 0;
             var msStart = new Date();
             this.openSet = [start];
             var onCurrent = options.onCurrent || ((node)=>true);
             var onCull = options.onCull || ((node,gscore_new) => null);
             start.fscore = this.estimateCost(start, goal);
             start.gscore = 0;
+            var stats = {
+                iter: 0,
+                nodes: 0,
+                unshift: 0,
+                unshiftf: 0,
+                push: 0,
+                pushf: Number.MAX_SAFE_INTEGER,
+            };
+            stats.push = 0;
             var path = [];
             while (this.openSet.length && stats.iter++ < this.maxIterations) {
                 var current = this.findMin(this.openSet);
@@ -78,8 +84,12 @@ var GraphNode = require("./GraphNode");
                     if (!neighbor.isOpen) {
                         if (this.openSet.length === 0 || neighbor.fscore < this.openSet[0].fscore) {
                             this.openSet.unshift(neighbor);
+                            stats.unshift++;
+                            stats.unshiftf = mathjs.max(stats.unshiftf, neighbor.fscore);
                         } else {
                             this.openSet.push(neighbor);
+                            stats.push++;
+                            stats.pushf = mathjs.min(stats.pushf, neighbor.fscore);
                         }
                         neighbor.isOpen = true;
                     }
@@ -189,5 +199,36 @@ var GraphNode = require("./GraphNode");
         };
         var path = graph.findPath(START, END, options).path; 
         should.deepEqual(path.map((n) => n.name), ["START","B","B1","END"]);
+    })
+    it("TESTTESTpush() is faster than unshift", function() {
+        var start = {color: "purple"};
+        var msStart = new Date();
+        for (var i=0; i<100; i++) {
+            var a = [];
+            for (var j=0; j<1000; j++) {
+                a.push(start);
+            }
+            for (var j=0; j<1000; j++) {
+                a.pop();
+            }
+        }
+        var msElapsedPush = new Date() - msStart;
+
+        var a = [];
+        var msStart = new Date();
+        for (var i=0; i<200; i++) {
+            var a = [];
+            for (var j=0; j<1000; j++) {
+                a.unshift(start);
+            }
+            for (var j=0; j<1000; j++) {
+                a.shift();
+            }
+        }
+        var msElapsedUnshift = new Date() - msStart;
+
+        //console.log("push", msElapsedPush);
+        //console.log("unshift", msElapsedUnshift);
+        msElapsedPush.should.below(msElapsedUnshift/3);
     })
 })

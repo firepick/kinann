@@ -25,19 +25,6 @@ var PathNode = require("./PathNode");
                 neighborsOf: 0,
             };
         }
-        stats() {
-            return {
-                start: JSON.stringify(start.s),
-                goal: JSON.stringify(goal.s),
-                iter: iterations, 
-                ms: msElapsed, 
-                path: path.length,
-                jerk: JSON.stringify(pf.jMax), 
-                lookup: pf.stats.lookupHit+"/"+pf.stats.lookupTotal,
-                nOf: pf.stats.neighborsOf,
-                open: pf.openSet.length,
-            }
-        }
         svaToNode(position, velocity, acceleration) {
             var node = new PathNode(position, velocity, acceleration);
             return this.lookupNode(node);
@@ -313,7 +300,7 @@ var PathNode = require("./PathNode");
             onCurrent: (current) => {
                 if (verbose>2) {
                     var path = pf.pathTo(current);
-                    console.log("openset:"+pf.openSet.length, 
+                    console.log(
                         "path:"+JSON.stringify(mathjs.round(path.map((node) => node.s[0]),2)),
                         JSON.stringify(current),
                         "g:"+path.length,
