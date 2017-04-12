@@ -99,7 +99,7 @@ var mathjs = require("mathjs");
     var should = require("should");
     var PriorityQ = exports.PriorityQ;
 
-    it("TESTTESTPriorityQ(options) can have a custom comparator", function() {
+    it("PriorityQ(options) can have a custom comparator", function() {
         var pq = new PriorityQ({
             compare: (a,b) => a.value - b.value,
         });
@@ -112,14 +112,14 @@ var mathjs = require("mathjs");
         pq.extractMin().value.should.equal(5);
         pq.extractMin().value.should.equal(10);
     })
-    it("TESTTESTinsert() should increase length", function() {
+    it("insert() should increase length", function() {
         var pq = new PriorityQ();
         pq.length.should.equal(0);
         pq.insert(10);
         pq.insert(1);
         pq.insert(5);
     })
-    it("TESTTESTextractMin() removes and returns smallest element", function() {
+    it("extractMin() removes and returns smallest element", function() {
         var pq = new PriorityQ();
         pq.insert(10);
         pq.insert(5);
@@ -131,7 +131,7 @@ var mathjs = require("mathjs");
         pq.extractMin().should.equal(10);
         should(pq.extractMin()).equal(null);
     })
-    it("TESTTESTPriorityQ(options) can use multiple buckets", function() {
+    it("PriorityQ(options) can use multiple buckets", function() {
         var verbose = 0;
         var pq = new PriorityQ({
             sizes: [3, 3, Number.MAX_SAFE_INTEGER],
@@ -173,7 +173,7 @@ var mathjs = require("mathjs");
         ]);
         should(pq.extractMin()).equal(null);
     });
-    it("TESTTESTPriorityQ() can handle many items", function() {
+    it("PriorityQ() can handle many items", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var n = 10000;
@@ -191,14 +191,14 @@ var mathjs = require("mathjs");
             pq.insert(values[i]);
         }
         var msElapsed = new Date() - msStart;
-        console.log("insert", msElapsed);
+        verbose && console.log("insert", msElapsed);
 
         var msStart = new Date();
         values.sort((a,b) => a - b);
         var msElapsed = new Date() - msStart;
-        console.log("sort", msElapsed);
+        verbose && console.log("sort", msElapsed);
 
-        console.log("pq", "max:"+pq.bucketMax, "buckets:"+pq.buckets.map((b) => b.length));
+        verbose && console.log("pq", "max:"+pq.bucketMax, "buckets:"+pq.buckets.map((b) => b.length));
 
         var msStart = new Date();
         for (var i=0; i<values.length; i++) {
@@ -209,6 +209,6 @@ var mathjs = require("mathjs");
             v.should.equal(values[i]);
         }
         var msElapsed = new Date() - msStart;
-        console.log("extractMin", msElapsed);
+        verbose && console.log("extractMin", msElapsed);
     });
 })

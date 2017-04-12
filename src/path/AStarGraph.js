@@ -1,5 +1,6 @@
 var mathjs = require("mathjs");
 var GraphNode = require("./GraphNode");
+var PriorityQ = require("./PriorityQ");
 
 (function(exports) { 
     class AStarGraph {
@@ -20,41 +21,6 @@ var GraphNode = require("./GraphNode");
             // estimatedCost must be admissible (i.e., less than or equal to actual cost)
             throw new Error("estimateCost(node1, goal) must be overridden by subclass");
         }
-        findMinOpen() {
-            var fScore = Number.MAX_SAFE_INTEGER;
-            var result = this.fastOpen.reduce((acc,node) => {
-                if (node.isOpen && node.fscore <= fScore ) {
-                    fScore = node.fscore;
-                    return node;
-                }
-                return acc;
-            }, null);
-            if (result == null) {
-                this.stats.findPath.sort++;
-                this.slowOpen.sort((a,b) => b.fscore - a.fscore);
-                this.fastOpenMax = 0;
-                this.fastOpen = [];
-                var node;
-                while (this.fastOpen.length < this.fastOpenSize && (node = this.slowOpen.pop())) {
-                    if (node.isOpen) {
-                        this.fastOpenMax = node.fscore;
-                        this.fastOpen.push(node);
-                    }
-                }
-                var result = this.fastOpen.reduce((acc,node) => {
-                    if (node.isOpen && node.fscore <= fScore ) {
-                        fScore = node.fscore;
-                        return node;
-                    }
-                    return acc;
-                }, null);
-                if (result == null) {
-                    throw new Error("findMinOpen FAIL:"+this.fastOpen.length+" "+this.slowOpen.length);
-                }
-            }
-
-            return result;
-        }
         pathTo(node) {
             var totalPath = [node];
             while ((node = node.cameFrom)) {
@@ -65,24 +31,24 @@ var GraphNode = require("./GraphNode");
         findPath(start, goal, options) { 
             // Implements A* algorithm
             var msStart = new Date();
-            this.fastOpen = [start];
-            this.slowOpen = [];
+            var pq = new PriorityQ({
+                sizes: [6, 1000, Number.MAX_SAFE_INTEGER],
+                compare: (a,b) => a.fscore - b.fscore,
+            });
             var onCurrent = options.onCurrent || ((node)=>true);
             var onCull = options.onCull || ((node,gscore_new) => null);
             start.fscore = this.estimateCost(start, goal);
             start.gscore = 0;
             start.isOpen = true;
+            pq.insert(start);
             var stats = this.stats.findPath = {
                 iter: 0,
                 nodes: 0,
-                fast: 0,
-                slow: 0,
-                sort: 0,
+                inOpen: 0,
             };
             var path = [];
-            this.fastOpenMax = start.fscore;
             while (stats.iter++ < this.maxIterations) {
-                var current = this.findMinOpen();
+                var current = pq.extractMin();
                 if (current == null) {
                     break;
                 }
@@ -101,29 +67,24 @@ var GraphNode = require("./GraphNode");
                         continue;
                     }
                     var tentative_gScore = current.gscore + this.cost(current, neighbor);
-                    if (neighbor.isOpen && tentative_gScore >= neighbor.gscore) {
+                    if (tentative_gScore >= neighbor.gscore) {
                         onCull(neighbor, tentative_gScore);
                         continue;
                     }
                     neighbor.cameFrom = current;
                     neighbor.gscore = tentative_gScore;
                     neighbor.fscore = neighbor.gscore + this.estimateCost(neighbor, goal);
-                    if (!neighbor.isOpen) {
+                    if (neighbor.isOpen) {
+                        stats.inOpen++;
+                    } else {
                         neighbor.isOpen = true;
-                        if (this.fastOpen.length === 0 || neighbor.fscore < this.fastOpenMax) {
-                            this.fastOpen.push(neighbor);
-                            this.fastOpenMax = mathjs.max(this.fastOpenMax, neighbor.fscore);
-                            stats.fast++;
-                        } else {
-                            this.slowOpen.push(neighbor);
-                            stats.slow++;
-                        }
+                        pq.insert(neighbor);
                     }
                 }
             }
             stats.ms = new Date() - msStart;
-            stats.fastOpen = this.fastOpen.length;
-            stats.slowOpen = this.slowOpen.length;
+            stats.pqm = pq.bucketMax.map((b) => b && mathjs.round(b.fscore, 1));
+            stats.pqb = pq.buckets.map((b) => b.length);
             stats.path = path.length;
             return {
                 path: path,
@@ -139,7 +100,7 @@ var GraphNode = require("./GraphNode");
     var should = require("should");
     var AStarGraph = exports.AStarGraph;
 
-    it("AStarGraph subclass finds shortest path", function() {
+    it("TESTTESTAStarGraph subclass finds shortest path", function() {
         var verbose = 0;
         // define a simple graph with weighted transitions between named nodes
         var nodeCosts = {
@@ -224,7 +185,7 @@ var GraphNode = require("./GraphNode");
         var path = graph.findPath(START, END, options).path; 
         should.deepEqual(path.map((n) => n.name), ["START","B","B1","END"]);
     })
-    it("TESTTESTpush/pop are faster than unshift/shift", function() {
+    it("push/pop are faster than unshift/shift", function() {
         var start = {color: "purple"};
         var msStart = new Date();
         for (var i=0; i<100; i++) {

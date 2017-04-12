@@ -413,7 +413,7 @@ var PathNode = require("./PathNode");
         neighbors[3].should.equal(pf.svaToNode([3,3],[2,2],[1,1]));
     })
     it("isGoalNeighbor(node, goal) returns true if goal is reachable in one step from node", function() {
-        var verbose = true;
+        var verbose = false;
         var pf = new PathFactory({
             dimensions: 2,
             maxVelocity: [100,100],
@@ -553,7 +553,7 @@ var PathNode = require("./PathNode");
         testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, []); // overshoot cull
         testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
     })
-    it("axisAccelerations(node, i) returns possible neighbor accelerations", function() {
+    it("TESTTESTaxisAccelerations(node, i) returns possible neighbor accelerations", function() {
         var pf = new PathFactory({
             dimensions: 2,
             maxVelocity: [10, 100],
@@ -568,7 +568,7 @@ var PathNode = require("./PathNode");
         should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[1,0]), 0), [0]);
         should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[-2,0]), 0), []);
     })
-    it("TESTTESTfindPath(start, goal) finds 1D acceleration path", function() {
+    it("findPath(start, goal) finds 1D acceleration path", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var msElapsedTotal = 0;
