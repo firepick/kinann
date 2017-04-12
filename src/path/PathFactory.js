@@ -591,7 +591,7 @@ var PathNode = require("./PathNode");
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
         nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
     })
-    it("TESTTESTfindPath(start, goal) finds 2D acceleration path", function() {
+    it("ESTTESTfindPath(start, goal) finds 2D acceleration path", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var msElapsedTotal = 0;
