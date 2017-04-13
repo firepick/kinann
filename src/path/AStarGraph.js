@@ -32,11 +32,10 @@ var PriorityQ = require("./PriorityQ");
             // Implements A* algorithm
             var msStart = new Date();
             var pq = new PriorityQ({
-                sizes: [6, 1000, Number.MAX_SAFE_INTEGER],
                 compare: (a,b) => a.fscore - b.fscore,
             });
+            var onNeighbor = options.onNeighbor || ((node,outcome) => node);
             var onCurrent = options.onCurrent || ((node)=>true);
-            var onCull = options.onCull || ((node,gscore_new) => null);
             start.fscore = this.estimateCost(start, goal);
             start.gscore = 0;
             start.isOpen = true;
@@ -64,27 +63,32 @@ var PriorityQ = require("./PriorityQ");
                 for (var neighbor of this.neighborsOf(current, goal)) {
                     stats.nodes++;
                     if (neighbor.isClosed) {
+                        onNeighbor(neighbor," -c");
                         continue;
                     }
                     var tentative_gScore = current.gscore + this.cost(current, neighbor);
                     if (tentative_gScore >= neighbor.gscore) {
-                        onCull(neighbor, tentative_gScore);
+                        onNeighbor(neighbor," -g");
                         continue;
                     }
                     neighbor.cameFrom = current;
                     neighbor.gscore = tentative_gScore;
                     neighbor.fscore = neighbor.gscore + this.estimateCost(neighbor, goal);
                     if (neighbor.isOpen) {
+                        onNeighbor(neighbor," -o");
                         stats.inOpen++;
                     } else {
                         neighbor.isOpen = true;
                         pq.insert(neighbor);
+                        onNeighbor(neighbor,"+++");
                     }
                 }
             }
             stats.ms = new Date() - msStart;
-            stats.pqm = pq.bucketMax.map((b) => b && mathjs.round(b.fscore, 1));
-            stats.pqb = pq.buckets.map((b) => b.length);
+            stats.pqm = pq.bmax.map((b) => b && mathjs.round(b.fscore, 1));
+            stats.pqb = pq.b.map((b) => b.length);
+            stats.pqfill = pq.stats.fill;
+            stats.pqslice = pq.stats.slice;
             stats.path = path.length;
             return {
                 path: path,
@@ -100,7 +104,7 @@ var PriorityQ = require("./PriorityQ");
     var should = require("should");
     var AStarGraph = exports.AStarGraph;
 
-    it("TESTTESTAStarGraph subclass finds shortest path", function() {
+    it("AStarGraph subclass finds shortest path", function() {
         var verbose = 0;
         // define a simple graph with weighted transitions between named nodes
         var nodeCosts = {
@@ -175,9 +179,9 @@ var PriorityQ = require("./PriorityQ");
                 }
                 return true;
             },
-            onCull: (node, gscore_new) => { // called whenever a node is rejected
+            onNeighbor: (node, outcome) => { // called whenever a node is rejected
                 if (verbose) {
-                    console.log("culling", JSON.stringify(node), gscore_new, node.gscore);
+                    console.log(outcome, JSON.stringify(node), gscore_new, node.gscore);
                 }
                 return null;
             },

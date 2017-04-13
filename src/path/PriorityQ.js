@@ -3,86 +3,146 @@ var mathjs = require("mathjs");
 (function(exports) { 
     class PriorityQ {
         constructor(options = {}) {
-            this.sizes = options.sizes || [1, 10, 100, 1000, Number.MAX_SAFE_INTEGER];
-            this.buckets = Array(this.sizes.length).fill(null).map(() => []);
-            this.bucketMax = Array(this.sizes.length).fill(null);
+            this.sizes = options.sizes || [5, 50, 500, Number.MAX_SAFE_INTEGER];
+            this.split = options.split || [16,64,1024]; // split bucket when it exceeds this size
+            this.b = this.sizes.map(() => []);
+            this.bmax = this.sizes.map(() => null);
             this.filter = options.filter || ((v) => v);
             this.length = 0;
+            this.stats = {
+                fill: 0,
+                split: 0,
+            };
             this.compare = options.compare || ((a,b) => (a-b));
         }
 
-        fillBucket(iBucket) {
-            if (this.buckets.length-1 <= iBucket) {
-                return null; // no more buckets
+        take(n, src) { // return array of n lowest values from src
+            var dst = [];
+            if (src) {
+                src.sort((a,b) => this.compare(b,a));
+                while (dst.length < n && src.length) {
+                    let v = this.filter(src.pop());
+                    (v != null) && dst.push(v);
+                }
             }
-            var n = this.sizes[iBucket];
-            if (this.buckets[iBucket].length) {
-                console.log("nonempty", this.buckets[iBucket]);
-            }
-            var b1;
-            var b2;
-            var transfer = () => {
-                b1 = this.buckets[iBucket] = [];
-                b2 = this.buckets[iBucket+1].sort((a,b) => this.compare(b,a));
-                var v;
-                var bucketMax = null;
-                while (b1.length < n && null != (v = b2.pop())) {
-                    if (null != (v = this.filter(v))) {
-                        b1.push(v);
-                        if (bucketMax && bucketMax > v) {
-                            console.log("max", bucketMax, v);
-                        }
-                        bucketMax = v;
+            return dst;
+        }
+
+        fillBucket(i) {
+            this.stats.fill++;
+            var n = 0;
+            if (0 <= i && i+1 < this.b.length) {
+                if (this.b[i+1].length || this.fillBucket(i+1)) {
+                    this.b[i] = this.take(this.sizes[i] || 1, this.b[i+1]);
+                    if ((n = this.b[i].length)) {
+                        this.bmax[i] = this.b[i][n-1];
                     }
                 }
-                this.bucketMax[iBucket] = bucketMax;
-                return b1.length;
             }
+            return n;
+        }
 
-            transfer() || (b2 = this.fillBucket(iBucket+1)) && transfer();
+        summarize(options={}) {
+            var log = options.log || console.log;
+            this.b.forEach((b,i) => {
+                log("b["+i+"]", 
+                    this.b[i].length, JSON.stringify(this.b[i].slice(0,10)), 
+                    "bmax:"+this.bmax[i], 
+                    "sizes:"+this.sizes[i]);
+            });
+        }
 
-            return b1;
+        validate(onErr = (()=>null)) {
+            try {
+                var len = this.b.reduce((acc,b) => acc + b.length,0);
+                if (len !== this.length) {
+                    throw new Error("length expected:"+this.length+" actual:", len);
+                }
+                this.b.forEach((b,i) => {
+                    var max = b.reduce((acc,v) => (acc == null || this.compare(v, acc) > 0 ? v : acc), null);
+                    if (max != null && max !== this.bmax[i]) {
+                        throw new Error("bmax["+i+"] expected:"+max+" actual:"+this.bmax[i]);
+                    }
+                });
+                this.bmax.forEach((m,i) => {
+                    if (i > 0 && this.bmax[i] != null && this.bmax[i-1] > m) {
+                        throw new Error("bmax not monotonic");
+                    }
+                });
+            } catch(err) {
+                console.log("=====", err.message, "=====");
+                this.summarize();
+                onErr(err);
+                throw new Error(err);
+            }
+        }
+
+        splitBucket(i) {
+            if (this.b.length-1 <= i) {
+                return null; // no more buckets
+            }
+            this.stats.split++;
+            this.b[i].sort(this.compare);
+            var bilen = this.b[i].length;
+            var cut = mathjs.round(mathjs.min(this.b[i].length,this.split[i])/2);
+
+            this.b[i+1] = this.b[i+1].concat(this.b[i].slice(cut));
+            this.b[i] = this.b[i].slice(0, cut);
+            this.bmax[i] = this.b[i][cut-1];
+            this.bmax[i+1] == null && (this.bmax[i+1] = this.b[i+1][this.b[i+1].length-1]);
+
+            if (this.split[i+1] && this.b[i+1].length > this.split[i+1]) {
+                this.splitBucket(i+1);
+            }
         }
 
         insert(value) {
-            var nb = this.buckets.length;
+            var nb = this.b.length;
             this.length++;
             for (var iBucket = 0; iBucket < nb; iBucket++) {
-                var vmax = this.bucketMax[iBucket];
+                var vmax = this.bmax[iBucket];
                 if (vmax == null) {
-                    this.buckets[iBucket].push(value);
-                    this.bucketMax[iBucket] = value;
-                    return this;
+                    this.b[iBucket].push(value);
+                    this.bmax[iBucket] = value;
+                    break;
                 }
                 if (this.compare(value,vmax) <= 0) {
-                    this.buckets[iBucket].push(value);
-                    return this;
+                    this.b[iBucket].push(value);
+                    break;
                 }
             }
-            this.bucketMax[nb-1] = value;
-            this.buckets[nb-1].push(value);
+            if (iBucket === nb) { 
+                this.bmax[nb-1] = value;
+                this.b[nb-1].push(value);
+            }
+            if (this.split[0] && this.b[0].length > this.split[0]) {
+                this.splitBucket(0);
+            }
+            var len = this.b.reduce((acc,b) => acc+b.length,0);
+            if (len !== this.length) {
+                throw new Error();
+            }
             return this;
         }
 
         extractMin() {
             var min = null;
             if (this.length) {
-                var b = this.buckets[0];
-                var bnew = [];
-                for (var i=b.length; i-- > 0; ) {
-                    var v = this.filter(b[i]);
+                var b0new = [];
+                for (var i=this.b[0].length; i-- > 0; ) {
+                    var v = this.filter(this.b[0][i]);
                     if (min == null) {
                         min = v; // v can be null;
                     } else if (v != null) {
                         if (this.compare(v, min) < 0) {
-                            bnew.push(min);
+                            b0new.push(min);
                             min = v;
                         } else {
-                            bnew.push(v);
+                            b0new.push(v);
                         }
                     }
                 }
-                this.buckets[0] = bnew;
+                this.b[0] = b0new;
                 if (min == null) {
                     return this.fillBucket(0) && this.extractMin();
                 } 
@@ -125,17 +185,21 @@ var mathjs = require("mathjs");
         pq.insert(5);
         pq.insert(1);
         pq.insert(5);
+        pq.validate();
         pq.extractMin().should.equal(1);
+        pq.validate();
         pq.extractMin().should.equal(5);
         pq.extractMin().should.equal(5);
         pq.extractMin().should.equal(10);
         should(pq.extractMin()).equal(null);
+        pq.validate();
     })
     it("PriorityQ(options) can use multiple buckets", function() {
         var verbose = 0;
         var pq = new PriorityQ({
             sizes: [3, 3, Number.MAX_SAFE_INTEGER],
         });
+        pq.validate();
         pq.insert(3);
         pq.insert(1);
         pq.insert(7);
@@ -147,13 +211,14 @@ var mathjs = require("mathjs");
         pq.insert(9);
         pq.insert(8);
         pq.insert(5);
-        should.deepEqual(pq.buckets, [
+        should.deepEqual(pq.b, [
             [3, 1, 0, 2],
             [7, 6, 4,5],
             [10, 9, 8],
         ]);
+        pq.validate();
         pq.insert(11);
-        should.deepEqual(pq.buckets, [
+        should.deepEqual(pq.b, [
             [3, 1, 0, 2],
             [7, 6, 4,5],
             [10, 9, 8, 11],
@@ -162,53 +227,77 @@ var mathjs = require("mathjs");
         var n = pq.length;
         for (var i = 0; i < n; i++) {
             var v = pq.extractMin();
-            verbose && console.log("buckets", v, JSON.stringify(pq.buckets));
+            verbose && console.log("buckets", v, JSON.stringify(pq.b));
             should(v).equal(i);
             pq.length.should.equal(n-i-1);
         }
-        should.deepEqual(pq.buckets, [
+        should.deepEqual(pq.b, [
             [],
             [],
             [],
         ]);
         should(pq.extractMin()).equal(null);
     });
+    it("take(n,src) return n values from src", function() {
+        var pq = new PriorityQ();
+        var src = [1,3,2,3,7,5];
+        var dst = pq.take(0, src);
+        should.deepEqual(dst, []);
+        should.deepEqual(src, [7,5,3,3,2,1]);
+        var dst = pq.take(3, src);
+        should.deepEqual(dst, [1,2,3]); // destination is sorted
+        should.deepEqual(src, [7,5,3]);
+        var dst = pq.take(4, src);
+        should.deepEqual(dst, [3,5,7]); // destination is sorted
+        should.deepEqual(src, []);
+        var dst = pq.take(3, null);
+        should.deepEqual(dst, []);
+    });
+    it("summarize() generates summary", function() {
+        var pq = new PriorityQ();
+        var log = "";
+        pq.summarize({
+            log: (...x) => (log += JSON.stringify(x)),
+        });
+        log.length.should.above(50);
+    });
     it("PriorityQ() can handle many items", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var n = 10000;
-        var pq = new PriorityQ({
-            sizes: [1, 10, 100, 1000, Number.MAX_SAFE_INTEGER],
-        });
-        var values = [];
-        for (var i=0; i < n; i++) {
-            var v = mathjs.round(mathjs.random(-10,10)+i/100); // random number with increasing mean
-            values.push(v);
-        }
+        function test() {
+            var pq = new PriorityQ();
 
-        var msStart = new Date();
-        for (var i=0; i < n; i++) {
-            pq.insert(values[i]);
-        }
-        var msElapsed = new Date() - msStart;
-        verbose && console.log("insert", msElapsed);
-
-        var msStart = new Date();
-        values.sort((a,b) => a - b);
-        var msElapsed = new Date() - msStart;
-        verbose && console.log("sort", msElapsed);
-
-        verbose && console.log("pq", "max:"+pq.bucketMax, "buckets:"+pq.buckets.map((b) => b.length));
-
-        var msStart = new Date();
-        for (var i=0; i<values.length; i++) {
-            var v = pq.extractMin();
-            if (v != values[i]) {
-                console.log("BAD", i, v, values[i]);
+            var values = [];
+            for (var i=0; i < n; i++) {
+                v = mathjs.random(-10,10)+i/100; // random number with increasing mean
+                v = mathjs.round(v, 2);
+                values.push(v);
             }
-            v.should.equal(values[i]);
+
+            var msStart = new Date();
+            values.forEach((v) => pq.insert(v));
+            var msElapsed = new Date() - msStart;
+            verbose>1 && console.log("insert", msElapsed);
+
+            values.sort(pq.compare);
+
+            verbose && console.log("pq", "max:"+pq.bmax, 
+                "buckets:"+pq.b.map((b) => b.length),
+                "stats:"+JSON.stringify(pq.stats),
+                "");
+            pq.validate();
+
+            var msStart = new Date();
+            for (var i=0; i<values.length; i++) {
+                var v = pq.extractMin();
+                v.should.equal(values[i]);
+            }
+            var msElapsed = new Date() - msStart;
+            verbose>0 && console.log("extractMin", msElapsed);
         }
-        var msElapsed = new Date() - msStart;
-        verbose && console.log("extractMin", msElapsed);
+        for (var itest = 0; itest < 1; itest++) {
+            test();
+        }
     });
 })
