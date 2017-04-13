@@ -48,31 +48,45 @@ var PathNode = require("./PathNode");
                 var aminus = ai - jMax;
                 var vplus = vi + aplus;
                 var vminus = vi + aminus;
+                var vzero = vi + ai;
                 var vMax = pf.vMax[i];
                 var vMin = -vMax;
-                if (dsgoal < 0) {
-                    var ds = -dsgoal;
-                    vMin = vMin < -ds ? -ds : vMin; // prevent overshoot
-                    if (aMin < ai && vMin <= vminus && vminus <= vMax) {
-                        yield(aMin > aminus ? aMin : aminus);
-                    }
-                    if (vMin <= ai+vi && vMin <= ai+vi && ai+vi <= vMax) {
-                        yield(ai);
-                    }
-                    if (ai < aMax && vMin <= vplus && vplus <= vMax) {
-                        yield(aMax < aplus ? aMax : aplus);
-                    }
-                } else {
+                if (dsgoal >= 0) {
                     var ds = dsgoal;
                     vMax = ds < vMax ? ds : vMax; // prevent overshoot
-                    if (ai < aMax && vMin <= vplus && vplus <= vMax) {
+                    if (0<vzero && ds < vzero) {
+                        // cull overshoot
+                    } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax) {
+                        yield(ai); // maintain acceleration
+                    }
+                    if (0<vplus && ds < vplus) {
+                        // cull overshoot
+                    } else if (ai < aMax && vMin <= vplus && vplus <= vMax) {
                         yield(aMax < aplus ? aMax : aplus);
                     }
-                    if (vMin <= ai+vi && vMin <= ai+vi && ai+vi <= vMax) {
-                        yield(ai);
-                    }
+                    if (0<vminus && ds < vminus) {
+                        // cull overshoot
+                    } else 
                     if (aMin < ai && vMin <= vminus && vminus <= vMax) {
                         yield(aMin > aminus ? aMin : aminus);
+                    }
+                } else {
+                    vMin = vMin < dsgoal ? dsgoal : vMin; // prevent overshoot
+                    if (vzero<0 && dsgoal > vzero) { 
+                        // cull overshoot
+                    } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax && (vzero || vi)) {
+                        yield(ai); // maintain acceleration
+                    }
+                    if (vminus<0 && dsgoal > vminus) {
+                        // cull overshoot
+                    } else if (aMin < ai && vMin <= vminus && vminus <= vMax) {
+                        yield(aMin > aminus ? aMin : aminus);
+                    }
+                    if (vplus<0 && dsgoal > vplus) {
+                        // cull overshoot
+                    } else 
+                    if (ai < aMax && vMin <= vplus && vplus <= vMax) {
+                        yield(aMax < aplus ? aMax : aplus);
                     }
                 }
             }
@@ -434,18 +448,20 @@ var PathNode = require("./PathNode");
 
         var start = new PathNode([1,1]);
         var neighbors = Array.from(pf.neighborsOf(start, goal));
-        neighbors.length.should.equal(9);
+        neighbors.length.should.equal(4);
+        neighbors.forEach((n)=>console.log('n',JSON.stringify(n)));
         neighbors[0].should.equal(pf.svaToNode([0,0],[-1,-1],[-1,-1])); // closest to goal
-        neighbors[1].should.equal(pf.svaToNode([1,0],[0,-1],[0,-1]));
-        neighbors[2].should.equal(pf.svaToNode([2,0],[1,-1],[1,-1]));
+        neighbors[1].should.equal(pf.svaToNode([2,0],[1,-1],[1,-1]));
+        neighbors[2].should.equal(pf.svaToNode([0,2],[-1,1],[-1,1]));
+        neighbors[3].should.equal(pf.svaToNode([2,2],[1,1],[1,1]));
 
         var node = new PathNode([1,1],[1,1],[1,1]);
         var neighbors = Array.from(pf.neighborsOf(node, goal));
         neighbors.length.should.equal(4);
-        neighbors[0].should.equal(pf.svaToNode([2,2],[1,1],[0,0])); // closest to goal
-        neighbors[1].should.equal(pf.svaToNode([3,2],[2,1],[1,0]));
-        neighbors[2].should.equal(pf.svaToNode([2,3],[1,2],[0,1]));
-        neighbors[3].should.equal(pf.svaToNode([3,3],[2,2],[1,1]));
+        neighbors[0].should.equal(pf.svaToNode([3,3],[2,2],[1,1]));
+        neighbors[1].should.equal(pf.svaToNode([2,3],[1,2],[0,1]));
+        neighbors[2].should.equal(pf.svaToNode([3,2],[2,1],[1,0]));
+        neighbors[3].should.equal(pf.svaToNode([2,2],[1,1],[0,0])); 
     })
     it("isGoalNeighbor(node, goal) returns true if goal is reachable in one step from node", function() {
         var verbose = false;
@@ -552,56 +568,50 @@ var PathNode = require("./PathNode");
     it("iAxisAccelerations(node,i,dsgoal) generates axis acceleration iterator", function() {
         var pf = new PathFactory({
             dimensions: 2,
-            maxVelocity: [10, 100],
-            maxAcceleration: [1, 2],
+            maxVelocity: [10, 10],
+            maxAcceleration: [1, 1],
         });
-        function testAxisAcceleration(s,v,a, dsgoal, expected) {
-            should.deepEqual(Array.from(pf.iAxisAccelerations(pf.svaToNode(s,v,a), 0, dsgoal)), expected);
+        function test_iAxisAcceleration(s,v,a, i, dsgoal, expected) {
+            should.deepEqual(Array.from(pf.iAxisAccelerations(pf.svaToNode(s,v,a), i, dsgoal)), expected);
         }
-        var dsgoal = 10; // forward to goal
-        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [1,0,-1]);
-        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, [4,3]);
-        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-3,-4]);
-        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, [0,-1]);
-        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, [0]);
-        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
+        var dsgoal = 100; // forward to goal
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [0,1,-1]); 
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
+        test_iAxisAcceleration([0,0],[0,0],[0,-1], 1, dsgoal, [-1,0]); // cull 2:-amax
+        test_iAxisAcceleration([0,0],[10,0],[0,0], 0, dsgoal, [0,-1]); // cull 1:vmax
+        test_iAxisAcceleration([0,0],[0,-10],[0,0], 1, dsgoal, [0,1]); // cull -1:vmax
+        test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, [0]); // cull 2:vmax 1:vmax
+        test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
 
-        var dsgoal = -10; // backward to goal
-        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [-1,0,1]);
-        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [0,1]);
-        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, [3,4]);
-        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-4,-3]);
-        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, [-1,0]);
-        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [0,1]);
-        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, [0]);
-        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
+        var dsgoal = -100; // backward to goal
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [-1,1]); // cull 0:stationary
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
+        test_iAxisAcceleration([0,0],[0,0],[0,-1], 1, dsgoal, [-1,0]); // cull 2:-amax
+        test_iAxisAcceleration([0,0],[10,0],[0,0], 0, dsgoal, [0,-1]); // cull 1:vmax
+        test_iAxisAcceleration([0,0],[0,-10],[0,0], 1, dsgoal, [0,1]); // cull -1:vmax
+        test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, [0]); // cull 2:vmax 1:vmax
+        test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
 
         var dsgoal = 1; // near goal
-        testAxisAcceleration([0,0],[0,0],[0,1], dsgoal, [1,0,-1]);
-        testAxisAcceleration([0,0],[0,0],[1,1], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[0,0],[4,1], dsgoal, []); // overshoot cull
-        testAxisAcceleration([0,0],[0,0],[-4,1], dsgoal, [-3,-4]);
-        testAxisAcceleration([0,0],[10,0],[0,0], dsgoal, []); // overshoot cull
-        testAxisAcceleration([0,0],[-10,0],[0,0], dsgoal, [1,0]);
-        testAxisAcceleration([0,0],[10,0],[1,0], dsgoal, []); // overshoot cull
-        testAxisAcceleration([0,0],[-10,0],[-2,0], dsgoal, []);
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [0,1,-1]); 
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
+        test_iAxisAcceleration([0,0],[0,0],[0,-1], 1, dsgoal, [-1,0]); // cull 2:-amax
+        test_iAxisAcceleration([0,0],[10,0],[0,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[0,-10],[0,0], 1, dsgoal, [0,1]); // cull -1:vmax
+        test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
     })
     it("axisAccelerations(node, i) returns possible neighbor accelerations", function() {
         var pf = new PathFactory({
             dimensions: 2,
-            maxVelocity: [10, 100],
-            maxAcceleration: [1, 2],
+            maxVelocity: [100, 50],
+            maxAcceleration: [5, 2],
         });
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[0,1]), 0), [1,0,-1]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[1,1]), 0), [1,0]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[4,1]), 0), [4,3]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[0,0],[-4,1]), 0), [-3,-4]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[0,0]), 0), [0,-1]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[0,0]), 0), [1,0]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[10,0],[1,0]), 0), [0]);
-        should.deepEqual(pf.axisAccelerations(pf.svaToNode([0,0],[-10,0],[-2,0]), 0), []);
+        function testAxisAccelerations(s,v,a,i,dsgoal,expected) {
+            should.deepEqual(pf.axisAccelerations(pf.svaToNode(s,v,a),i,dsgoal), expected); 
+        }
+        var dsgoal = 100;
+        testAxisAccelerations([0,0],[0,0],[0,1], 0, dsgoal, [0, 5,-5]);
     })
     it("findPath(start, goal) finds 1D acceleration path", function() {
         this.timeout(60*1000);
@@ -626,20 +636,21 @@ var PathNode = require("./PathNode");
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
         nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
     })
-    it("TESTTESTfindPath(start, goal) finds 2D acceleration path", function() {
+    it("TESTTESTfindPath(start, goal) finds 3D acceleration path", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var msElapsedTotal = 0;
         var nTests = 1;
         nTests === 1 && (verbose = 2);
         for (var i = 0; i < nTests; i++) {
+            var bounds = 50.1;
             var start = new PathNode([0,0,0]);
-            var goal = new PathNode([15,65.1,40.8]);
+            var goal = new PathNode([0.1,bounds,-bounds]);
             var pf = new PathFactory({
                 dimensions: 3,
                 maxVelocity: [20,20,20],
                 maxAcceleration: [5,5,5],
-                maxIterations: 5000,
+                maxIterations: 7000,
             });
             msElapsedTotal += testFindPath(pf, start, goal, verbose);
         }
