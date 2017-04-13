@@ -23,6 +23,7 @@ var PathNode = require("./PathNode");
                 lookupTotal: 0,
                 lookupHit: 0,
                 tsdv: 0,
+                tsdva: 0,
                 neighborsOf: 0,
             };
         }
@@ -240,7 +241,7 @@ var PathNode = require("./PathNode");
                     var r2 = this.tsdv(0, v2, jerk);
                     return {
                         t: r1.t + r2.t,
-                        s: r2.s + r2.s,
+                        s: r1.s + r2.s,
                     }
                 }
             }
@@ -249,7 +250,7 @@ var PathNode = require("./PathNode");
                 var r2 = this.tsdv(0, -v2, jerk);
                 return {
                     t: r1.t + r2.t,
-                    s: r2.s + r2.s,
+                    s: r1.s + r2.s,
                 }
             }
             if (v2 < v1) {
@@ -259,6 +260,46 @@ var PathNode = require("./PathNode");
             var dv = v2 - v1;
             var t = -0.5 + mathjs.sqrt(0.25 + 2 * dv / jerk); // dv = jerk * t * (t + 1) / 2
             var s = t * (jerk * t * ( t / 6 + 0.5*jerk));
+            return {
+                t: t,
+                s: s,
+            }
+        }
+        tsdva(v1, v2, a) { // time and distance for change in velocity
+            if (v1 === v2) {
+            this.stats.tsdva++;
+                return {
+                    t: 0,
+                    s: 0,
+                }
+            }
+            if (v1 < 0) {
+                if (v2 < 0) {
+                    return this.tsdva(-v1, -v2, a);
+                } else {
+                    var r1 = this.tsdva(0, -v1, a);
+                    var r2 = this.tsdva(-v1, v2, a);
+                    return {
+                        t: 2*r1.t + r2.t,
+                        s: 2*r1.s + r2.s,
+                    }
+                }
+            }
+            if (v2 < 0) {
+                var r1 = this.tsdva(0, v1, a);
+                var r2 = this.tsdva(0, -v2, a);
+                return {
+                    t: r1.t + r2.t,
+                    s: r2.s + r2.s,
+                }
+            }
+            if (v2 < v1) {
+                return this.tsdva(v2, v1, a);
+            }
+            this.stats.tsdv++;
+            var dv = v2 - v1;
+            var t = -0.5 + mathjs.sqrt(0.25 + 2 * dv / a); // dv = a * t * (t + 1) / 2
+            var s = t * (a * t * ( t / 6 + 0.5*a));
             return {
                 t: t,
                 s: s,
@@ -389,10 +430,20 @@ var PathNode = require("./PathNode");
         var n2 = new PathNode([1,1,1], [1,2,3]);
         should.deepEqual(n2.v, [1,2,3]);
     });
-    it("estimateCost(n1,n2) estimates the cost to move between the given nodes", function() {
+    it("TESTTESTestimateCost(n1,n2) estimates the cost to move between the given nodes", function() {
         var vmax = 10;
-        var jmax = 1;
 
+        var jmax = 5;
+        var pf = new PathFactory({
+            dimensions: 3,
+            maxVelocity: [vmax,vmax,vmax],
+            maxAcceleration: [jmax,jmax,jmax],
+        });
+        var goal = new PathNode([0.1,50.1,-50.1]);
+        pf.estimateCost(pf.svaToNode([0,0,-5],[0,0,-5],[0,0,-5]),goal).should.approximately(9.35, 0.1);
+        pf.estimateCost(pf.svaToNode([0,5,-5],[0,5,-5],[0,5,-5]),goal).should.approximately(15.7, 0.1);
+
+        var jmax = 1;
         var pf = new PathFactory({
             dimensions: 1,
             maxVelocity: [vmax],
@@ -400,7 +451,7 @@ var PathNode = require("./PathNode");
         });
         var goal = new PathNode([-10.1]);
         var node = new PathNode([-10],[-1]);
-        pf.estimateCost(node,goal).should.approximately(1.1, 0.1);
+        pf.estimateCost(node,goal).should.approximately(1, 0.1);
 
         var pf = new PathFactory({
             dimensions: 3,
@@ -645,7 +696,7 @@ var PathNode = require("./PathNode");
         var nTests = 1;
         nTests === 1 && (verbose = 2);
         for (var i = 0; i < nTests; i++) {
-            var bounds = 50.1;
+            var bounds = 60.1;
             var start = new PathNode([0,0,0]);
             var goal = new PathNode([0.1,bounds,-bounds]);
             var pf = new PathFactory({
