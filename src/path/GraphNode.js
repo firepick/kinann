@@ -4,6 +4,7 @@ var AStarGraph = require("./AStarGraph");
     
     class GraphNode {
         constructor(props) {
+            this.id = 0;
             props != null && Object.assign(this, props);
             Object.defineProperty(this, "cameFrom", {
                 value: null, 
@@ -57,6 +58,9 @@ var AStarGraph = require("./AStarGraph");
         var node = new GraphNode({
             color: "purple",
         });
-        JSON.stringify(node).should.equal('{"color":"purple"}');
+        should.deepEqual(JSON.parse(JSON.stringify(node)), {
+            color: "purple",
+            id: 0,
+        });
     })
 })

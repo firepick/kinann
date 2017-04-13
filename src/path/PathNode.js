@@ -1,17 +1,12 @@
 var GraphNode = require("./GraphNode");
 
 (function(exports) { 
-    var id = 0;
-    
     class PathNode extends GraphNode{
         constructor(position, velocity, acceleration) {
             super();
             this.s = position;
             this.v = velocity || Array(position.length).fill(0);
             this.a = acceleration || Array(position.length).fill(0);
-            Object.defineProperty(this, "id", {
-                value: id++
-            });
             Object.defineProperty(this, "key", {
                 value: JSON.stringify(this)
             });

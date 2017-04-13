@@ -18,12 +18,16 @@ var PathNode = require("./PathNode");
             this.nodeMap = {};
             this.neighbors = new WeakMap();
             this.stopTimes = {};
+            this.nodeId = 0;
             this.stats = {
                 lookupTotal: 0,
                 lookupHit: 0,
                 tsdv: 0,
                 neighborsOf: 0,
             };
+        }
+        isCruiseNode(node) {
+            return node.v.reduce((acc,v,i) => acc || v === this.vMax[i] || v === -this.vMax[i], false);
         }
         svaToNode(position, velocity, acceleration) {
             var node = new PathNode(position, velocity, acceleration);
@@ -66,8 +70,7 @@ var PathNode = require("./PathNode");
                     }
                     if (0<vminus && ds < vminus) {
                         // cull overshoot
-                    } else 
-                    if (aMin < ai && vMin <= vminus && vminus <= vMax) {
+                    } else if (aMin < ai && vMin <= vminus && vminus <= vMax) {
                         yield(aMin > aminus ? aMin : aminus);
                     }
                 } else {
@@ -82,10 +85,9 @@ var PathNode = require("./PathNode");
                     } else if (aMin < ai && vMin <= vminus && vminus <= vMax) {
                         yield(aMin > aminus ? aMin : aminus);
                     }
-                    if (vplus<0 && dsgoal > vplus) {
+                    if (true && vplus<0 && dsgoal > vplus) {
                         // cull overshoot
-                    } else 
-                    if (ai < aMax && vMin <= vplus && vplus <= vMax) {
+                    } else if (ai < aMax && vMin <= vplus && vplus <= vMax) {
                         yield(aMax < aplus ? aMax : aplus);
                     }
                 }
@@ -100,6 +102,7 @@ var PathNode = require("./PathNode");
                 this.stats.lookupHit++;
             } else {
                 result = this.nodeMap[key] = node;
+                node.id = ++this.nodeId;
             }
             return result;
         }
@@ -373,7 +376,7 @@ var PathNode = require("./PathNode");
             acc > 0 && n.v[0].should.not.below(0);
             acc = n.v[0];
         }, 0);
-        verbose>1 && path.forEach((n,i) => console.log("path["+i+"]", n.id, JSON.stringify(n)));
+        verbose>1 && path.forEach((n,i) => console.log("path["+i+"]", JSON.stringify(n), pf.isCruiseNode(n) ? "cruise" : "accel"));
         verbose>0 && console.log("findPath", JSON.stringify(result.stats));
         path.length.should.above(0);
         path.length === 0 && console.log("FAIL: no path");
@@ -449,7 +452,6 @@ var PathNode = require("./PathNode");
         var start = new PathNode([1,1]);
         var neighbors = Array.from(pf.neighborsOf(start, goal));
         neighbors.length.should.equal(4);
-        neighbors.forEach((n)=>console.log('n',JSON.stringify(n)));
         neighbors[0].should.equal(pf.svaToNode([0,0],[-1,-1],[-1,-1])); // closest to goal
         neighbors[1].should.equal(pf.svaToNode([2,0],[1,-1],[1,-1]));
         neighbors[2].should.equal(pf.svaToNode([0,2],[-1,1],[-1,1]));
@@ -648,7 +650,7 @@ var PathNode = require("./PathNode");
             var goal = new PathNode([0.1,bounds,-bounds]);
             var pf = new PathFactory({
                 dimensions: 3,
-                maxVelocity: [20,20,20],
+                maxVelocity: [10,10,10],
                 maxAcceleration: [5,5,5],
                 maxIterations: 7000,
             });
