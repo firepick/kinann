@@ -4,10 +4,9 @@ var mathjs = require("mathjs");
     class PriorityQ {
         constructor(options = {}) {
             this.sizes = options.sizes || [5, 50, 500, Number.MAX_SAFE_INTEGER];
-            this.split = options.split || [16,64,1024]; // split bucket when it exceeds this size
+            this.split = options.split || [16,64,4096]; // split bucket when it exceeds this size
             this.b = this.sizes.map(() => []);
             this.bmax = this.sizes.map(() => null);
-            this.filter = options.filter || ((v) => v);
             this.length = 0;
             this.stats = {
                 fill: 0,
@@ -21,7 +20,7 @@ var mathjs = require("mathjs");
             if (src) {
                 src.sort((a,b) => this.compare(b,a));
                 while (dst.length < n && src.length) {
-                    let v = this.filter(src.pop());
+                    let v = src.pop();
                     (v != null) && dst.push(v);
                 }
             }
@@ -130,7 +129,7 @@ var mathjs = require("mathjs");
             if (this.length) {
                 var b0new = [];
                 for (var i=this.b[0].length; i-- > 0; ) {
-                    var v = this.filter(this.b[0][i]);
+                    var v = this.b[0][i];
                     if (min == null) {
                         min = v; // v can be null;
                     } else if (v != null) {

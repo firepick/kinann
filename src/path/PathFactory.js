@@ -11,9 +11,11 @@ var PathNode = require("./PathNode");
             this.vMax = options.maxVelocity || Array(this.dimensions).fill(10);
             this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
             this.jMin = options.minJerk || Array(this.dimensions).fill(0.1);
+            this.onNoPath = options.onNoPath || ((start, goal) => {
+                throw new Error("No path found from:"+JSON.stringify(start)+" to:"+JSON.stringify(goal));
+            });
             this.jerkScale = 1; // fraction of path length
             this.jMax = this.aMax; // initial value
-            this.a0 = Array(this.dimensions).fill(0);
             this.round = 2; // force discrete graph space
             this.nodeMap = {};
             this.neighbors = new WeakMap();
@@ -22,7 +24,6 @@ var PathNode = require("./PathNode");
             this.stats = {
                 lookupTotal: 0,
                 lookupHit: 0,
-                tsdv: 0,
                 tsdva: 0,
                 neighborsOf: 0,
             };
@@ -78,7 +79,7 @@ var PathNode = require("./PathNode");
                     vMin = vMin < dsgoal ? dsgoal : vMin; // prevent overshoot
                     if (vzero<0 && dsgoal > vzero) { 
                         // cull overshoot
-                    } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax && (vzero || vi)) {
+                    } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax) {
                         yield(ai); // maintain acceleration
                     }
                     if (vminus<0 && dsgoal > vminus) {
@@ -134,6 +135,7 @@ var PathNode = require("./PathNode");
             var result = super.findPath(start, goal, options);
             result.stats.start = start.s;
             result.stats.goal = goal.s;
+            result.path.length || this.onNoPath(start, goal);
 
             return result;
         }
@@ -225,49 +227,9 @@ var PathNode = require("./PathNode");
         cost(n1, n2) {
             return n1 === n2 ? 0 : 1;
         }
-        tsdv(v1, v2, jerk) { // time and distance for change in velocity
-            if (v1 === v2) {
-            this.stats.tsdv++;
-                return {
-                    t: 0,
-                    s: 0,
-                }
-            }
-            if (v1 < 0) {
-                if (v2 < 0) {
-                    return this.tsdv(-v1, -v2, jerk);
-                } else {
-                    var r1 = this.tsdv(0, -v1, jerk);
-                    var r2 = this.tsdv(0, v2, jerk);
-                    return {
-                        t: r1.t + r2.t,
-                        s: r1.s + r2.s,
-                    }
-                }
-            }
-            if (v2 < 0) {
-                var r1 = this.tsdv(0, v1, jerk);
-                var r2 = this.tsdv(0, -v2, jerk);
-                return {
-                    t: r1.t + r2.t,
-                    s: r1.s + r2.s,
-                }
-            }
-            if (v2 < v1) {
-                return this.tsdv(v2, v1, jerk);
-            }
-            this.stats.tsdv++;
-            var dv = v2 - v1;
-            var t = -0.5 + mathjs.sqrt(0.25 + 2 * dv / jerk); // dv = jerk * t * (t + 1) / 2
-            var s = t * (jerk * t * ( t / 6 + 0.5*jerk));
-            return {
-                t: t,
-                s: s,
-            }
-        }
         tsdva(v1, v2, a) { // time and distance for change in velocity
             if (v1 === v2) {
-            this.stats.tsdva++;
+                this.stats.tsdva++;
                 return {
                     t: 0,
                     s: 0,
@@ -276,71 +238,61 @@ var PathNode = require("./PathNode");
             if (v1 < 0) {
                 if (v2 < 0) {
                     return this.tsdva(-v1, -v2, a);
+                } else if (v2 === 0) {
+                    return this.tsdva(0, -v1, a);
                 } else {
                     var r1 = this.tsdva(0, -v1, a);
                     var r2 = this.tsdva(-v1, v2, a);
-                    return {
+                    return { // include time for v1 reversal
                         t: 2*r1.t + r2.t,
                         s: 2*r1.s + r2.s,
                     }
                 }
             }
             if (v2 < 0) {
-                var r1 = this.tsdva(0, v1, a);
-                var r2 = this.tsdva(0, -v2, a);
-                return {
-                    t: r1.t + r2.t,
-                    s: r2.s + r2.s,
-                }
+                return this.tsdva(-v1, -v2, a);
             }
             if (v2 < v1) {
                 return this.tsdva(v2, v1, a);
             }
-            this.stats.tsdv++;
+            this.stats.tsdva++;
             var dv = v2 - v1;
-            var t = -0.5 + mathjs.sqrt(0.25 + 2 * dv / a); // dv = a * t * (t + 1) / 2
-            var s = t * (a * t * ( t / 6 + 0.5*a));
+            var t = dv/a; // dv = a * t
             return {
                 t: t,
-                s: s,
+                s: 0.5 * a * t * t,
             }
         }
         estimateCost(n1, goal) {
             if (n1.h) {
-                return n1.h;
+                return n1.h; // cached estimate
             }
             var ds = mathjs.subtract(goal.s, n1.s);
-            var vts = n1.v.map((v1, i) => this.tsdv(v1, goal.v[i], this.jMax[i]));
+            var vts = n1.v.map((v1, i) => this.tsdva(v1, goal.v[i], this.aMax[i]));
             var t = vts.map((ts,i) => { // transition time + cruise time
                 var v1 = n1.v[i];
+                var v1abs = v1 < 0 ? -v1 : v1;
                 var v2 = goal.v[i];
                 var dvi = v2 - v1;
                 var dsi = ds[i];
-
-                //if (dsi === 0 && v2 !== v1) {
-                    //n1.culled = "velocity change without moving";
-                    //return n1.h = Number.MAX_SAFE_INTEGER; // can't changing velocity without moving
-                //}
-                var dsiabs = mathjs.abs(dsi);
-                if (dsiabs > this.jMax[i] && mathjs.abs(n1.v[i]) > dsiabs) {
+                var dsiabs = dsi < 0 ? -dsi : dsi;
+                if (dsiabs > this.jMax[i] && v1abs > dsiabs) {
                     n1.culled = "too fast";
                     return n1.h = Number.MAX_SAFE_INTEGER; // too fast
                 }
                 var scruise = dsiabs - ts.s;
-                if (v1 < 0 && dsi > 0 || v1 > 0 && dsi < 0) {
-                    scruise += mathjs.abs(v1); // backtrack penalty (not exact)
-                }
                 if (scruise <= 0) {
                     return n1.h = ts.t;
                 }
                 if (v1 == 0) {
                     if (v2 === 0) {
-                        return n1.h = 1; // admissible but not accurate
+                        return n1.h = scruise/this.jMax[i]; // slowest possible speed
                     } else {
-                        return n1.h = scruise / v2;
+                        var v2abs = v2 < 0 ? -v2 : v2;
+                        return n1.h = ts.t + scruise / v2abs;
                     }
                 }
-                return n1.h = ts.t + scruise / mathjs.abs(v1);
+                return n1.h = ts.t + scruise / v1abs;
             });
             return n1.h = mathjs.sum(t);
         }
@@ -419,8 +371,11 @@ var PathNode = require("./PathNode");
         }, 0);
         verbose>1 && path.forEach((n,i) => console.log("path["+i+"]", JSON.stringify(n), pf.isCruiseNode(n) ? "cruise" : "accel"));
         verbose>0 && console.log("findPath", JSON.stringify(result.stats));
+        if (path.length === 0) {
+            console.log("start", JSON.stringify(start));
+            console.log("goal", JSON.stringify(goal));
+        }
         path.length.should.above(0);
-        path.length === 0 && console.log("FAIL: no path");
         return result.stats.ms;
     }
 
@@ -430,7 +385,7 @@ var PathNode = require("./PathNode");
         var n2 = new PathNode([1,1,1], [1,2,3]);
         should.deepEqual(n2.v, [1,2,3]);
     });
-    it("TESTTESTestimateCost(n1,n2) estimates the cost to move between the given nodes", function() {
+    it("estimateCost(n1,n2) estimates the cost to move between the given nodes", function() {
         var vmax = 10;
 
         var jmax = 5;
@@ -440,27 +395,15 @@ var PathNode = require("./PathNode");
             maxAcceleration: [jmax,jmax,jmax],
         });
         var goal = new PathNode([0.1,50.1,-50.1]);
-        pf.estimateCost(pf.svaToNode([0,0,-5],[0,0,-5],[0,0,-5]),goal).should.approximately(9.35, 0.1);
-        pf.estimateCost(pf.svaToNode([0,5,-5],[0,5,-5],[0,5,-5]),goal).should.approximately(15.7, 0.1);
-
-        var jmax = 1;
-        var pf = new PathFactory({
-            dimensions: 1,
-            maxVelocity: [vmax],
-            maxAcceleration: [jmax],
-        });
-        var goal = new PathNode([-10.1]);
-        var node = new PathNode([-10],[-1]);
-        pf.estimateCost(node,goal).should.approximately(1, 0.1);
-
-        var pf = new PathFactory({
-            dimensions: 3,
-            maxVelocity: [vmax, vmax, vmax],
-            maxAcceleration: [jmax,jmax,jmax],
-        });
-        var n1 = new PathNode([1,3,2]);
-        var n2 = new PathNode([3,1,4]);
-        pf.estimateCost(n1,n2).should.equal(3);
+        var node1 = pf.svaToNode([0,0,-5],[0,0,-5],[0,0,-5]);
+        var node2 = pf.svaToNode([0,5,-5],[0,5,-5],[0,5,-5]);
+        var vts1 = node1.v.map((v, i) => pf.tsdva(v, goal.v[i], pf.aMax[i]));
+        var vts2 = node2.v.map((v, i) => pf.tsdva(v, goal.v[i], pf.aMax[i]));
+        should.deepEqual(vts1[2], vts2[2]);
+        should.deepEqual(vts1[2], vts2[2]);
+        var cost1 = pf.estimateCost(node1,goal);
+        var cost2 = pf.estimateCost(node2,goal);
+        cost1.should.above(cost2);
     })
     it("svaToNode(s,v,a) returns unique node with given attributes", function() {
         var pf = new PathFactory({
@@ -502,11 +445,11 @@ var PathNode = require("./PathNode");
 
         var start = new PathNode([1,1]);
         var neighbors = Array.from(pf.neighborsOf(start, goal));
-        neighbors.length.should.equal(4);
-        neighbors[0].should.equal(pf.svaToNode([0,0],[-1,-1],[-1,-1])); // closest to goal
-        neighbors[1].should.equal(pf.svaToNode([2,0],[1,-1],[1,-1]));
-        neighbors[2].should.equal(pf.svaToNode([0,2],[-1,1],[-1,1]));
-        neighbors[3].should.equal(pf.svaToNode([2,2],[1,1],[1,1]));
+        neighbors.length.should.equal(9);
+        neighbors.indexOf(pf.svaToNode([0,0],[-1,-1],[-1,-1])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([2,0],[1,-1],[1,-1])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([0,2],[-1,1],[-1,1])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([2,2],[1,1],[1,1])).should.above(-1);
 
         var node = new PathNode([1,1],[1,1],[1,1]);
         var neighbors = Array.from(pf.neighborsOf(node, goal));
@@ -587,37 +530,6 @@ var PathNode = require("./PathNode");
         msElapsed = new Date() - msStart;
         msElapsed.should.below(40); // neighborsOf is a CPU hog @ >0.1ms
     })
-    it("tsdv(v1,v2,jerk) estimates velocity transition time", function() {
-        var jerk = 1;
-        var pf = new PathFactory();
-
-        // same direction
-        pf.tsdv(0,10,1).t.should.equal(4);
-        pf.tsdv(10,0,1).t.should.equal(4);
-        pf.tsdv(-6,0,1).t.should.equal(3);
-        pf.tsdv(0,-6,1).t.should.equal(3);
-        pf.tsdv(0,3,1).t.should.equal(2);
-        pf.tsdv(1,11,1).t.should.equal(4);
-        pf.tsdv(-12,-2,1).t.should.equal(4);
-        
-        // change direction
-        pf.tsdv(-5,5,1).t.should.approximately(5.4, 0.01);
-        pf.tsdv(5,-5,1).t.should.approximately(5.4, 0.01);
-
-        pf.tsdv(0,10,1).s.should.approximately(18.67,0.01);
-        pf.tsdv(1,11,1).s.should.approximately(18.67,0.01);
-        pf.tsdv(-11,-1,1).s.should.approximately(18.67,0.01);
-        pf.tsdv(10,0,1).s.should.approximately(18.67,0.01);
-        pf.tsdv(-5,5,1).s.should.approximately(13.87,0.01);
-        pf.tsdv(5,-5,1).s.should.approximately(13.87,0.01);
-
-        var msStart = new Date();
-        for (var i=0; i<10000; i++) {
-            pf.tsdv(5,-5,1);
-        }
-        var msElapsed = new Date() - msStart;
-        msElapsed.should.below(20);
-    })
     it("iAxisAccelerations(node,i,dsgoal) generates axis acceleration iterator", function() {
         var pf = new PathFactory({
             dimensions: 2,
@@ -627,6 +539,7 @@ var PathNode = require("./PathNode");
         function test_iAxisAcceleration(s,v,a, i, dsgoal, expected) {
             should.deepEqual(Array.from(pf.iAxisAccelerations(pf.svaToNode(s,v,a), i, dsgoal)), expected);
         }
+
         var dsgoal = 100; // forward to goal
         test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [0,1,-1]); 
         test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
@@ -637,7 +550,7 @@ var PathNode = require("./PathNode");
         test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
 
         var dsgoal = -100; // backward to goal
-        test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [-1,1]); // cull 0:stationary
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [0,-1,1]); // cull 0:stationary
         test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
         test_iAxisAcceleration([0,0],[0,0],[0,-1], 1, dsgoal, [-1,0]); // cull 2:-amax
         test_iAxisAcceleration([0,0],[10,0],[0,0], 0, dsgoal, [0,-1]); // cull 1:vmax
@@ -653,6 +566,15 @@ var PathNode = require("./PathNode");
         test_iAxisAcceleration([0,0],[0,-10],[0,0], 1, dsgoal, [0,1]); // cull -1:vmax
         test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, []); // overshoot
         test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
+
+        var dsgoal = -1; // near goal
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [0,-1,1]); 
+        test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
+        test_iAxisAcceleration([0,0],[0,0],[0,-1], 1, dsgoal, [-1,0]); // cull 2:-amax
+        test_iAxisAcceleration([0,0],[-10,0],[0,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[0,10],[0,0], 1, dsgoal, [0,-1]); // cull -1:vmax
+        test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
     })
     it("axisAccelerations(node, i) returns possible neighbor accelerations", function() {
         var pf = new PathFactory({
@@ -687,27 +609,37 @@ var PathNode = require("./PathNode");
             msElapsedTotal += testFindPath(pf, start, goal, verbose);
         }
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
-        nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
+        nTests>1 && console.log("findPath 1D ms avg:", msElapsedTotal/nTests);
     })
-    it("TESTTESTfindPath(start, goal) finds 3D acceleration path", function() {
+    it("findPath(start, goal) finds 3D acceleration path", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var msElapsedTotal = 0;
-        var nTests = 1;
+        var nTests = 20;
         nTests === 1 && (verbose = 2);
         for (var i = 0; i < nTests; i++) {
-            var bounds = 60.1;
-            var start = new PathNode([0,0,0]);
-            var goal = new PathNode([0.1,bounds,-bounds]);
+            var bounds = 300;
+            var start = new PathNode([
+                mathjs.random(-bounds,bounds),
+                mathjs.random(-bounds,bounds),
+                mathjs.random(-bounds,bounds),
+            ]);
+            var goal = new PathNode([
+                mathjs.random(-bounds,bounds),
+                mathjs.random(-bounds,bounds),
+                mathjs.random(-bounds,bounds),
+            ]);
+            //var start = new PathNode([62.06,241.79,116.04]);
+            //var goal = new PathNode([-154.52,241.6,44.19]);
             var pf = new PathFactory({
                 dimensions: 3,
                 maxVelocity: [10,10,10],
                 maxAcceleration: [5,5,5],
-                maxIterations: 7000,
+                maxIterations: 5000,
             });
             msElapsedTotal += testFindPath(pf, start, goal, verbose);
         }
-        nTests>1 && (msElapsedTotal/nTests).should.below(20);
-        nTests>1 && console.log("findPath ms avg:", msElapsedTotal/nTests);
+        nTests>1 && (msElapsedTotal/nTests).should.below(100);
+        nTests>1 && console.log("findPath 3D ms avg:", msElapsedTotal/nTests);
     })
 })
