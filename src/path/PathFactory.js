@@ -11,6 +11,7 @@ var PathNode = require("./PathNode");
             this.vMax = options.maxVelocity || Array(this.dimensions).fill(10);
             this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
             this.jMin = options.minJerk || Array(this.dimensions).fill(0.1);
+            this.filter = options.filter || ((neighbor) => neighbor);
             this.onNoPath = options.onNoPath || ((start, goal) => {
                 throw new Error("No path found from:"+JSON.stringify(start)+" to:"+JSON.stringify(goal));
             });
@@ -29,7 +30,8 @@ var PathNode = require("./PathNode");
             };
         }
         isCruiseNode(node) {
-            return node.v.reduce((acc,v,i) => acc || v === this.vMax[i] || v === -this.vMax[i], false);
+            return node.a.length === node.a.reduce((acc,a) => !a ? (1+acc) : acc, 0) && // not accel
+                node.v.reduce((acc,v) => v ? (1+acc) : acc, 0); // moving
         }
         svaToNode(position, velocity, acceleration) {
             var node = new PathNode(position, velocity, acceleration);
@@ -180,49 +182,48 @@ var PathNode = require("./PathNode");
             if (goal && this.isGoalNeighbor(node, goal)) {
                 return [goal];
             }
-            var anewbasis = node.a.map((a,i) => this.axisAccelerations(node, i, goal.s[i]-node.s[i]));
-            if (true) {
-                function * iNeighbors(pf, anewbasis) {
-                    for (var anew of PathFactory.permutations(anewbasis)) {
-                        var avariation = anew;
-                        var vvariation = mathjs.add(node.v,avariation); // instantaneous acceleration
-                        var svariation = mathjs.add(node.s,vvariation); // instantaneous acceleration
-                        var neighbor = pf.svaToNode(svariation, vvariation, avariation);
-                        if (pf.estimateCost(neighbor, goal) < Number.MAX_SAFE_INTEGER) {
-                            yield(neighbor);
+            var createNeighbor = (avariation) => {
+                var vvariation = mathjs.add(node.v,avariation); // instantaneous acceleration
+                var svariation = mathjs.add(node.s,vvariation); // instantaneous acceleration
+                var neighbor = this.svaToNode(svariation, vvariation, avariation);
+                neighbor = this.filter(neighbor);
+                if (neighbor && this.estimateCost(neighbor, goal) < Number.MAX_SAFE_INTEGER) {
+                    return neighbor;
+                }
+                return null;
+            }
+            function* iNeighbors(pf) {
+                var anewbasis = node.a.map((a,i) => pf.axisAccelerations(node, i, goal.s[i]-node.s[i]));
+                var neighbor;
+                if (pf.isCruiseNode(node)) { // generate restricted set of neighbors (8 for 3D)
+                    var acoast = [];
+                    var abrake = [];
+                    for (var i = 0; i < anewbasis.length; i++) {
+                        var basis = anewbasis[i];
+                        var a0 = basis[0];
+                        if (a0 == null) {
+                            return; // no values
+                        }
+                        acoast.push(a0);
+                        var an = basis[basis.length-1];
+                        abrake.push(an);
+                    }
+                    (neighbor = createNeighbor(acoast)) && (yield neighbor);
+                    (neighbor = createNeighbor(abrake)) && (yield neighbor);
+                    for (var i = 0; i < anewbasis.length; i++) { // +/- accel per axis
+                        var basis = anewbasis[i];
+                        for (var j = 1; j < basis.length; j++) {
+                            var anew = acoast.map((a,k) => i==k ? basis[j] : acoast[i]);
+                            (neighbor = createNeighbor(anew)) && (yield neighbor);
                         }
                     }
-                }
-                return iNeighbors(this, anewbasis);
-            }
-            // SLIGHTLY SLOWER...
-            //var neighbors = Array.from(iNeighbors(this, anewbasis)).sort((a,b) => a.h - b.h);
-            //return neighbors;
-            var hMin = Number.MAX_SAFE_INTEGER;
-            var hIndex = -1;
-            var neighbors = PathFactory.permutations(anewbasis).reduce((acc,anew) => {
-                var avariation = anew;
-                // Minimize number of states by applying acceleration variations immediately 
-                // to velocity and position.
-                var vvariation = mathjs.add(node.v,avariation);
-                var svariation = mathjs.add(node.s,vvariation);
-                var neighbor = this.svaToNode(svariation, vvariation, avariation);
-                if (this.estimateCost(neighbor, goal) < Number.MAX_SAFE_INTEGER) {
-                    if (neighbor.h < hMin) {
-                        hIndex = acc.length;
-                        hMin = neighbor.h;
+                } else { // generate all possible neighbors (27 for 3D)
+                    for (var anew of PathFactory.permutations(anewbasis)) { 
+                        (neighbor = createNeighbor(anew)) && (yield neighbor);
                     }
-                    acc.push(neighbor);
                 }
-                return acc;
-            }, []);
-            //return neighbors.sort((a,b) => a.h - b.h); // SLIGHTLY SLOWER
-            if (hIndex > 0) { // SLIGHTLY FASTER
-                var tmp = neighbors[hIndex];
-                neighbors[hIndex] = neighbors[0];
-                neighbors[0] = tmp;
             }
-            return neighbors;
+            return iNeighbors(this);
         }
         cost(n1, n2) {
             return n1 === n2 ? 0 : 1;
@@ -432,6 +433,7 @@ var PathNode = require("./PathNode");
         msElapsed.should.below(60); // ~0.04ms
     })
     it("neighborsOf(node) iterates over node neighbors", function() {
+        var verbose = 0;
         var pf = new PathFactory({
             dimensions: 2,
             maxVelocity: [10,10],
@@ -442,6 +444,17 @@ var PathNode = require("./PathNode");
         var node = new PathNode([-10,-10],[-1,-1]);
         var neighbors = Array.from(pf.neighborsOf(node, goal));
         neighbors.length.should.equal(1);
+
+        var cruisenode = new PathNode([1,1],[10,1]);
+        var neighbors = Array.from(pf.neighborsOf(cruisenode, goal));
+        verbose && neighbors.forEach((n,i) => console.log("neighbor["+i+"]", JSON.stringify(n)));
+        neighbors.indexOf(pf.svaToNode([11,2],[10,1],[0,0])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([10,2],[9,1],[-1,0])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([11,1],[10,0],[0,-1])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([11,3],[10,2],[0,1])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([10,3],[9,2],[-1,1])).should.above(-1);
+        neighbors.indexOf(pf.svaToNode([10,1],[9,0],[-1,-1])).should.not.above(-1);
+        neighbors.length.should.equal(5);
 
         var start = new PathNode([1,1]);
         var neighbors = Array.from(pf.neighborsOf(start, goal));
