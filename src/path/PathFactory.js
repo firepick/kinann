@@ -11,7 +11,13 @@ var PathNode = require("./PathNode");
             this.vMax = options.maxVelocity || Array(this.dimensions).fill(10);
             this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
             this.jMin = options.minJerk || Array(this.dimensions).fill(0.1);
-            this.filter = options.filter || ((neighbor) => neighbor);
+            if (options.filter) {
+                this.filter = options.filter;
+                this.isFiltered = options.isFiltered || ((node) => true);
+            } else {
+                this.filter = ((neighbor) => neighbor);
+                this.isFiltered = options.isFiltered || ((node) => false);
+            }
             this.onNoPath = options.onNoPath || ((start, goal) => {
                 throw new Error("No path found from:"+JSON.stringify(start)+" to:"+JSON.stringify(goal));
             });
@@ -19,8 +25,6 @@ var PathNode = require("./PathNode");
             this.jMax = this.aMax; // initial value
             this.round = 2; // force discrete graph space
             this.nodeMap = {};
-            this.neighbors = new WeakMap();
-            this.stopTimes = {};
             this.nodeId = 0;
             this.stats = {
                 lookupTotal: 0,
@@ -45,6 +49,7 @@ var PathNode = require("./PathNode");
         }
         iAxisAccelerations(node, i, dsgoal) {
             var pf = this;
+            var cullOvershoot = !node.isFiltered;
             function * iAxisAccelerations(node, i, dsgoal) {
                 var av = [];
                 var ai = node.a[i];
@@ -62,37 +67,49 @@ var PathNode = require("./PathNode");
                 if (dsgoal >= 0) {
                     var ds = dsgoal;
                     vMax = ds < vMax ? ds : vMax; // prevent overshoot
-                    if (0<vzero && ds < vzero) {
-                        // cull overshoot
-                    } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax) {
+                    if (node.isFiltered) {
                         yield(ai); // maintain acceleration
-                    }
-                    if (0<vplus && ds < vplus) {
-                        // cull overshoot
-                    } else if (ai < aMax && vMin <= vplus && vplus <= vMax) {
                         yield(aMax < aplus ? aMax : aplus);
-                    }
-                    if (0<vminus && ds < vminus) {
-                        // cull overshoot
-                    } else if (aMin < ai && vMin <= vminus && vminus <= vMax) {
                         yield(aMin > aminus ? aMin : aminus);
+                    } else { //apply unfiltered optimizations
+                        if (0<vzero && ds < vzero) {
+                            // cull overshoot
+                        } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax) {
+                            yield(ai); // maintain acceleration
+                        }
+                        if (0<vplus && ds < vplus) {
+                            // cull overshoot
+                        } else if (ai < aMax && vMin <= vplus && vplus <= vMax) {
+                            yield(aMax < aplus ? aMax : aplus);
+                        }
+                        if (0<vminus && ds < vminus) {
+                            // cull overshoot
+                        } else if (aMin < ai && vMin <= vminus && vminus <= vMax) {
+                            yield(aMin > aminus ? aMin : aminus);
+                        }
                     }
                 } else {
                     vMin = vMin < dsgoal ? dsgoal : vMin; // prevent overshoot
-                    if (vzero<0 && dsgoal > vzero) { 
-                        // cull overshoot
-                    } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax) {
+                    if (node.isFiltered) {
                         yield(ai); // maintain acceleration
-                    }
-                    if (vminus<0 && dsgoal > vminus) {
-                        // cull overshoot
-                    } else if (aMin < ai && vMin <= vminus && vminus <= vMax) {
                         yield(aMin > aminus ? aMin : aminus);
-                    }
-                    if (true && vplus<0 && dsgoal > vplus) {
-                        // cull overshoot
-                    } else if (ai < aMax && vMin <= vplus && vplus <= vMax) {
                         yield(aMax < aplus ? aMax : aplus);
+                    } else {
+                        if (vzero<0 && dsgoal > vzero) { 
+                            // cull overshoot
+                        } else if (vMin <= vzero && vMin <= vzero && vzero <= vMax) {
+                            yield(ai); // maintain acceleration
+                        }
+                        if (vminus<0 && dsgoal > vminus) {
+                            // cull overshoot
+                        } else if (aMin < ai && vMin <= vminus && vminus <= vMax) {
+                            yield(aMin > aminus ? aMin : aminus);
+                        }
+                        if (vplus<0 && dsgoal > vplus) {
+                            // cull overshoot
+                        } else if (ai < aMax && vMin <= vplus && vplus <= vMax) {
+                            yield(aMax < aplus ? aMax : aplus);
+                        }
                     }
                 }
             }
@@ -106,6 +123,7 @@ var PathNode = require("./PathNode");
                 this.stats.lookupHit++;
             } else {
                 result = this.nodeMap[key] = node;
+                node.isFiltered = this.isFiltered(node);
                 node.id = ++this.nodeId;
             }
             return result;
@@ -133,7 +151,6 @@ var PathNode = require("./PathNode");
             var ds = mathjs.abs(mathjs.subtract(goal.s, start.s));
             var jerk = mathjs.round(mathjs.divide(ds, this.jerkScale), this.round);
             this.jMax = jerk.map((j,i) => mathjs.min(this.aMax[i], mathjs.max(j, this.jMin[i])));
-            this.neighbors = new WeakMap();
             var result = super.findPath(start, goal, options);
             result.stats.start = start.s;
             result.stats.goal = goal.s;
@@ -187,15 +204,17 @@ var PathNode = require("./PathNode");
                 var svariation = mathjs.add(node.s,vvariation); // instantaneous acceleration
                 var neighbor = this.svaToNode(svariation, vvariation, avariation);
                 neighbor = this.filter(neighbor);
-                if (neighbor && this.estimateCost(neighbor, goal) < Number.MAX_SAFE_INTEGER) {
-                    return neighbor;
+                if (neighbor) {
+                    if (this.estimateCost(neighbor, goal) < Number.MAX_SAFE_INTEGER) {
+                        return neighbor;
+                    }
                 }
                 return null;
             }
             function* iNeighbors(pf) {
                 var anewbasis = node.a.map((a,i) => pf.axisAccelerations(node, i, goal.s[i]-node.s[i]));
                 var neighbor;
-                if (pf.isCruiseNode(node)) { // generate restricted set of neighbors (8 for 3D)
+                if (!node.isFiltered && pf.isCruiseNode(node)) { // generate restricted set of neighbors (8 for 3D)
                     var acoast = [];
                     var abrake = [];
                     for (var i = 0; i < anewbasis.length; i++) {
@@ -649,6 +668,41 @@ var PathNode = require("./PathNode");
                 maxVelocity: [10,10,10],
                 maxAcceleration: [5,5,5],
                 maxIterations: 5000,
+            });
+            msElapsedTotal += testFindPath(pf, start, goal, verbose);
+        }
+        nTests>1 && (msElapsedTotal/nTests).should.below(100);
+        nTests>1 && console.log("findPath 3D ms avg:", msElapsedTotal/nTests);
+    })
+    it("TESTTESTfindPath(start, goal) finds constrained path", function() {
+        this.timeout(60*1000);
+        var verbose = 0;
+        var msElapsedTotal = 0;
+        var nTests = 100;
+        nTests === 1 && (verbose = 2);
+        var zcruise = 15;
+        for (var i = 0; i < nTests; i++) {
+            var bounds = 300;
+            var start = new PathNode([0,0,0]);
+            var goal = new PathNode([-100,100,5]);
+            var pf = new PathFactory({
+                dimensions: 3,
+                maxVelocity: [10,10,10],
+                maxAcceleration: [5,5,5],
+                maxIterations: 1000,
+                isCruiseSimple: false,
+                isFiltered: (node) => node.s[2] < zcruise,
+                filter: (n) => {
+                    if (n.s[2] < 0) {
+                        return null; // only paths above bed
+                    }
+                    if (n.s[2] < zcruise) {
+                        if (n.v[0] || n.v[1] || n.a[0] || n.a[1]) {
+                            return null; // no xy movement below zcruise;
+                        }
+                    }
+                    return n;
+                },
             });
             msElapsedTotal += testFindPath(pf, start, goal, verbose);
         }

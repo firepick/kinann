@@ -49,6 +49,7 @@ var PriorityQ = require("./PriorityQ");
             while (stats.iter++ < this.maxIterations) {
                 var current = pq.extractMin();
                 if (current == null) {
+                    console.log("no solution. open set is empty");
                     break;
                 }
                 if (!onCurrent(current)) {
