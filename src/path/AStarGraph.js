@@ -34,7 +34,7 @@ var PriorityQ = require("./PriorityQ");
             var pq = new PriorityQ({
                 compare: (a,b) => a.fscore - b.fscore,
             });
-            var onNeighbor = options.onNeighbor || ((node,outcome) => node);
+            var onNeighbor = this.onNeighbor = options.onNeighbor || ((node,outcome) => node);
             var onCurrent = options.onCurrent || ((node)=>true);
             start.fscore = this.estimateCost(start, goal);
             start.gscore = 0;
@@ -64,12 +64,12 @@ var PriorityQ = require("./PriorityQ");
                 for (var neighbor of this.neighborsOf(current, goal)) {
                     stats.nodes++;
                     if (neighbor.isClosed) {
-                        onNeighbor(neighbor," -c");
+                        onNeighbor(neighbor,"-cl");
                         continue;
                     }
                     var tentative_gScore = current.gscore + this.cost(current, neighbor);
                     if (tentative_gScore >= neighbor.gscore) {
-                        onNeighbor(neighbor," -g");
+                        onNeighbor(neighbor, (tentative_gScore > neighbor.gscore ? "-g>" : "-g=")); 
                         continue;
                     }
                     neighbor.cameFrom = current;
