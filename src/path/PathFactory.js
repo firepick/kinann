@@ -9,7 +9,7 @@ var PathNode = require("./PathNode");
             super(options);
             this.dimensions = options.dimensions || 1;
             this.estimateFree = options.estimateFree || this.cost_tsvva;
-            this.estimateConstrained = options.estimateConstrained || this.cost_constant(1);
+            this.estimateConstrained = options.estimateConstrained || this.cost_explore;
             this.cost = options.cost || this.cost_constant(0.2);
             this.vMax = options.maxVelocity || Array(this.dimensions).fill(10);
             this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
@@ -276,13 +276,28 @@ var PathNode = require("./PathNode");
         cost_constant(cost) {
             return (n1,n2) => n1 == n2 ? 0 : cost;
         }
+        cost_distance(n1, goal) {
+            var sumsquares = n1.s.reduce((acc,s,i) => {
+                var diff = goal.s[i] - s;
+                return acc + diff * diff;
+            },0);
+            return mathjs.sqrt(sumsquares);
+        }
+        cost_explore(n1, goal) {
+            var constrained_cost = n1.v.reduce((acc,v,i) => acc + (this.vMax[i]-v)/this.vMax[i], 0); 
+            return this.estimateFree(n1,goal) + constrained_cost;
+        }
         cost_tsvva(n1, goal) {
-            if (n1.h) {
-                return n1.h; // cached estimate
-            }
             var ds = mathjs.subtract(goal.s, n1.s);
             var t = ds.map((s,i) => this.tsvva(s, n1.v[i], goal.v[i], this.aMax[i]));
             return mathjs.sum(t);
+        }
+        cost_tsvva_explore(n1,goal) { // explore aggressively with maximum speed
+            return n1.v.reduce((acc,v,i) => 
+                acc + 
+                +(this.vMax[i]-v)/this.vMax[i]
+                +this.tsvva(goal.s[i]-n1.s[i], n1.v[i], goal.v[i], this.aMax[i]),
+                0); 
         }
         estimateCost(n1, goal) {
             if (n1.h) {
@@ -391,7 +406,7 @@ var PathNode = require("./PathNode");
             maxAcceleration: [jmax,jmax],
         });
         pf.estimateFree.should.equal(pf.cost_tsvva); // default cost estimator
-        pf.estimateConstrained.toString().should.equal(pf.cost_constant(1).toString()); // default cost estimator
+        pf.estimateConstrained.should.equal(pf.cost_explore); // default cost estimator
 
         var goal1 = pf.svaToNode([1,1]);
         var node = pf.svaToNode([0,0]);
@@ -456,7 +471,7 @@ var PathNode = require("./PathNode");
         var msElapsed = new Date() - msStart;
         msElapsed.should.below(60); // ~0.04ms
     })
-    it("TESTTESTneighborsOf(node) returns fewer neighbors when cruising", function() {
+    it("neighborsOf(node) returns fewer neighbors when cruising", function() {
         // 1 dimension
         var pf = new PathFactory({
             dimensions: 1,
@@ -737,11 +752,11 @@ var PathNode = require("./PathNode");
         nTests>1 && (msElapsedTotal/nTests).should.below(100);
         nTests>1 && console.log("findPath 3D ms avg:", msElapsedTotal/nTests);
     })
-    it("findPath(start, goal) finds constrained path", function() {
+    it("TESTTESTfindPath(start, goal) finds constrained path", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var msElapsedTotal = 0;
-        var nTests = 2;
+        var nTests = 1;
         nTests === 1 && (verbose = 2);
         var zcruise = 15;
         for (var i = 0; i < nTests; i++) {
@@ -766,6 +781,7 @@ var PathNode = require("./PathNode");
                     return n;
                 },
             });
+            pf.estimateConstrained = pf.estimateFree; 
             var result = testFindPath(pf, start, goal, verbose);
             //result.path.forEach((n) => console.log(n.s));
             msElapsedTotal += result.stats.ms;
