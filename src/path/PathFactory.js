@@ -8,7 +8,8 @@ var PathNode = require("./PathNode");
         constructor(options={}) {
             super(options);
             this.dimensions = options.dimensions || 1;
-            this.estimateCost = options.estimateCost || this.cost_tsvva;
+            this.estimateFree = options.estimateFree || this.cost_tsvva;
+            this.estimateConstrained = options.estimateConstrained || this.cost_constant(1);
             this.cost = options.cost || this.cost_constant(0.2);
             this.vMax = options.maxVelocity || Array(this.dimensions).fill(10);
             this.aMax = options.maxAcceleration || Array(this.dimensions).fill(2);
@@ -283,6 +284,15 @@ var PathNode = require("./PathNode");
             var t = ds.map((s,i) => this.tsvva(s, n1.v[i], goal.v[i], this.aMax[i]));
             return mathjs.sum(t);
         }
+        estimateCost(n1, goal) {
+            if (n1.h) {
+                return n1.h; // cached estimate
+            }
+            if (n1.c) { // constrained node
+                return this.estimateConstrained(n1, goal);
+            }
+            return this.estimateFree(n1, goal);
+        }
         static get PathNode() {
             return PathNode;
         }
@@ -380,7 +390,8 @@ var PathNode = require("./PathNode");
             maxVelocity: [vmax,vmax],
             maxAcceleration: [jmax,jmax],
         });
-        pf.estimateCost.should.equal(pf.cost_tsvva); // default cost estimator
+        pf.estimateFree.should.equal(pf.cost_tsvva); // default cost estimator
+        pf.estimateConstrained.toString().should.equal(pf.cost_constant(1).toString()); // default cost estimator
 
         var goal1 = pf.svaToNode([1,1]);
         var node = pf.svaToNode([0,0]);
