@@ -21,9 +21,7 @@ var PathNode = require("./PathNode");
                 this.constrain = ((neighbor) => neighbor);
                 this.isConstrained = options.isConstrained || ((node) => false);
             }
-            this.onNoPath = options.onNoPath || ((start, goal) => {
-                throw new Error("No path found from:"+JSON.stringify(start)+" to:"+JSON.stringify(goal));
-            });
+            this.onNoPath = options.onNoPath || ((start, goal, onNoPath) => onNoPath(start, goal));
             this.jerkScale = 1; // fraction of path length
             this.jMax = this.aMax; // initial value
             this.round = 2; // force discrete graph space
@@ -152,7 +150,15 @@ var PathNode = require("./PathNode");
             var result = super.findPath(start, goal, options);
             result.stats.start = start.s;
             result.stats.goal = goal.s;
-            result.path.length || this.onNoPath(start, goal);
+            var onNoPath = (start,goal,onNoPath) => {
+                throw new Error("No path found\n" +
+                    "  start:"+JSON.stringify(start)+"\n" +
+                    "   goal:"+JSON.stringify(goal)+"\n" +
+                    "  nodes:"+this.nodeId+"\n"+
+                    "   iter:"+this.maxIterations
+                    );
+            };
+            result.path.length || this.onNoPath(start, goal, onNoPath);
 
             return result;
         }
@@ -723,7 +729,7 @@ var PathNode = require("./PathNode");
             msElapsedTotal += testFindPath(pf, start, goal, verbose).stats.ms;
         }
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
-        nTests>1 && console.log("findPath 1D ms avg:", msElapsedTotal/nTests);
+        nTests>1 && console.log("findPath 1D ms avg:", msElapsedTotal/nTests, "nodes:"+pf.nodeId);
     })
     it("TESTTESTfindPath(start, goal) finds 3D acceleration path", function() {
         this.timeout(60*1000);
@@ -754,7 +760,7 @@ var PathNode = require("./PathNode");
             msElapsedTotal += testFindPath(pf, start, goal, verbose).stats.ms;
         }
         nTests>1 && (msElapsedTotal/nTests).should.below(100);
-        nTests>1 && console.log("findPath 3D ms avg:", msElapsedTotal/nTests);
+        nTests>1 && console.log("findPath 3D ms avg:", msElapsedTotal/nTests, "nodes:"+pf.nodeId);
     })
     it("TESTTESTfindPath(start, goal) finds constrained path", function() {
         this.timeout(60*1000);
@@ -767,8 +773,8 @@ var PathNode = require("./PathNode");
             var bounds = 300;
             var start = new PathNode([200,-200,0]);
             //var goal = new PathNode([-200,200,5]);
-            //var start = new PathNode([200,-200,zcruise],[0,0,1],[0,0,0]);
-            var goal = new PathNode([-200,200,zcruise]);
+            var start = new PathNode([200,-200,zcruise],[0,0,0],[0,0,0]);
+            var goal = new PathNode([-200,200,zcruise],[0,0,-1]);
             var pf = new PathFactory({
                 dimensions: 3,
                 maxVelocity: [25,25,4],
@@ -793,6 +799,6 @@ var PathNode = require("./PathNode");
             msElapsedTotal += result.stats.ms;
         }
         //nTests>1 && (msElapsedTotal/nTests).should.below(100);
-        nTests>1 && console.log("findPath 3D constrained ms avg:", msElapsedTotal/nTests);
+        nTests>1 && console.log("findPath 3D constrained ms avg:", msElapsedTotal/nTests, "nodes:"+pf.nodeId);
     })
 })
