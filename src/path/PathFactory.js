@@ -82,31 +82,31 @@ var PathNode = require("./PathNode");
                 var vMin = -vMax;
                 if (dsgoal >= 0) {
                     var ds = dsgoal;
-                    vMax = ds < vMax ? ds : vMax; // prevent overshoot
+                    var dsvMax = ds < vMax ? ds : vMax; // prevent overshoot
 
                     (vzero <= 0 || vzero <= ds) &&
-                    (vMin <= vzero && vMin <= vzero && vzero <= vMax) &&
+                    (vMin <= vzero && vMin <= vzero && vzero <= dsvMax) &&
                     (yield ai); // maintain acceleration
 
                     (vplus <= 0 || vplus <= ds) &&
-                    (ai < aMax && vMin <= vplus && vplus <= vMax) &&
+                    (ai < aMax && vMin <= vplus && vplus <= dsvMax) &&
                     (yield (aMax < aplus ? aMax : aplus));
                     
-                    (vminus <= 0 || vminus <= ds) &&
+                    //(vminus <= 0 || vminus <= ds) && // allow overshoot for deceleration
                     (aMin < ai && vMin <= vminus && vminus <= vMax) &&
                     (yield (aMin > aminus ? aMin : aminus));
                 } else {
-                    vMin = vMin < dsgoal ? dsgoal : vMin; // prevent overshoot
+                    var dsvMin = vMin < dsgoal ? dsgoal : vMin; // prevent overshoot
 
                     (0 <= vzero || dsgoal <= vzero) &&
-                    (vMin <= vzero && vMin <= vzero && vzero <= vMax) &&
+                    (vMin <= vzero && dsvMin <= vzero && vzero <= vMax) &&
                     (yield ai); // maintain acceleration
 
                     (0 <= vminus || dsgoal <= vminus) &&
-                    (aMin < ai && vMin <= vminus && vminus <= vMax) &&
+                    (aMin < ai && dsvMin <= vminus && vminus <= vMax) &&
                     (yield (aMin > aminus ? aMin : aminus));
 
-                    (0<vplus || dsgoal <= vplus) &&
+                    //(0<vplus || dsgoal <= vplus) && // allow overshoot for deceleration
                     (ai < aMax && vMin <= vplus && vplus <= vMax) &&
                     (yield (aMax < aplus ? aMax : aplus));
                 }
@@ -254,6 +254,8 @@ var PathNode = require("./PathNode");
                     }
                 } else { // generate all possible neighbors (27 for 3D)
                     var permutations = PathFactory.permutations(anewbasis);
+                    permutations = Array.from(permutations);
+                    //console.log("permutations", permutations, "anewbasis", anewbasis, "node", JSON.stringify(node));
                     for (var anew of permutations) { 
                         (neighbor = createNeighbor(anew)) && (yield neighbor);
                     }
@@ -347,7 +349,9 @@ var PathNode = require("./PathNode");
             onCurrent: (current) => {
                 if (verbose>2) {
                     var path = pf.pathTo(current);
-                    console.log("path: "+path.map((node) => node.id));
+                    console.log("path: "+path.map((node) => node.id), JSON.stringify(mathjs.round(current.s,pf.round)));
+                } 
+                if (verbose>3) {
                     console.log("  current:",
                         JSON.stringify(current),
                         "h:"+mathjs.round(pf.estimateCost(current, goal), pf.round),
@@ -670,18 +674,18 @@ var PathNode = require("./PathNode");
         test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [0,1,-1]); 
         test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
         test_iAxisAcceleration([0,0],[0,0],[0,-1], 1, dsgoal, [-1,0]); // cull 2:-amax
-        test_iAxisAcceleration([0,0],[10,0],[0,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[10,0],[0,0], 0, dsgoal, [-1]); // overshoot
         test_iAxisAcceleration([0,0],[0,-10],[0,0], 1, dsgoal, [0,1]); // cull -1:vmax
-        test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, [0]); // overshoot
         test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
 
         var dsgoal = -1; // near goal
         test_iAxisAcceleration([0,0],[0,0],[0,1], 0, dsgoal, [0,-1,1]); 
         test_iAxisAcceleration([0,0],[0,0],[0,1], 1, dsgoal, [1,0]); // cull 2:amax
         test_iAxisAcceleration([0,0],[0,0],[0,-1], 1, dsgoal, [-1,0]); // cull 2:-amax
-        test_iAxisAcceleration([0,0],[-10,0],[0,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[-10,0],[0,0], 0, dsgoal, [1]); // overshoot
         test_iAxisAcceleration([0,0],[0,10],[0,0], 1, dsgoal, [0,-1]); // cull -1:vmax
-        test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, []); // overshoot
+        test_iAxisAcceleration([0,0],[-10,0],[-1,0], 0, dsgoal, [0]); // overshoot
         test_iAxisAcceleration([0,0],[10,0],[1,0], 0, dsgoal, [0]); // cull -2:vmax -1:vmax
     })
     it("axisAccelerations(node, i) returns possible neighbor accelerations", function() {
@@ -721,7 +725,7 @@ var PathNode = require("./PathNode");
         nTests>1 && (msElapsedTotal/nTests).should.below(20);
         nTests>1 && console.log("findPath 1D ms avg:", msElapsedTotal/nTests);
     })
-    it("findPath(start, goal) finds 3D acceleration path", function() {
+    it("TESTTESTfindPath(start, goal) finds 3D acceleration path", function() {
         this.timeout(60*1000);
         var verbose = 0;
         var msElapsedTotal = 0;
@@ -756,18 +760,20 @@ var PathNode = require("./PathNode");
         this.timeout(60*1000);
         var verbose = 0;
         var msElapsedTotal = 0;
-        var nTests = 1;
+        var nTests = 2;
         nTests === 1 && (verbose = 2);
         var zcruise = 15;
         for (var i = 0; i < nTests; i++) {
             var bounds = 300;
             var start = new PathNode([200,-200,0]);
-            var goal = new PathNode([-200,200,5]);
+            //var goal = new PathNode([-200,200,5]);
+            //var start = new PathNode([200,-200,zcruise],[0,0,1],[0,0,0]);
+            var goal = new PathNode([-200,200,zcruise]);
             var pf = new PathFactory({
                 dimensions: 3,
                 maxVelocity: [25,25,4],
                 maxAcceleration: [5,5,1],
-                maxIterations: 9000,
+                maxIterations: 5000,
                 isConstrained: (node) => node.s[2] < zcruise,
                 constrain: (n) => {
                     if (n.s[2] < 0) {
