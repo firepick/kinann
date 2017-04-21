@@ -13,6 +13,7 @@ var GraphNode = require("./GraphNode");
             Object.defineProperty(this, "h", {
                 value: null, // estimated cost
                 writable: true,
+                enumerable: true,
             });
         }
 
