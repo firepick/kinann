@@ -32,6 +32,13 @@ var Network = require("../src/Network");
         lead: 1,
     });
 
+    it("DriveFrame(drives) assigns default names to given drives", function() {
+        var drives = [belt300, belt200, screw];
+        var frame = new DriveFrame(drives);
+        drives[0].name.should.equal("X");
+        drives[1].name.should.equal("Y");
+        drives[2].name.should.equal("Z");
+    });
     it("DriveFrame(drives) creates a positionable drive collection", function() {
         var drives = [belt300, belt200, screw];
         var frame = new DriveFrame(drives);
