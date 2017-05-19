@@ -11,6 +11,12 @@ var Network = require("./Network");
         var that = this;
         that.type = "DriveFrame";
         that.drives = drives;
+        var driveNames = ["X","Y","Z","A","B","C"];
+        that.drives.forEach((drive,i) => {
+            if (drive.name == null) {
+                drive.name = i < driveNames.length ? driveNames[i] : ("Drive" + (i+1));
+            }
+        });
         that.backlash = options.backlash == null || options.backlash;
         that.deadbandScale = options.deadbandScale || 3; // provides continuous yet quick transition across deadband
         that.deadbandHome = options.deadbandHome || 0.5; // default is homing to minPos with backoff exceeding positive deadband

@@ -297,7 +297,7 @@ var mathjs = require("mathjs");
             y_dx: "_2_dx",
         });
     });
-    it("TESTTESTparameters() returns parameters (i.e., unbound symbols)", function() {
+    it("parameters() returns parameters (i.e., unbound symbols)", function() {
         var eq = new Equations();
         eq.define("s", "u * t + 0.5 * a * t^2");
         should.deepEqual(eq.parameters(), [ "u", "t", "a", ]);
