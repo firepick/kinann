@@ -99,11 +99,16 @@ var mathjs = require("mathjs");
                             return new ConstantNode(Number(a0.value) * Number(a1.value));
                         }
                     }
-                    if (a1.isConstantNode && a1.value === "0") {
-                        return this.node0;
-                    }
-                    if (a1.isConstantNode && a1.value === "1") {
-                        return a0;
+                    if (a1.isConstantNode) {
+                        if (a1.value === "0") {
+                            return this.node0;
+                        } else if (a1.value === "1") {
+                            return a0;
+                        } else if (a0.isOperatorNode && a0.op === node.op && a0.args[0].isConstantNode) {
+                            var a00_a1 =  new ConstantNode(Number(a0.args[0].value) * Number(a1.value));
+                            return new OperatorNode(node.op, node.fn, [a00_a1, a0.args[1]]); // constants on left
+                        }
+                        return new OperatorNode(node.op, node.fn, [a1, a0]); // constants on left
                     }
                     return new OperatorNode(node.op, node.fn, [a0, a1]);
                 } else if (node.op === "/") {
@@ -361,9 +366,15 @@ var mathjs = require("mathjs");
                 if (node.args.length === 1) {
                     result = this.bindNormalizedExpr(node.op + this.digestNode(node.args[0]));
                 } else if (node.args.length > 1) {
-                    var args = node.args.map((arg) => this.digestNode(arg));
-                    var expr = args.join(" " + node.op + " ");
-                    result = this.bindNormalizedExpr(expr);
+                    if (node.op === "*" && node.args.length === 2 && node.args[1].isConstantNode) {
+                        var args = node.args.map((arg) => this.digestNode(arg));
+                        var expr = args[1] + " " + node.op + " " + args[0];
+                        result = this.bindNormalizedExpr(expr); // constants on the left
+                    } else {
+                        var args = node.args.map((arg) => this.digestNode(arg));
+                        var expr = args.join(" " + node.op + " ");
+                        result = this.bindNormalizedExpr(expr);
+                    }
                 } else {
                     throw new Error("TBD OperatorNode with args:" + node.args.length);
                 }
