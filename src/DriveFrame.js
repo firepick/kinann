@@ -97,8 +97,15 @@ var Network = require("./Network");
                 .concat(this.drives.map((d) => this.deadbandHome))
             );
         }
-        home() {
-            this.axisPos = this.drives.map((d) => d.minPos);
+        home(options = {}) {
+            if (options.axis != null) {
+                var drive = this.drives[options.axis];
+                if (drive == null) { throw new Error("home() invalid axis:"+options.axis); }
+                var axisPos = this.axisPos;
+                this.axisPos = axisPos.map((p, i) => i===options.axis ? this.drives[i].minPos : p);
+            } else {
+                this.axisPos = this.drives.map((d) => d.minPos);
+            }
             return this;
         }
         moveTo(axisPos) {

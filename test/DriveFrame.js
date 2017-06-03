@@ -95,8 +95,14 @@ var Network = require("../src/Network");
         frame.home();
         should.deepEqual(frame.moveTo([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
     })
-    it("home() moves all drives to their minimum position (chainable)", function() {
+    it("home() moves one or all drives to minimum position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
+        should.deepEqual(frame.axisPos, [null,null,null]);
+        frame.home({axis:1}).should.equal(frame);
+        should.deepEqual(frame.axisPos, [null,-2,null]);
+        frame.home({axis:0}).should.equal(frame);
+        should.deepEqual(frame.axisPos, [-1,-2,null]);
+        should.throws(() => frame.home({axis:-1}));
         frame.home();
         frame.axisPos = [10,20,30];
         should.deepEqual(frame.home().state,[
