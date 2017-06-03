@@ -6,179 +6,167 @@ var Example = require("./Example");
 var Network = require("./Network");
 
 (function(exports) {
-    //// CLASS
-    function DriveFrame(drives, options={}) {
-        var that = this;
-        that.type = "DriveFrame";
-        that.drives = drives;
-        var driveNames = ["X","Y","Z","A","B","C"];
-        that.drives.forEach((drive,i) => {
-            if (drive.name == null) {
-                drive.name = i < driveNames.length ? driveNames[i] : ("Drive" + (i+1));
-            }
-        });
-        that.backlash = options.backlash == null || options.backlash;
-        that.deadbandScale = options.deadbandScale || 3; // provides continuous yet quick transition across deadband
-        that.deadbandHome = options.deadbandHome || 0.5; // default is homing to minPos with backoff exceeding positive deadband
-
-        Object.defineProperty(that, "deadband", {
-            enumerable: true,
-            get: () => that.state.slice(that.drives.length, 2*that.drives.length).map((p) => p),
-            set: (deadband) => {throw new Error("attempt to set read-only property: deadband")},
-        });
-        Object.defineProperty(that, "axisPos", {
-            enumerable: true,
-            get: () => that.state.slice(0, that.drives.length),
-            set: (axisPos) => {
-                if (!(axisPos instanceof Array) || axisPos.length !== that.drives.length) {
-                    throw new Error("Expected array of length:"+that.drives.length + " axisPos:"+JSON.stringify(axisPos));
+    class DriveFrame {
+        constructor (drives, options={}) {
+            this.type = "DriveFrame";
+            this.drives = drives;
+            var driveNames = ["X","Y","Z","A","B","C"];
+            this.drives.forEach((drive,i) => {
+                if (drive.name == null) {
+                    drive.name = i < driveNames.length ? driveNames[i] : ("Drive" + (i+1));
                 }
-                return axisPos.map((p,i) => {
-                    var di = that.drives[i];
-                    var pos = mathjs.min(mathjs.max(di.minPos,p), di.maxPos);
-                    var deadbandOld = that.$state[i+that.drives.length];
-                    if (that.state[i] === pos) {
-                        var deadbandNew = deadbandOld;
-                    } else if (pos === di.minPos) {
-                        var deadbandNew = that.deadbandHome; // homing to minPos
-                    } else {
-                        var posDelta = pos - that.state[i];
-                        var deadbandNew = mathjs.tanh(that.deadbandScale*posDelta);
-                        deadbandNew = mathjs.min(0.5,mathjs.max(deadbandOld+deadbandNew,-0.5));
+            });
+            this.backlash = options.backlash == null || options.backlash;
+            this.deadbandScale = options.deadbandScale || 3; // provides continuous yet quick transition across deadband
+            this.deadbandHome = options.deadbandHome || 0.5; // default is homing to minPos with backoff exceeding positive deadband
+
+            Object.defineProperty(this, "deadband", {
+                enumerable: true,
+                get: () => this.state.slice(this.drives.length, 2*this.drives.length).map((p) => p),
+                set: (deadband) => {throw new Error("attempt to set read-only property: deadband")},
+            });
+            Object.defineProperty(this, "axisPos", {
+                enumerable: true,
+                get: () => this.state.slice(0, this.drives.length),
+                set: (axisPos) => {
+                    if (!(axisPos instanceof Array) || axisPos.length !== this.drives.length) {
+                        throw new Error("Expected array of length:"+this.drives.length + " axisPos:"+JSON.stringify(axisPos));
                     }
-                    that.$state[i+that.drives.length] = deadbandNew;
-                    that.$state[i] = pos;
-                    return pos;
-                });
-            },
-        });
-        Object.defineProperty(that, "state", {
-            enumerable: true,
-            get: () => that.$state.map((s) => s),
-            set: (state) => ((that.$state = state.map((s) => s)), state),
-        });
-        Object.defineProperty(that, "calibratedState", {
-            enumerable: true,
-            get: () => that.calibratedStateOf(),
-            set: (state) => { throw new Error("calibratedState is read-only"); },
-        });
-        Object.defineProperty(that, "outputTransform", {
-            value: options.outputTransform || 
-                ((frame) => frame.state.slice(0, frame.drives.length)),
-        });
-        Object.defineProperty(that, "output", {
-            get: () => that.outputTransform(that),
-        });
-
-        // initialize
-        that.state = options.state || (
-            that.drives.map((d) => d.minPos)
-            .concat(that.drives.map((d) => that.deadbandHome))
-        );
-
-        return that;
-    }
-    DriveFrame.fromJSON = function(json) {
-        json = typeof json === "string" ? JSON.parse(json) : json;
-        var drives = json.drives.map((d) => StepperDrive.fromJSON(d));
-        var frame = new DriveFrame(drives, json);
-        json.annCalibrated && (frame.annCalibrated = Network.fromJSON(json.annCalibrated));
-        return frame;
-    }
-
-    //// INSTANCE
-    DriveFrame.prototype.toJSON = function() {
-        var that = this;
-        var obj = {
-            type: "DriveFrame",
-            state: that.state,
-            axisPos: that.axisPos,
-            backlash: that.backlash,
-            deadbandScale: that.deadbandScale,
-            drives: that.drives.map((d) => d.toJSON()),
-            annCalibrated: that.annCalibrated,
+                    return axisPos.map((p,i) => {
+                        var di = this.drives[i];
+                        var pos = mathjs.min(mathjs.max(di.minPos,p), di.maxPos);
+                        var deadbandOld = this.$state[i+this.drives.length];
+                        if (this.state[i] === pos) {
+                            var deadbandNew = deadbandOld;
+                        } else if (pos === di.minPos) {
+                            var deadbandNew = this.deadbandHome; // homing to minPos
+                        } else {
+                            var posDelta = pos - this.state[i];
+                            var deadbandNew = mathjs.tanh(this.deadbandScale*posDelta);
+                            deadbandNew = mathjs.min(0.5,mathjs.max(deadbandOld+deadbandNew,-0.5));
+                        }
+                        this.$state[i+this.drives.length] = deadbandNew;
+                        this.$state[i] = pos;
+                        return pos;
+                    });
+                },
+            });
+            Object.defineProperty(this, "state", {
+                enumerable: true,
+                get: () => this.$state.map((s) => s),
+                set: (state) => ((this.$state = state.map((s) => s)), state),
+            });
+            Object.defineProperty(this, "calibratedState", {
+                enumerable: true,
+                get: () => this.calibratedStateOf(),
+                set: (state) => { throw new Error("calibratedState is read-only"); },
+            });
+            Object.defineProperty(this, "outputTransform", {
+                value: options.outputTransform || 
+                    ((frame) => frame.state.slice(0, frame.drives.length)),
+            });
+            Object.defineProperty(this, "output", {
+                get: () => this.outputTransform(this),
+            });
+            options.state && (this.state = options.state) || this.clearPos();
         }
-        return obj;
-    }
-    DriveFrame.prototype.home = function() {
-        var that = this;
-        that.axisPos = that.drives.map((d) => d.minPos);
-        return that;
-    }
-    DriveFrame.prototype.moveTo = function(axisPos) {
-        var that = this;
-        that.axisPos = axisPos;
-        return that;
-    }
-    DriveFrame.prototype.calibrationExamples = function(nExamples=30, options={}) {
-        var that = this;
-        var vars = that.variables().slice(0, that.drives.length);
-        var measuredPos = options.measuredPos || ((pos) => pos);
-        var targetState = options.targetState || 
-            ((state) => Object.assign([],state,measuredPos(that.axisPos)));
-        var separation = options.separation || 1; // stay out of deadband
-        return Array(nExamples).fill().map((na,iEx) => {
-            if (iEx === 0) {
-                that.axisPos = that.drives.map((d) => d.minPos);
-            } else {
-                do {
-                    var axisPos = vars.map((v) => v.sample());
-                    var distance = mathjs.min(mathjs.abs(mathjs.subtract(axisPos,that.axisPos)));
-                } while(distance < separation);
-                that.axisPos = axisPos;
+
+        static fromJSON(json) {
+            json = typeof json === "string" ? JSON.parse(json) : json;
+            var drives = json.drives.map((d) => StepperDrive.fromJSON(d));
+            var frame = new DriveFrame(drives, json);
+            json.annCalibrated && (frame.annCalibrated = Network.fromJSON(json.annCalibrated));
+            return frame;
+        }
+
+        toJSON() {
+            var obj = {
+                type: "DriveFrame",
+                state: this.state,
+                axisPos: this.axisPos,
+                backlash: this.backlash,
+                deadbandScale: this.deadbandScale,
+                drives: this.drives.map((d) => d.toJSON()),
+                annCalibrated: this.annCalibrated,
             }
-            return new Example(that.state, targetState(that.state) 
+            return obj;
+        }
+        clearPos() {
+            this.state = (
+                this.drives.map((d) => null)
+                .concat(this.drives.map((d) => this.deadbandHome))
             );
-        });
-    }
-    DriveFrame.prototype.compile = function(options={}) {
-        var that = this;
-        var factory = new Factory(that.variables(options));
-        return that.annMeasured = factory.createNetwork({
-            preTrain: options.preTrain == null 
-                ? false // pre-training decreeases accuracy with backlash
-                : options.preTrain, 
-        });
-    }
-    DriveFrame.prototype.calibrate = function(examples, options={}) {
-        var that = this;
-        var factory = new Factory(that.variables(options));
-        that.annMeasured = that.annMeasured || that.compile(options);
-        var trainResult = that.annMeasured.train(examples, options);
-        options.onTrain && options.onTrain(trainResult);
-        return that.annCalibrated = factory.inverseNetwork(that.annMeasured, options);
-    }
-    DriveFrame.prototype.calibratedStateOf = function(state) {
-        var that = this;
-        if (!that.annCalibrated) {
-            throw new Error("DriveFrame is not calibrated");
         }
-        state = state || that.state;
-        return that.annCalibrated.activate(state);
-    }
-    DriveFrame.prototype.toAxisPos = function(motorPos) {
-        var that = this;
-        return motorPos.map((m,i) => that.drives[i].toAxisPos(m));
-    }
-    DriveFrame.prototype.toMotorPos = function(axisPos) {
-        var that = this;
-        return axisPos.map((a,i) => that.drives[i].toMotorPos(a));
-    }
-    DriveFrame.prototype.variables = function() {
-        var that = this;
-        var vars = that.drives.map( (d) => new Variable([d.minPos, d.maxPos]) )
-        if (that.backlash) {
-            var deadbandVars = that.drives.map( (d) => new Variable([-0.5,0.5]) )
-            vars = vars.concat(deadbandVars);
+        home() {
+            this.axisPos = this.drives.map((d) => d.minPos);
+            return this;
         }
-        return vars;
-    }
-    DriveFrame.prototype.createFactory = function(options={}) {
-        var that = this;
-        var nOut = that.drives.length;
-        var opts = Object.assign({nOut:nOut}, options);
-        var vars = that.variables();
-        return new Factory(vars, opts);
+        moveTo(axisPos) {
+            this.axisPos = axisPos;
+            return this;
+        }
+        calibrationExamples(nExamples=30, options={}) {
+            var vars = this.variables().slice(0, this.drives.length);
+            var measuredPos = options.measuredPos || ((pos) => pos);
+            var targetState = options.targetState || 
+                ((state) => Object.assign([],state,measuredPos(this.axisPos)));
+            var separation = options.separation || 1; // stay out of deadband
+            return Array(nExamples).fill().map((na,iEx) => {
+                if (iEx === 0) {
+                    this.axisPos = this.drives.map((d) => d.minPos);
+                } else {
+                    do {
+                        var axisPos = vars.map((v) => v.sample());
+                        var distance = mathjs.min(mathjs.abs(mathjs.subtract(axisPos,this.axisPos)));
+                    } while(distance < separation);
+                    this.axisPos = axisPos;
+                }
+                return new Example(this.state, targetState(this.state) 
+                );
+            });
+        }
+        compile(options={}) {
+            var factory = new Factory(this.variables(options));
+            return this.annMeasured = factory.createNetwork({
+                preTrain: options.preTrain == null 
+                    ? false // pre-training decreeases accuracy with backlash
+                    : options.preTrain, 
+            });
+        }
+        calibrate(examples, options={}) {
+            var factory = new Factory(this.variables(options));
+            this.annMeasured = this.annMeasured || this.compile(options);
+            var trainResult = this.annMeasured.train(examples, options);
+            options.onTrain && options.onTrain(trainResult);
+            return this.annCalibrated = factory.inverseNetwork(this.annMeasured, options);
+        }
+        calibratedStateOf(state) {
+            if (!this.annCalibrated) {
+                throw new Error("DriveFrame is not calibrated");
+            }
+            state = state || this.state;
+            return this.annCalibrated.activate(state);
+        }
+        toAxisPos(motorPos) {
+            return motorPos.map((m,i) => this.drives[i].toAxisPos(m));
+        }
+        toMotorPos(axisPos) {
+            return axisPos.map((a,i) => this.drives[i].toMotorPos(a));
+        }
+        variables() {
+            var vars = this.drives.map( (d) => new Variable([d.minPos, d.maxPos]) )
+            if (this.backlash) {
+                var deadbandVars = this.drives.map( (d) => new Variable([-0.5,0.5]) )
+                vars = vars.concat(deadbandVars);
+            }
+            return vars;
+        }
+        createFactory(options={}) {
+            var nOut = this.drives.length;
+            var opts = Object.assign({nOut:nOut}, options);
+            var vars = this.variables();
+            return new Factory(vars, opts);
+        }
     }
 
     module.exports = exports.DriveFrame = DriveFrame;

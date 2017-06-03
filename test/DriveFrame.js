@@ -43,6 +43,8 @@ var Network = require("../src/Network");
         var drives = [belt300, belt200, screw];
         var frame = new DriveFrame(drives);
         frame.drives.length.should.equal(drives.length);
+        should.deepEqual(frame.axisPos, [null,null,null]);
+        frame.home();
         should.deepEqual(frame.axisPos, [-1,-2,-3]);
     });
     it("toAxisPos(motorPos) transforms position vector", function() {
@@ -63,6 +65,8 @@ var Network = require("../src/Network");
     })
     it("axisPos is position property", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
+        should.deepEqual(frame.axisPos, [null,null,null]);
+        frame.home();
         should.deepEqual(frame.axisPos, [-1,-2,-3]);
         frame.axisPos = [1,2,3];
         should.deepEqual(frame.axisPos, [1,2,3]);
@@ -79,12 +83,21 @@ var Network = require("../src/Network");
 
         // setting any axis position to its minimum changes the corresponding axis direction to 1 (homing)
     })
+    it("clearPos() sets position to be undefined", function() {
+        var frame = new DriveFrame([belt300, belt200, screw]);
+        frame.axisPos = [1,2,3];
+        should.deepEqual(frame.axisPos, [1,2,3]);
+        frame.clearPos();
+        should.deepEqual(frame.axisPos, [null,null,null]);
+    });
     it("moveTo(axisPos) moves to position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
+        frame.home();
         should.deepEqual(frame.moveTo([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
     })
     it("home() moves all drives to their minimum position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
+        frame.home();
         frame.axisPos = [10,20,30];
         should.deepEqual(frame.home().state,[
             -1,-2,-3,0.5,0.5,0.5,
@@ -94,6 +107,7 @@ var Network = require("../src/Network");
         var frame = new DriveFrame([belt300, belt200, screw], {
             deadbandScale: 1
         });
+        frame.home();
         should.deepEqual(frame.axisPos, [-1,-2,-3]); // home
         should.deepEqual(frame.deadband, [0.5,0.5,0.5]); // home
 
@@ -121,6 +135,7 @@ var Network = require("../src/Network");
     })
     it("state is kinematic state, which includes deadband position", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
+        frame.home();
         should.deepEqual(frame.state, [-1,-2,-3,0.5,0.5,0.5]);
         frame.axisPos = [10,20,30];
         var state123 = mathjs.round(frame.state,5);
