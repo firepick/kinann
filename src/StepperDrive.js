@@ -1,6 +1,7 @@
 (function(exports) { class StepperDrive {
     constructor(options={}) {
         this.type = "StepperDrive";
+        this.isHomed = true;
         Object.assign(this, options);
         this.minPos = this.minPos == null ? 0 : this.minPos; // minimum position
         this.maxPos = this.maxPos == null ? 100 : this.maxPos; // maximum position
