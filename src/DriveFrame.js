@@ -33,7 +33,7 @@ const winston = require("winston");
                     if (!(axisPos instanceof Array) || axisPos.length !== this.drives.length) {
                         throw new Error("Expected array of length:"+this.drives.length + " axisPos:"+JSON.stringify(axisPos));
                     }
-                    return axisPos.map((p,i) => {
+                    var newpos = axisPos.map((p,i) => {
                         var di = this.drives[i];
                         var pos = mathjs.min(mathjs.max(di.minPos,p), di.maxPos);
                         var deadbandOld = this.$state[i+this.drives.length];
@@ -50,6 +50,7 @@ const winston = require("winston");
                         this.$state[i] = pos;
                         return pos;
                     });
+                    return newpos;
                 },
             });
             Object.defineProperty(this, "state", {
