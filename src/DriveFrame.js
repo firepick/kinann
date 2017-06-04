@@ -1,9 +1,10 @@
-var mathjs = require("mathjs");
-var StepperDrive = require("./StepperDrive");
-var Factory = require("./Factory");
-var Variable = require("./Variable");
-var Example = require("./Example");
-var Network = require("./Network");
+const mathjs = require("mathjs");
+const StepperDrive = require("./StepperDrive");
+const Factory = require("./Factory");
+const Variable = require("./Variable");
+const Example = require("./Example");
+const Network = require("./Network");
+const winston = require("winston");
 
 (function(exports) {
     class DriveFrame {
@@ -99,11 +100,13 @@ var Network = require("./Network");
         }
         home(options = {}) {
             if (options.axis != null) {
+                winston.debug("home axis", options.axis);
                 var drive = this.drives[options.axis];
                 if (drive == null) { throw new Error("home() invalid axis:"+options.axis); }
-                var axisPos = this.axisPos;
-                this.axisPos = axisPos.map((p, i) => i===options.axis ? this.drives[i].minPos : p);
+                var oldPos = this.axisPos;
+                this.axisPos = oldPos.map((p, i) => i===options.axis ? this.drives[i].minPos : p);
             } else {
+                winston.debug("home all");
                 this.axisPos = this.drives.map((d) => d.minPos);
             }
             return this;

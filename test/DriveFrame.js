@@ -1,16 +1,17 @@
-var mathjs = require("mathjs");
-var StepperDrive = require("../src/StepperDrive");
-var Factory = require("../src/Factory");
-var Variable = require("../src/Variable");
-var Example = require("../src/Example");
-var Network = require("../src/Network");
+const mathjs = require("mathjs");
+const StepperDrive = require("../src/StepperDrive");
+const Factory = require("../src/Factory");
+const Variable = require("../src/Variable");
+const Example = require("../src/Example");
+const Network = require("../src/Network");
 
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("DriveFrame", function() {
-    var should = require("should");
-    var DriveFrame = require("../src/DriveFrame");
-    var BeltDrive = StepperDrive.BeltDrive;
-    var ScrewDrive = StepperDrive.ScrewDrive;
+    const winston = require("winston");
+    const should = require("should");
+    const DriveFrame = require("../src/DriveFrame");
+    const BeltDrive = StepperDrive.BeltDrive;
+    const ScrewDrive = StepperDrive.ScrewDrive;
     var sequence = function* (start,last,inc=1, it) {
         for (var v = start; inc<0 && v>=last || inc>0 && v<=last; v+=inc) {
             yield v;
@@ -90,16 +91,18 @@ var Network = require("../src/Network");
         frame.clearPos();
         should.deepEqual(frame.axisPos, [null,null,null]);
     });
-    it("moveTo(axisPos) moves to position (chainable)", function() {
+    it("TESTmoveTo(axisPos) moves to position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
         frame.home();
         should.deepEqual(frame.moveTo([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
         should.deepEqual(frame.moveTo([null,0,3]).axisPos, [300,0,3]); // motion is restricted
     })
-    it("home() moves one or all drives to minimum position (chainable)", function() {
+    it("TESThome() moves one or all drives to minimum position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
         should.deepEqual(frame.axisPos, [null,null,null]);
+    winston.level = "debug";
         frame.home({axis:1}).should.equal(frame);
+    winston.level = "info";
         should.deepEqual(frame.axisPos, [null,-2,null]);
         frame.home({axis:0}).should.equal(frame);
         should.deepEqual(frame.axisPos, [-1,-2,null]);
