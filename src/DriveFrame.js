@@ -35,7 +35,7 @@ const winston = require("winston");
                     }
                     var newpos = axisPos.map((p,i) => {
                         var di = this.drives[i];
-                        var pos = mathjs.min(mathjs.max(di.minPos,p), di.maxPos);
+                        var pos = DriveFrame.clipPosition(p, di.minPos, di.maxPos);
                         var deadbandOld = this.$state[i+this.drives.length];
                         if (this.state[i] === pos) {
                             var deadbandNew = deadbandOld;
@@ -79,6 +79,10 @@ const winston = require("winston");
             var frame = new DriveFrame(drives, json);
             json.annCalibrated && (frame.annCalibrated = Network.fromJSON(json.annCalibrated));
             return frame;
+        }
+        static clipPosition(value, min, max) {
+            // Javascript min/max coerce null to zero. UGH!
+            return value == null ? null : Math.min(Math.max(min,value), max);
         }
 
         toJSON() {
