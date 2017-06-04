@@ -94,6 +94,7 @@ var Network = require("../src/Network");
         var frame = new DriveFrame([belt300, belt200, screw]);
         frame.home();
         should.deepEqual(frame.moveTo([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
+        should.deepEqual(frame.moveTo([null,0,3]).axisPos, [300,0,3]); // motion is restricted
     })
     it("home() moves one or all drives to minimum position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);

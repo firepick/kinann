@@ -109,7 +109,8 @@ var Network = require("./Network");
             return this;
         }
         moveTo(axisPos) {
-            this.axisPos = axisPos;
+            var oldPos = this.axisPos;
+            this.axisPos = axisPos.map((p,i) => p == null ? oldPos[i] : p);
             return this;
         }
         calibrationExamples(nExamples=30, options={}) {
