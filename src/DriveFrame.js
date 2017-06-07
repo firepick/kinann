@@ -141,21 +141,6 @@ const winston = require("winston");
                 );
             });
         }
-        compile(options={}) {
-            var factory = new Factory(this.variables(options));
-            return this.annMeasured = factory.createNetwork({
-                preTrain: options.preTrain == null 
-                    ? false // pre-training decreeases accuracy with backlash
-                    : options.preTrain, 
-            });
-        }
-        calibrate(examples, options={}) {
-            var factory = new Factory(this.variables(options));
-            this.annMeasured = this.annMeasured || this.compile(options);
-            var trainResult = this.annMeasured.train(examples, options);
-            options.onTrain && options.onTrain(trainResult);
-            return this.annCalibrated = factory.inverseNetwork(this.annMeasured, options);
-        }
         calibratedStateOf(state) {
             if (!this.annCalibrated) {
                 throw new Error("DriveFrame is not calibrated");
@@ -177,11 +162,20 @@ const winston = require("winston");
             }
             return vars;
         }
-        createFactory(options={}) {
-            var nOut = this.drives.length;
-            var opts = Object.assign({nOut:nOut}, options);
-            var vars = this.variables();
-            return new Factory(vars, opts);
+        compile(options={}) {
+            var factory = new Factory(this.variables(options));
+            return this.annMeasured = factory.createNetwork({
+                preTrain: options.preTrain == null 
+                    ? false // pre-training decreeases accuracy with backlash
+                    : options.preTrain, 
+            });
+        }
+        calibrate(examples, options={}) {
+            var factory = new Factory(this.variables(options));
+            this.annMeasured = this.annMeasured || this.compile(options);
+            var trainResult = this.annMeasured.train(examples, options);
+            options.onTrain && options.onTrain(trainResult);
+            return this.annCalibrated = factory.inverseNetwork(this.annMeasured, options);
         }
     }
 
