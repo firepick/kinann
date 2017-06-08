@@ -37,7 +37,7 @@
         static fromJSON(json) {
             json = typeof json === "string" ? JSON.parse(json) : json;
             if (json.type !== "Calibration") {
-                throw new Error("Calibration.fromJSON() invalid json:"+json);
+                return null;
             }
             var cal = new Calibration(json.model);
             function body(fjson) {
@@ -130,6 +130,6 @@
         should.deepEqual(cal1.model, cal2.model);
         should.deepEqual(cal1.toNominal(state), cal2.toNominal(state));
         should.deepEqual(cal1.toActual(state), cal2.toActual(state));
-        should.throws(() => Calibration.fromJSON({type:"bad"}));
+        should.strictEqual(Calibration.fromJSON({type:"bad"}), null);
     });
 })

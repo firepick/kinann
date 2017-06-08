@@ -22,7 +22,7 @@ var Example = require("./Example");
 
     toJSON(type) {
         var obj = {
-            type: this.type || "Network",
+            type: this.type || "UnknownNetwork",
             nIn: this.nIn,
             nOut: this.nOut,
         }

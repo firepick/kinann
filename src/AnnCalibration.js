@@ -1,43 +1,13 @@
 const mathjs = require("mathjs");
 const StepperDrive = require("./StepperDrive");
 const DriveFrame = require("./DriveFrame");
+const Calibration = require("./Calibration");
 const Factory = require("./Factory");
 
 (function(exports) {
-    class Calibration {
+    class AnnCalibration extends Calibration {
         constructor () {
-        }
-
-        static fromJSON(json) {
-            json = typeof json === "string" ? JSON.parse(json) : json;
-            if (json.type !== "Calibration") {
-                throw new Error("Calibration.fromJSON() invalid json:"+json);
-            }
-            var cal = new Calibration();
-            function body(fjson) {
-                var lbrace = fjson.indexOf("{");
-                var rbrace = fjson.lastIndexOf("}");
-                return fjson.substr(lbrace+1, rbrace-lbrace-1);
-            }
-            cal.toNominal = new Function('state', body(json.toNominal));
-            cal.toActual = new Function('state', body(json.toActual));
-            return cal;
-        }
-        toNominal(actualState) {
-            return actualState.map(v=>v);
-        }
-
-        toActual(nominalState) {
-            return nominalState.map(v=>v);
-        }
-
-        toJSON() {
-            var obj = {
-                type: "Calibration",
-                toNominal: this.toNominal.toString(),
-                toActual: this.toActual.toString(),
-            }
-            return obj;
+            super();
         }
 
         compile(driveFrame, options={}) {
@@ -48,23 +18,26 @@ const Factory = require("./Factory");
                     : options.preTrain, 
             });
         }
+
         calibrate(driveFrame, examples, options={}) {
             var factory = new Factory(driveFrame.variables(options));
             driveFrame.annMeasured = driveFrame.annMeasured || this.compile(driveFrame, options);
             var trainResult = driveFrame.annMeasured.train(examples, options);
             options.onTrain && options.onTrain(trainResult);
-            return driveFrame.calibration = factory.inverseNetwork(driveFrame.annMeasured, options);
+            var annCalibrated = factory.inverseNetwork(driveFrame.annMeasured, options);
+            return driveFrame.calibration = annCalibrated;
         }
-    }
 
-    module.exports = exports.Calibration = Calibration;
+    } // class AnnCalibration
+
+    module.exports = exports.AnnCalibration = AnnCalibration;
 })(typeof exports === "object" ? exports : (exports = {}));
 
 // mocha -R min --inline-diffs *.js
-(typeof describe === 'function') && describe("Calibrate", function() {
+(typeof describe === 'function') && describe("AnnCalibration", function() {
     const should = require("should");
-    //const Calibration = require("./Calibration");
-    const Calibration = exports.Calibration;
+    //const AnnCalibration = require("./AnnCalibration");
+    const AnnCalibration = exports.AnnCalibration;
     const DriveFrame = require("../src/DriveFrame");
     const BeltDrive = StepperDrive.BeltDrive;
     const ScrewDrive = StepperDrive.ScrewDrive;
@@ -88,42 +61,7 @@ const Factory = require("./Factory");
         minPos: -3,
         lead: 1,
     });
-    function assertApproximately(a,b,e) {
-        a.length.should.equal(b.length);
-        a.forEach((av,i) => should(av).approximately(b[i],e));
-    }
-    class TestCal extends Calibration { 
-        constructor() {
-            super();
-        }
-        toActual(state) {
-            return state.map(v => Math.exp(v/11));
-        }
-        toNominal(state) {
-            return state.map(v => 11*Math.log(v));
-        }
-    }
 
-    it("A calibration is a 1-to-1 mapping between actual and nominal state vectors", function() {
-        // the identity calibrations is a perfect 1-to-1 mapping
-        var cal = new Calibration(); 
-        var state = [1,0.5,0.3];
-        should.deepEqual(state, cal.toNominal(cal.toActual(state))); 
-
-        // actual calibrations are approximations with algorithm-dependent tolerance 
-        var testCal = new TestCal();
-        var tolerance = 1e-15;
-        assertApproximately(state, testCal.toNominal(testCal.toActual(state)), tolerance);
-    });
-    it("A calibration is serializable", function() {
-        var testCal = new TestCal();
-        var json = JSON.stringify(testCal);
-        var cal = Calibration.fromJSON(json);
-        var state = [1,0.5,0.3];
-        should.deepEqual(testCal.toNominal(state), cal.toNominal(state));
-        should.deepEqual(testCal.toActual(state), cal.toActual(state));
-        should.throws(() => Calibration.fromJSON({type:"bad"}));
-    });
     it("calibrate(driveFrame, examples) trains DriveFrame to handle backlash", function() {
         this.timeout(60 * 1000);
         var verbose = false;
@@ -142,14 +80,15 @@ const Factory = require("./Factory");
         });
 
         // calibrate DriveFrame (~2 seconds)
-        var cal = new Calibration();
+        var annCal = new AnnCalibration();
         var calibrationesult = []; // OPTIONAL: collect annMeasurement and calibration training results
-        var calibration = cal.calibrate(frame, trainEx, {
+        var calibration = annCal.calibrate(frame, trainEx, {
             onTrain: (result) => calibrationesult.push(result), // OPTIONAL: collect training results
             onEpoch: (result) => verbose && // OPTIONAL: examine training progression
                 (result.epochs % 3) == 0 && // show every third epoch
                 console.log("onEpoch:"+JSON.stringify(result)),
         });
+        should.strictEqual(frame.calibration, calibration);
         verbose && console.log("calibrate ms:", new Date() - msStart, calibrationesult); 
         
         function verifyCalibration(frame) {
@@ -165,7 +104,7 @@ const Factory = require("./Factory");
             ]);
 
             frame.home();
-            var calState = calibrationPath.map((axisPos) => frame.moveTo(axisPos).calibratedState);
+            var calState = calibrationPath.map((axisPos) => frame.moveTo(axisPos).calibration.activate(frame.state));
             should.deepEqual(mathjs.round(calState[0],2), [9,9,9,0.5,0.5,0.5]);
             should.deepEqual(mathjs.round(calState[10],2), [10,10,10,0.5,0.5,0.5]);
             should.deepEqual(mathjs.round(calState[11],2), [10.1,9.61,9.9,0.5,0.21,0.21]);
