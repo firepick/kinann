@@ -4,7 +4,7 @@
      * between a "nominal" space and an "actual" space.
      */
     class Calibration {
-        constructor (model={}) {
+        constructor(model = {}) {
             this.type = "Calibration";
             this.model = model;
             Object.defineProperty(this, "toNominal", { // not serializable
@@ -17,12 +17,12 @@
             });
         }
 
-        model_toNominal(model, state) { 
-            return state.map(v=>v);
+        model_toNominal(model, state) {
+            return state.map(v => v);
         }
 
-        model_toActual(model,state) { 
-            return state.map(v=>v);
+        model_toActual(model, state) {
+            return state.map(v => v);
         }
 
         toJSON() {
@@ -41,21 +41,22 @@
                 return null;
             }
             var cal = new Calibration(json.model);
+
             function body(fjson) {
                 var lbrace = fjson.indexOf("{");
                 var rbrace = fjson.lastIndexOf("}");
-                return fjson.substr(lbrace+1, rbrace-lbrace-1);
+                return fjson.substr(lbrace + 1, rbrace - lbrace - 1);
             }
             if (json.model_toNominal) {
                 cal.model_toNominal = new Function('model', 'state', body(json.model_toNominal));
             }
             if (json.model_toActual) {
-                cal.model_toActual = new Function('model','state', body(json.model_toActual));
+                cal.model_toActual = new Function('model', 'state', body(json.model_toActual));
             }
             return cal;
         }
 
-        static isApproximately(state1,state2,e=0.01) {
+        static isApproximately(state1, state2, e = 0.01) {
             if (!(state1 instanceof Array)) {
                 throw new Error("expected state Array");
             }
@@ -67,7 +68,7 @@
             }
             for (var i = 0; i < state1.length; i++) {
                 var diff = state2[i] - state1[i];
-                if ( diff < -e || e < diff) {
+                if (diff < -e || e < diff) {
                     return false;
                 }
             }

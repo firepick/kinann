@@ -2,7 +2,7 @@ var mathjs = require("mathjs");
 // TODO: n-ary OperatorNode
 // TODO: derivative of all mathjs functions
 
-(function(exports) { 
+(function(exports) {
     const ConstantNode = mathjs.expression.node.ConstantNode;
     const SymbolNode = mathjs.expression.node.SymbolNode;
     const FunctionNode = mathjs.expression.node.FunctionNode;
@@ -10,7 +10,7 @@ var mathjs = require("mathjs");
     const ParenthesisNode = mathjs.expression.node.ParenthesisNode;
 
     class Equations {
-        constructor (options={}) {
+        constructor(options = {}) {
             this.symbolExprMap = {};
             this.exprSymbolMap = {};
             this.symbolTreeMap = {};
@@ -33,7 +33,7 @@ var mathjs = require("mathjs");
 
         parameters() {
             var parms = {};
-            var  traverse = (node) => {
+            var traverse = (node) => {
                 if (node.isSymbolNode) {
                     if (this.symbolExprMap[node.name] == null && node.name[0] !== "_") {
                         parms[node.name] = true;
@@ -42,7 +42,7 @@ var mathjs = require("mathjs");
                     traverse(node.content);
                 } else if (node.isFunctionNode || node.isOperatorNode) {
                     node.args.forEach((arg) => traverse(arg));
-                } 
+                }
             }
             Object.keys(this.symbolTreeMap).forEach((symbol) => traverse(this.symbolTreeMap[symbol]));
             return Object.keys(parms);
@@ -72,7 +72,7 @@ var mathjs = require("mathjs");
                     if (a1.isConstantNode && a1.value === "0") {
                         return a0;
                     }
-                    return new OperatorNode(node.op, node.fn, [a0,a1]);
+                    return new OperatorNode(node.op, node.fn, [a0, a1]);
                 } else if (node.op === "-") {
                     if (a0.isConstantNode && a1) {
                         if (a1.isConstantNode) {
@@ -85,7 +85,7 @@ var mathjs = require("mathjs");
                         if (a1.isConstantNode && a1.value === "0") {
                             return a0;
                         }
-                        return new OperatorNode(node.op, node.fn, [a0,a1]);
+                        return new OperatorNode(node.op, node.fn, [a0, a1]);
                     } else if (node.fn === "unaryMinus") {
                         return new OperatorNode(node.op, node.fn, [a0]);
                     }
@@ -105,7 +105,7 @@ var mathjs = require("mathjs");
                         } else if (a1.value === "1") {
                             return a0;
                         } else if (a0.isOperatorNode && a0.op === node.op && a0.args[0].isConstantNode) {
-                            var a00_a1 =  new ConstantNode(Number(a0.args[0].value) * Number(a1.value));
+                            var a00_a1 = new ConstantNode(Number(a0.args[0].value) * Number(a1.value));
                             return new OperatorNode(node.op, node.fn, [a00_a1, a0.args[1]]); // constants on left
                         }
                         return new OperatorNode(node.op, node.fn, [a1, a0]); // constants on left
@@ -132,7 +132,7 @@ var mathjs = require("mathjs");
                         }
                     }
                     return new OperatorNode(node.op, node.fn, [a0, a1]);
-                } 
+                }
             } else if (node.isParenthesisNode) {
                 var c = this.fastSimplify(node.content);
                 if (c.isParenthesisNode || c.isSymbolNode || c.isConstantNode) {
@@ -151,7 +151,7 @@ var mathjs = require("mathjs");
             return node;
         }
 
-        derivative(expr, variable="x") {
+        derivative(expr, variable = "x") {
             if (typeof variable !== "string") {
                 throw new Error("derivative(expr, variable) requires a string variable");
             }
@@ -168,7 +168,7 @@ var mathjs = require("mathjs");
                 var node = this.symbolTreeMap[digestedSym];
                 if (node == null) {
                     if (exprTree.isSymbolNode) {
-                        return variable === expr ? "1" : "0"; 
+                        return variable === expr ? "1" : "0";
                     }
                     throw new Error("Unknown symbol:" + digestedSym);
                 }
@@ -176,11 +176,11 @@ var mathjs = require("mathjs");
                 dnode = this.fastSimplify(dnode);
                 dexpr = dnode.toString();
                 var dexprSymbol = this.bindNormalizedExpr(dexpr, dsymbol);
-                if (dexprSymbol !== dsymbol) { 
+                if (dexprSymbol !== dsymbol) {
                     // bind dsymbol  bindNode doesn't work here)
                     this.exprSymbolMap[dsymbol] = dexprSymbol;
                     this.symbols.push(dsymbol);
-                    this.symbolTreeMap[dsymbol] = this.symbolNodeOfString(dexprSymbol); 
+                    this.symbolTreeMap[dsymbol] = this.symbolNodeOfString(dexprSymbol);
                 }
             }
 
@@ -226,7 +226,7 @@ var mathjs = require("mathjs");
                     } else if (a1.isConstantNode) {
                         dnode = da0;
                     } else {
-                        dnode = new OperatorNode(node.op, node.fn, [da0,da1]);
+                        dnode = new OperatorNode(node.op, node.fn, [da0, da1]);
                     }
                 } else if (node.op === "-") {
                     if (a1 == null) {
@@ -234,7 +234,7 @@ var mathjs = require("mathjs");
                     } else if (a1.isConstantNode) {
                         dnode = da0;
                     } else {
-                        dnode = new OperatorNode(node.op, node.fn, [da0,da1]);
+                        dnode = new OperatorNode(node.op, node.fn, [da0, da1]);
                     }
                 } else if (node.op === "*") { // udv+vdu
                     var vdu = new OperatorNode(node.op, node.fn, [a1, da0]);
@@ -244,16 +244,16 @@ var mathjs = require("mathjs");
                 } else if (node.op === "/") { // d(u/v) = (vdu-udv)/v^2
                     var vdu = new OperatorNode("*", "multiply", [a1, da0]);
                     var udv = new OperatorNode("*", "multiply", [a0, da1]);
-                    var vduudv = new OperatorNode("-", "subtract", [ vdu, udv ]);
+                    var vduudv = new OperatorNode("-", "subtract", [vdu, udv]);
                     vduudv = this.fastSimplify(vduudv);
                     var vduudvn = this.digestNode(vduudv);
-                    var vv = new OperatorNode("^", "pos", [a1,this.node2]);
+                    var vv = new OperatorNode("^", "pos", [a1, this.node2]);
                     var vvname = this.bindNormalizedExpr(vv.toString());
                     dnode = new OperatorNode("/", "divide", [
-                        this.symbolNodeOfString(vduudvn), 
+                        this.symbolNodeOfString(vduudvn),
                         this.symbolNodeOfString(vvname),
                     ]);
-                } else if (node.op === "^") { 
+                } else if (node.op === "^") {
                     var exponent = a1;
                     var dexponent = da1;
                     if (exponent.isSymbolNode) {
@@ -264,9 +264,9 @@ var mathjs = require("mathjs");
                         dexponent = this.nodeDerivative(exponent, variable);
                     }
                     if (exponent.isConstantNode) {
-                        var power = new ConstantNode(Number(exponent.value)-1);
-                        var a0p = new OperatorNode("^", "pow", [a0,power]);
-                        var prod = new OperatorNode("*", "multiply", [exponent,a0p]);
+                        var power = new ConstantNode(Number(exponent.value) - 1);
+                        var a0p = new OperatorNode("^", "pow", [a0, power]);
+                        var prod = new OperatorNode("*", "multiply", [exponent, a0p]);
                         prod = this.fastSimplify(prod);
                         var prodn = this.bindNormalizedExpr(prod.toString());
                         var prodnn = this.symbolNodeOfString(prodn);
@@ -281,13 +281,13 @@ var mathjs = require("mathjs");
                         var dvlnu = new OperatorNode("*", "multiply", [dv, lnu]);
                         var uvdvlnu = new OperatorNode("*", "multiply", [uv, dvlnu]);
                         var uvdvlnun = this.digestNode(this.fastSimplify(uvdvlnu));
-                        var v1 = new OperatorNode("-", "subtract", [v,this.node1]);
-                        var uv1 = new OperatorNode("^", "pow", [u,v1]);
+                        var v1 = new OperatorNode("-", "subtract", [v, this.node1]);
+                        var uv1 = new OperatorNode("^", "pow", [u, v1]);
                         var vdu = new OperatorNode("*", "multiply", [v, du]);
                         var uv1vdu = new OperatorNode("*", "multiply", [uv1, vdu]);
                         var uv1vdun = this.digestNode(this.fastSimplify(uv1vdu));
                         dnode = new OperatorNode("+", "add", [
-                            this.symbolNodeOfString(uvdvlnun), 
+                            this.symbolNodeOfString(uvdvlnun),
                             this.symbolNodeOfString(uv1vdun),
                         ]);
                     }
@@ -321,7 +321,7 @@ var mathjs = require("mathjs");
                     dnode = new OperatorNode("*", "multiply", [fcoshn, da0]);
                 } else if (node.name === "cosh") {
                     var sinh = new FunctionNode("sinh", [a0]);
-                    var fsinh= this.bindNormalizedExpr(sinh.toString());
+                    var fsinh = this.bindNormalizedExpr(sinh.toString());
                     var fsinhn = this.symbolNodeOfString(fsinh);
                     dnode = new OperatorNode("*", "multiply", [fsinhn, da0]);
                 } else if (node.name === "tanh") {
@@ -331,17 +331,17 @@ var mathjs = require("mathjs");
                     var fsech2n = this.symbolNodeOfString(fsech2);
                     dnode = new OperatorNode("*", "multiply", [fsech2n, da0]);
                 } else if (node.name === "sqrt") {
-                    var k = new ConstantNode(1/2);
-                    var power = new ConstantNode(1/2-1);
-                    var a0p = new OperatorNode("^", "pow", [a0,power]);
-                    var prod = new OperatorNode("*", "multiply", [k,a0p]);
+                    var k = new ConstantNode(1 / 2);
+                    var power = new ConstantNode(1 / 2 - 1);
+                    var a0p = new OperatorNode("^", "pow", [a0, power]);
+                    var prod = new OperatorNode("*", "multiply", [k, a0p]);
                     var prodn = this.bindNormalizedExpr(prod.toString());
                     var prodnn = this.symbolNodeOfString(prodn);
                     dnode = new OperatorNode("*", "multiply", [prodnn, da0]);
                 } else if (node.name === "exp") { // d(exp(g)) = d(g) * exp(g)
                     dnode = new OperatorNode("*", "multiply", [da0, a0]);
                 } else {
-                    throw new Error("TBD derivative(" +node.name+ ")");
+                    throw new Error("TBD derivative(" + node.name + ")");
                 }
             }
             if (dnode == null) {
@@ -385,11 +385,11 @@ var mathjs = require("mathjs");
                 var content = this.digestNode(node.content);
                 result = this.bindNormalizedExpr(content.toString());
             } else {
-                throw new Error("TBD digestNode("+node.type+")");
+                throw new Error("TBD digestNode(" + node.type + ")");
             }
 
             if (typeof result !== "string") {
-                throw new Error("DEBUG intenal" + node.type );
+                throw new Error("DEBUG intenal" + node.type);
             }
             return result;
         }
@@ -416,7 +416,7 @@ var mathjs = require("mathjs");
                 var tree = this.symbolTreeMap[node.name];
                 return node.name[0] === "_" && this.undigestNode(tree) || node;
             } else if (node.isOperatorNode) {
-                return new OperatorNode(node.op, node.fn, 
+                return new OperatorNode(node.op, node.fn,
                     node.args.map((n) => this.undigestNode(n))
                 );
             } else if (node.isFunctionNode) {
@@ -426,7 +426,7 @@ var mathjs = require("mathjs");
             } else if (node.isParenthesisNode) {
                 return new ParenthesisNode(this.undigestNode(node.content));
             } else {
-                throw new Error("TBD undigest"+node.toString()+" "+node.type);
+                throw new Error("TBD undigest" + node.toString() + " " + node.type);
             }
         }
 
@@ -437,7 +437,7 @@ var mathjs = require("mathjs");
             if (typeof expr === "number") {
                 expr = "" + expr;
             } else if (typeof expr !== "string") {
-                throw new Error("Invalid call to define(\""+symbol+"\", expr) => expr must be string");
+                throw new Error("Invalid call to define(\"" + symbol + "\", expr) => expr must be string");
             }
             var tree = mathjs.parse(expr);
             if (tree.isConstantNode) {
@@ -452,12 +452,12 @@ var mathjs = require("mathjs");
         }
 
         set(symbol, expr) {
-            console.log("DEPRECATED: set => define("+symbol+","+expr+")");
+            console.log("DEPRECATED: set => define(" + symbol + "," + expr + ")");
             return this.define(symbol, expr);
         }
 
         get(symbol) {
-            console.log("DEPRECATED: get => lookup("+symbol+")");
+            console.log("DEPRECATED: get => lookup(" + symbol + ")");
             return this.lookup(symbol);
         }
 
@@ -469,7 +469,7 @@ var mathjs = require("mathjs");
             var tree = this.undigestNode(node);
             tree = this.simplify(tree);
             if (!tree) {
-                throw new Error("undigest(" +symbol+ ") failed:");
+                throw new Error("undigest(" + symbol + ") failed:");
             }
             return this.simplify(tree).toString();
         }
@@ -489,26 +489,28 @@ var mathjs = require("mathjs");
         compile() {
             var body = "";
             var isConstant = (name) => '0' <= name[0] && name[0] <= '9' || name[0] === '-';
-            this.symbols.forEach((symbol) => { if (!isConstant(symbol)) {
-                var tree = this.symbolTreeMap[symbol].cloneDeep(); 
-                tree = tree.transform((node, path, parent) => {
-                    if (node.isSymbolNode) {
-                        if (!isConstant(node.name)) {
-                            node.name = "$." + node.name;
+            this.symbols.forEach((symbol) => {
+                if (!isConstant(symbol)) {
+                    var tree = this.symbolTreeMap[symbol].cloneDeep();
+                    tree = tree.transform((node, path, parent) => {
+                        if (node.isSymbolNode) {
+                            if (!isConstant(node.name)) {
+                                node.name = "$." + node.name;
+                            }
+                        } else if (node.isFunctionNode) {
+                            node.fn.name = "math." + node.fn.name;
+                        } else if (node.isOperatorNode && node.op === "^") { // Javascript doesn't have "^"
+                            return new FunctionNode("math.pow", node.args);
                         }
-                    } else if (node.isFunctionNode) {
-                        node.fn.name = "math." + node.fn.name;
-                    } else if (node.isOperatorNode && node.op === "^") { // Javascript doesn't have "^"
-                        return new FunctionNode("math.pow", node.args);
-                    }
-                    return node;
-                });
-                body += "\n  $." + symbol + " = " + tree.toString() + ";";
-            }});
+                        return node;
+                    });
+                    body += "\n  $." + symbol + " = " + tree.toString() + ";";
+                }
+            });
             body += "\n  return $;\n";
             var parms = JSON.stringify(this.parameters());
-            var evaleq = "function EvalEquations($) {try{" + 
-                body + 
+            var evaleq = "function EvalEquations($) {try{" +
+                body +
                 "}catch(err){throw new Error('Verify parameter values for " + parms + ": '+err.message);}}";
             // use Function to create a function with "math" in its lexical environment
             return (new Function("math", "return " + evaleq))(mathjs);
@@ -518,4 +520,3 @@ var mathjs = require("mathjs");
 
     module.exports = exports.Equations = Equations;
 })(typeof exports === "object" ? exports : (exports = {}));
-

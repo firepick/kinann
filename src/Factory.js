@@ -8,7 +8,7 @@
     const Network = require("./Network");
 
     class Factory {
-        constructor(vars,options={}) {
+        constructor(vars, options = {}) {
             this.vars = vars;
             this.nIn = this.vars.length;
             this.nOut = options.nOut || this.nIn;
@@ -35,28 +35,28 @@
         }
 
         mapIdentity(iIn) {
-            return new Function("eIn", "return  eIn[" +iIn+ "]");
+            return new Function("eIn", "return  eIn[" + iIn + "]");
         }
 
-        mapPower(iIn,power) {
-            var body = "return \"(\" + eIn[" +iIn+ "]+\"^" +power+ ")\"";
+        mapPower(iIn, power) {
+            var body = "return \"(\" + eIn[" + iIn + "]+\"^" + power + ")\"";
             return new Function("eIn", body);
         }
 
-        mapSigmoid(iIn,scale) {
-            var body = "return \"tanh(\" + eIn[" +iIn+ "]+\"*" +scale+ ")\"";
+        mapSigmoid(iIn, scale) {
+            var body = "return \"tanh(\" + eIn[" + iIn + "]+\"*" + scale + ")\"";
             return new Function("eIn", body);
         }
 
-        mapFourier(iIn,n,freq,phase) {
-            var mult = n === 1 ? freq : ("(" + n +"*"+freq+")");
-            var body = "return \"(sin((\" + eIn[" +iIn+ "]+\"*" +mult+ "+" +phase+ ")))\"";
+        mapFourier(iIn, n, freq, phase) {
+            var mult = n === 1 ? freq : ("(" + n + "*" + freq + ")");
+            var body = "return \"(sin((\" + eIn[" + iIn + "]+\"*" + mult + "+" + phase + ")))\"";
             return new Function("eIn", body);
         }
 
-        createNetwork(options={}) {
+        createNetwork(options = {}) {
             var nvars = this.vars.length;
-            var fmap = options.fmap || this.vars.map((v,iv) => this.mapIdentity(iv));
+            var fmap = options.fmap || this.vars.map((v, iv) => this.mapIdentity(iv));
             var power = options.power || this.power;
             var fourier = options.fourier || this.fourier;
             var mapWeights = Object.assign({}, options.mapWeights);
@@ -65,8 +65,8 @@
                     fmap.push(this.mapPower(iv, iDeg)); // polynomial
                 }
                 for (var nFreq = 1; nFreq <= fourier; nFreq++) {
-                    var w0xf = "w0x" + iv + "f";            // frequency weight
-                    var w0xp = "w0x" + iv + "p" + nFreq;    // phase weight
+                    var w0xf = "w0x" + iv + "f"; // frequency weight
+                    var w0xp = "w0x" + iv + "p" + nFreq; // phase weight
                     mapWeights[w0xf] = 1;
                     mapWeights[w0xp] = 0;
                     fmap.push(this.mapFourier(iv, nFreq, w0xf, w0xp));
@@ -77,7 +77,7 @@
                 weights: mapWeights,
             };
             var layers = options.layers || [
-                new MapLayer(fmap,mapOpts),
+                new MapLayer(fmap, mapOpts),
                 new Layer(this.nOut, {
                     activation: Layer.ACT_IDENTITY,
                 }),
@@ -93,7 +93,7 @@
 
             var preTrain = options.preTrain == null ? true : options.preTrain;
             if (preTrain) {
-                var trainOpts = Object.assign({},options);
+                var trainOpts = Object.assign({}, options);
                 var tolerance = trainOpts.tolerance || this.tolerance;
                 trainOpts.targetCost = tolerance * tolerance / 4;
                 var result = network.train(examples, trainOpts);
@@ -103,8 +103,8 @@
             return network;
         } // createNetwork
 
-        inverseNetwork(network, options={}) {
-            var opts = Object.assign({}, options); 
+        inverseNetwork(network, options = {}) {
+            var opts = Object.assign({}, options);
             var inStats = network.inStats;
             if (inStats == null) {
                 throw new Error("only normalized networks are invertible");
@@ -114,7 +114,7 @@
             var maxInput = inStats.map((stats) => stats.max);
             var maxOutput = network.activate(maxInput);
 
-            var vars = inStats.map((stats,i) => new Variable([minOutput[i], maxOutput[i]]) );
+            var vars = inStats.map((stats, i) => new Variable([minOutput[i], maxOutput[i]]));
 
             var invFactory = new Factory(vars, {
                 power: this.power,
@@ -129,16 +129,16 @@
             invNetwork.initialize();
             invNetwork.compile();
             invNetwork.normalizeInput(invExamples);
-            
+
             // add enough training examples to ensure accuracy 
-            var nExamples = opts.nExamples || 150; 
+            var nExamples = opts.nExamples || 150;
             for (var iEx = 0; iEx < nExamples; iEx++) {
-                var target = inStats.map((stats) => 
-                    mathjs.random( 
+                var target = inStats.map((stats) =>
+                    mathjs.random(
                         mathjs.min(stats.min, stats.max),
                         mathjs.max(stats.min, stats.max)
-                ));
-                invExamples.push(new Example(network.activate(target),target));
+                    ));
+                invExamples.push(new Example(network.activate(target), target));
             }
             options.onExamples && options.onExamples(invExamples);
 
@@ -147,12 +147,12 @@
             return invNetwork;
         } // inverseNetwork
 
-        createExamples(options={}) {
+        createExamples(options = {}) {
             var power = options.power || this.power;
             var transform = options.transform || ((data) => data);
             var examples = [];
             var addExample = (data) => {
-                examples.push( new Example(data, transform(data).slice(0, this.nOut)) );
+                examples.push(new Example(data, transform(data).slice(0, this.nOut)));
             };
             addExample(this.vars.map((v) => v.min)); // normalization bound
             addExample(this.vars.map((v) => v.max)); // normalization bound
@@ -167,7 +167,7 @@
                         addExample(this.vars.map((v) => v === thatv ? v.median : v.max));
                     }
                 };
-                this.vars.map((v,i) => addv(v));
+                this.vars.map((v, i) => addv(v));
             }
 
             if (options.nRandom) {
@@ -182,4 +182,3 @@
 
     module.exports = exports.Factory = Factory;
 })(typeof exports === "object" ? exports : (exports = {}));
-

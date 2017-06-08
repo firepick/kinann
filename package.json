@@ -13,24 +13,14 @@
     "winston": "^2.3.1"
   },
   "devDependencies": {
-    "grunt": "^1.0.1",
-    "grunt-cli": "^1.2.0",
-    "grunt-contrib-jshint": "1.1.0",
-    "grunt-contrib-uglify": "2.1.0",
-    "grunt-contrib-watch": "1.0.0",
-    "grunt-jsbeautifier": "^0.2.13",
-    "grunt-mocha-test": "~0.13.2",
-    "grunt-npm-install": "^0.3.1",
-    "grunt-release": "^0.14.0",
-    "grunt-simple-mocha": "0.4.1",
     "mocha": "^3.2.0",
     "should": "^11.2.0"
   },
   "scripts": {
     "test": "npm run test:verbose",
-    "test:min": "mocha -w -R min --inline-diffs",
+    "test:watch": "mocha -w -R min --inline-diffs",
     "test:test": "mocha -w -R min --inline-diffs -g TEST",
-    "test:verbose": "mocha -w --inline-diffs"
+    "test:verbose": "mocha --inline-diffs"
   },
   "repository": {
     "type": "git",

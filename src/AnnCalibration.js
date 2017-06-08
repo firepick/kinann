@@ -7,7 +7,7 @@
     const Example = require("./Example");
 
     class AnnCalibration extends Calibration {
-        constructor () {
+        constructor() {
             super();
             this.type = "AnnCalibration";
         }
@@ -20,33 +20,33 @@
             return model.annCalibrated.activate(state);
         }
 
-        calibrationExamples(driveFrame, nExamples=30, options={}) {
+        calibrationExamples(driveFrame, nExamples = 30, options = {}) {
             var vars = driveFrame.basisVariables().slice(0, driveFrame.drives.length);
             var measuredPos = options.measuredPos || ((pos) => pos);
-            var targetState = options.targetState || 
-                ((state) => Object.assign([],state,measuredPos(driveFrame.axisPos)));
+            var targetState = options.targetState ||
+                ((state) => Object.assign([], state, measuredPos(driveFrame.axisPos)));
             var separation = options.separation || 1; // stay out of deadband
-            return Array(nExamples).fill().map((na,iEx) => {
+            return Array(nExamples).fill().map((na, iEx) => {
                 if (iEx === 0) {
                     driveFrame.axisPos = driveFrame.drives.map((d) => d.minPos);
                 } else {
                     do {
                         var axisPos = vars.map((v) => v.sample());
-                        var distance = mathjs.min(mathjs.abs(mathjs.subtract(axisPos,driveFrame.axisPos)));
-                    } while(distance < separation);
+                        var distance = mathjs.min(mathjs.abs(mathjs.subtract(axisPos, driveFrame.axisPos)));
+                    } while (distance < separation);
                     driveFrame.axisPos = axisPos;
                 }
-                return new Example(driveFrame.state, targetState(driveFrame.state) 
-                );
+                return new Example(driveFrame.state, targetState(driveFrame.state));
             });
         }
 
-        calibrate(driveFrame, examples, options={}) {
+        calibrate(driveFrame, examples, options = {}) {
             var factory = new Factory(driveFrame.basisVariables(options));
             this.model.annMeasured = factory.createNetwork({
-                preTrain: options.preTrain == null 
-                    ? false // pre-training decreases accuracy with backlash
-                    : options.preTrain, 
+                preTrain: options.preTrain == null ?
+                    false // pre-training decreases accuracy with backlash
+                    :
+                    options.preTrain,
             });
             var trainResult = this.model.annMeasured.train(examples, options);
             options.onTrain && options.onTrain(trainResult);
@@ -69,4 +69,3 @@
 
     module.exports = exports.AnnCalibration = AnnCalibration;
 })(typeof exports === "object" ? exports : (exports = {}));
-
