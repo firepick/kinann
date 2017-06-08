@@ -27,7 +27,7 @@
     "should": "^11.2.0"
   },
   "scripts": {
-    "test": "npm run test:min",
+    "test": "npm run test:verbose",
     "test:min": "mocha -w -R min --inline-diffs",
     "test:test": "mocha -w -R min --inline-diffs -g TEST",
     "test:verbose": "mocha -w --inline-diffs"

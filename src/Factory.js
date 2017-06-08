@@ -1,12 +1,11 @@
-const mathjs = require("mathjs");
-const Example = require("./Example");
-const MapLayer = require("./MapLayer");
-const Layer = require("./Layer");
-const Sequential = require("./Sequential");
-const Variable = require("./Variable");
-const Network = require("./Network");
-
 (function(exports) {
+    const mathjs = require("mathjs");
+    const Example = require("./Example");
+    const MapLayer = require("./MapLayer");
+    const Layer = require("./Layer");
+    const Sequential = require("./Sequential");
+    const Variable = require("./Variable");
+    const Network = require("./Network");
 
     class Factory {
         constructor(vars,options={}) {
@@ -23,8 +22,15 @@ const Network = require("./Network");
         }
 
         static fromJSON(json) {
+            const DriveFrame = require("./DriveFrame");
+            const AnnCalibration = require("./AnnCalibration");
+            const Calibration = require("./Calibration");
+
             var json = typeof json === 'string' ? JSON.parse(json) : json;
             var obj = Network.fromJSON(json);
+            obj = obj || DriveFrame.fromJSON(json);
+            obj = obj || AnnCalibration.fromJSON(json);
+            obj = obj || Calibration.fromJSON(json);
             return obj;
         }
 

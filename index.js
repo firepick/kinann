@@ -16,6 +16,8 @@
     Kinann.DriveFrame = require("./src/DriveFrame");
     Kinann.StepperDrive = require("./src/StepperDrive");
     Kinann.Equations = require("./src/Equations");
+    Kinann.Calibration = require("./src/Calibration");
+    Kinann.AnnCalibration = require("./src/AnnCalibration");
     Kinann.models = {
         RotaryDelta: require("./src/models/RotaryDelta"),
     };

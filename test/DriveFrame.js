@@ -182,12 +182,12 @@ const Network = require("../src/Network");
         frame2.axisPos = [1000,1000,1000];
         should.deepEqual(frame2.state, [300,200,100,0.5,0.5,0.5]);
     })
-    it("variables() returns neural network input variables", function() {
+    it("basisVariables() returns neural network input basisVariables", function() {
         var drives = [belt300, belt200, screw];
 
-        // with backlash disabled, variables are motion axes
+        // with backlash disabled, basisVariables are motion axes
         var frame = new DriveFrame(drives, {backlash: false});
-        should.deepEqual(frame.variables(), [
+        should.deepEqual(frame.basisVariables(), [
             new Variable([-1,300]), // belt300 motion axis x
             new Variable([-2,200]), // belt200 motion axis y
             new Variable([-3,100]), // screw motion axis z
@@ -195,7 +195,7 @@ const Network = require("../src/Network");
 
         // default variables track backlash with deadband variables
         var frame = new DriveFrame(drives);
-        should.deepEqual(frame.variables(), [
+        should.deepEqual(frame.basisVariables(), [
             new Variable([-1,300]), // belt300 motion axis x
             new Variable([-2,200]), // belt200 motion axis y
             new Variable([-3,100]), // screw motion axis z
@@ -228,32 +228,5 @@ const Network = require("../src/Network");
         c3Backlash.axisPos = [5,11,12];
         should.deepEqual(c3Backlash.output, [5,11,12]); // backlash position
         should.deepEqual(c3Backlash.axisPos, [5,11,12]); // control position 
-    })
-    it("calibrationExamples(nExamples) builds calibration random walk examples", function() {
-        var frame = new DriveFrame([belt300, belt200, screw]);
-
-        // more examples yield higher accuracy
-        var examples = frame.calibrationExamples();
-        examples.length.should.equal(30); 
-        var examples = frame.calibrationExamples(10);
-        examples.length.should.equal(10); 
-
-        // examples always start with home
-        should.deepEqual(examples[0].input, [-1,-2,-3,0.5,0.5,0.5]); // home
-        should.deepEqual(examples[0].target, [-1,-2,-3,0.5,0.5,0.5]);
-        var last = examples.length - 1;
-        should.deepEqual(examples[last].input, frame.state); 
-        frame.axisPos.map((p,i) => p.should.above(frame.drives[i].minPos)); // not home
-
-        // build custom examples with measuredPos option
-        var examples = frame.calibrationExamples(5, {
-            measuredPos: (axisPos) => mathjs.add(axisPos,[1,2,3]), // measurement callback
-        });
-        should.deepEqual(examples[0].input, [-1,-2,-3,0.5,0.5,0.5]); // home
-        examples.forEach((ex) => {
-            ex.target[0].should.equal(ex.input[0]+1);
-            ex.target[1].should.equal(ex.input[1]+2);
-            ex.target[2].should.equal(ex.input[2]+3);
-        });
     })
 })

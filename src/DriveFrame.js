@@ -1,8 +1,6 @@
 const mathjs = require("mathjs");
 const StepperDrive = require("./StepperDrive");
-const Factory = require("./Factory");
 const Variable = require("./Variable");
-const Example = require("./Example");
 const Network = require("./Network");
 const winston = require("winston");
 
@@ -70,9 +68,14 @@ const winston = require("winston");
 
         static fromJSON(json) {
             json = typeof json === "string" ? JSON.parse(json) : json;
-            var drives = json.drives.map((d) => StepperDrive.fromJSON(d));
-            var frame = new DriveFrame(drives, json);
-            json.calibration && (frame.calibration = Network.fromJSON(json.calibration));
+            var frame = null;
+            if (json.type === "DriveFrame") {
+                const Factory = require("./Factory");
+                json = typeof json === "string" ? JSON.parse(json) : json;
+                var drives = json.drives.map((d) => StepperDrive.fromJSON(d));
+                frame = new DriveFrame(drives, json);
+                json.calibration && (frame.calibration = Factory.fromJSON(json.calibration));
+            }
             return frame;
         }
 
@@ -121,27 +124,6 @@ const winston = require("winston");
             return this;
         }
 
-        calibrationExamples(nExamples=30, options={}) {
-            var vars = this.variables().slice(0, this.drives.length);
-            var measuredPos = options.measuredPos || ((pos) => pos);
-            var targetState = options.targetState || 
-                ((state) => Object.assign([],state,measuredPos(this.axisPos)));
-            var separation = options.separation || 1; // stay out of deadband
-            return Array(nExamples).fill().map((na,iEx) => {
-                if (iEx === 0) {
-                    this.axisPos = this.drives.map((d) => d.minPos);
-                } else {
-                    do {
-                        var axisPos = vars.map((v) => v.sample());
-                        var distance = mathjs.min(mathjs.abs(mathjs.subtract(axisPos,this.axisPos)));
-                    } while(distance < separation);
-                    this.axisPos = axisPos;
-                }
-                return new Example(this.state, targetState(this.state) 
-                );
-            });
-        }
-
         toAxisPos(motorPos) {
             return motorPos.map((m,i) => this.drives[i].toAxisPos(m));
         }
@@ -150,7 +132,7 @@ const winston = require("winston");
             return axisPos.map((a,i) => this.drives[i].toMotorPos(a));
         }
 
-        variables() {
+        basisVariables() {
             var vars = this.drives.map( (d) => new Variable([d.minPos, d.maxPos]) )
             if (this.backlash) {
                 var deadbandVars = this.drives.map( (d) => new Variable([-0.5,0.5]) )
