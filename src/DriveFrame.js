@@ -58,11 +58,6 @@ const winston = require("winston");
                 get: () => this.$state.map((s) => s),
                 set: (state) => ((this.$state = state.map((s) => s)), state),
             });
-            Object.defineProperty(this, "calibratedState", {
-                enumerable: true,
-                get: () => this.calibratedStateOf(),
-                set: (state) => { throw new Error("calibratedState is read-only"); },
-            });
             Object.defineProperty(this, "outputTransform", {
                 value: options.outputTransform || 
                     ((frame) => frame.state.slice(0, frame.drives.length)),
@@ -77,9 +72,10 @@ const winston = require("winston");
             json = typeof json === "string" ? JSON.parse(json) : json;
             var drives = json.drives.map((d) => StepperDrive.fromJSON(d));
             var frame = new DriveFrame(drives, json);
-            json.annCalibrated && (frame.annCalibrated = Network.fromJSON(json.annCalibrated));
+            json.calibration && (frame.calibration = Network.fromJSON(json.calibration));
             return frame;
         }
+
         static clipPosition(value, min, max) {
             // Javascript min/max coerce null to zero. UGH!
             return value == null ? null : Math.min(Math.max(min,value), max);
@@ -93,16 +89,18 @@ const winston = require("winston");
                 backlash: this.backlash,
                 deadbandScale: this.deadbandScale,
                 drives: this.drives.map((d) => d.toJSON()),
-                annCalibrated: this.annCalibrated,
+                calibration: this.calibration,
             }
             return obj;
         }
+
         clearPos() {
             this.state = (
                 this.drives.map((d) => null)
                 .concat(this.drives.map((d) => this.deadbandHome))
             );
         }
+
         home(options = {}) {
             if (options.axis != null) {
                 winston.debug("home axis", options.axis);
@@ -116,11 +114,13 @@ const winston = require("winston");
             }
             return this;
         }
+
         moveTo(axisPos) {
             var oldPos = this.axisPos;
             this.axisPos = axisPos.map((p,i) => p == null ? oldPos[i] : p);
             return this;
         }
+
         calibrationExamples(nExamples=30, options={}) {
             var vars = this.variables().slice(0, this.drives.length);
             var measuredPos = options.measuredPos || ((pos) => pos);
@@ -141,19 +141,15 @@ const winston = require("winston");
                 );
             });
         }
-        calibratedStateOf(state) {
-            if (!this.annCalibrated) {
-                throw new Error("DriveFrame is not calibrated");
-            }
-            state = state || this.state;
-            return this.annCalibrated.activate(state);
-        }
+
         toAxisPos(motorPos) {
             return motorPos.map((m,i) => this.drives[i].toAxisPos(m));
         }
+
         toMotorPos(axisPos) {
             return axisPos.map((a,i) => this.drives[i].toMotorPos(a));
         }
+
         variables() {
             var vars = this.drives.map( (d) => new Variable([d.minPos, d.maxPos]) )
             if (this.backlash) {
@@ -162,22 +158,8 @@ const winston = require("winston");
             }
             return vars;
         }
-        compile(options={}) {
-            var factory = new Factory(this.variables(options));
-            return this.annMeasured = factory.createNetwork({
-                preTrain: options.preTrain == null 
-                    ? false // pre-training decreeases accuracy with backlash
-                    : options.preTrain, 
-            });
-        }
-        calibrate(examples, options={}) {
-            var factory = new Factory(this.variables(options));
-            this.annMeasured = this.annMeasured || this.compile(options);
-            var trainResult = this.annMeasured.train(examples, options);
-            options.onTrain && options.onTrain(trainResult);
-            return this.annCalibrated = factory.inverseNetwork(this.annMeasured, options);
-        }
-    }
+
+    } // class DriveFrame
 
     module.exports = exports.DriveFrame = DriveFrame;
 })(typeof exports === "object" ? exports : (exports = {}));

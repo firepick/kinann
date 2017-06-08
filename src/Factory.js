@@ -1,9 +1,9 @@
-var mathjs = require("mathjs");
-var Example = require("./Example");
-var MapLayer = require("./MapLayer");
-var Layer = require("./Layer");
-var Sequential = require("./Sequential");
-var Variable = require("./Variable");
+const mathjs = require("mathjs");
+const Example = require("./Example");
+const MapLayer = require("./MapLayer");
+const Layer = require("./Layer");
+const Sequential = require("./Sequential");
+const Variable = require("./Variable");
 
 (function(exports) {
 
@@ -21,6 +21,12 @@ var Variable = require("./Variable");
         that.tolerance = options.tolerance || 0.001;
         return that;
     }
+
+    //static fromJSON(json) {
+        //var json = typeof json === 'string' ? JSON.parse(json) : json;
+        //var obj = Network.fromJSON(json);
+        //return obj;
+    //}
 
     Factory.prototype.mapIdentity = function(iIn) {
         var that = this;
