@@ -157,7 +157,7 @@ const winston = require("winston");
             } else if (position.motor) {
                 var newPos = this.toAxisPos(position.motor);
             } else {
-                throw new Error("moveToSync() unkknown position:" + JSON.stringify(position));
+                throw new Error("moveToSync() unknown position:" + JSON.stringify(position));
             }
             this.axisPos = newPos.map((p, i) => p == null ? oldPos[i] : p);
             return this;
