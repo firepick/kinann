@@ -45,7 +45,7 @@ const Network = require("../src/Network");
         var frame = new DriveFrame(drives);
         frame.drives.length.should.equal(drives.length);
         should.deepEqual(frame.axisPos, [null,null,null]);
-        frame.home();
+        frame.homeSync();
         should.deepEqual(frame.axisPos, [-1,-2,-3]);
     });
     it("toAxisPos(motorPos) transforms position vector", function() {
@@ -67,7 +67,7 @@ const Network = require("../src/Network");
     it("axisPos is position property", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
         should.deepEqual(frame.axisPos, [null,null,null]);
-        frame.home();
+        frame.homeSync();
         should.deepEqual(frame.axisPos, [-1,-2,-3]);
         frame.axisPos = [1,2,3];
         should.deepEqual(frame.axisPos, [1,2,3]);
@@ -93,38 +93,50 @@ const Network = require("../src/Network");
     });
     it("moveTo(axisPos) moves to position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
-        frame.home();
+        frame.homeSync();
         should.deepEqual(frame.moveTo([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
         should.deepEqual(frame.moveTo([null,0,3]).axisPos, [300,0,3]); // motion is restricted
     })
-    it("TESThome() moves one or all drives to minimum position (chainable)", function() {
+    it("clipPosition() moves one or all drives to minimum position (chainable)", function() {
         DriveFrame.clipPosition(0, -10, 10).should.equal(0);
         DriveFrame.clipPosition(-100, -10, 10).should.equal(-10);
         DriveFrame.clipPosition(100, -10, 10).should.equal(10);
         should.deepEqual(DriveFrame.clipPosition(null, -10, 10), null);
         should.deepEqual(DriveFrame.clipPosition(null, 0, 10), null);
     })
-    it("TESThome() moves one or all drives to minimum position (chainable)", function() {
+    it("homeSync() moves one or all drives to minimum position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
         should.deepEqual(frame.axisPos, [null,null,null]);
-        frame.home({axis:0}).should.equal(frame);
+        frame.homeSync({axis:0}).should.equal(frame);
         should.deepEqual(frame.axisPos, [-1,null,null]);
-        frame.home({axis:1}).should.equal(frame);
+        frame.homeSync({axis:1}).should.equal(frame);
         should.deepEqual(frame.axisPos, [-1,-2,null]);
-        should.throws(() => frame.home({axis:-1}));
-        frame.home();
+        should.throws(() => frame.homeSync({axis:-1}));
+        frame.homeSync();
         frame.axisPos = [10,20,30];
-        should.deepEqual(frame.home().state,[
+        should.deepEqual(frame.homeSync().state,[
             -1,-2,-3,0.5,0.5,0.5,
         ]);
+    })
+    it("home() returns a promise that resolves when homed", function(done) {
+        var frame = new DriveFrame([belt300, belt200, screw]);
+        should.deepEqual(frame.axisPos, [null,null,null]);
+        var promise = frame.home({axis:0, homeTimeout:1});
+        should(promise).instanceOf(Promise);
+        promise.then((obj) => {
+            should.strictEqual(obj, frame);
+            should.deepEqual(frame.axisPos, [-1,null,null]);
+            done();
+        });
+        // DriveFrame subclasses should pass this test
     })
     it("deadband is backlash property that varies between -0.5 and 0.5", function() {
         var frame = new DriveFrame([belt300, belt200, screw], {
             deadbandScale: 1
         });
-        frame.home();
-        should.deepEqual(frame.axisPos, [-1,-2,-3]); // home
-        should.deepEqual(frame.deadband, [0.5,0.5,0.5]); // home
+        frame.homeSync();
+        should.deepEqual(frame.axisPos, [-1,-2,-3]); // homeSync
+        should.deepEqual(frame.deadband, [0.5,0.5,0.5]); // homeSync
 
         // move outside deadband
         frame.axisPos = mathjs.add(frame.axisPos, [10,10,10]); // large covariant movement sets deadband limit
@@ -150,7 +162,7 @@ const Network = require("../src/Network");
     })
     it("state is kinematic state, which includes deadband position", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
-        frame.home();
+        frame.homeSync();
         should.deepEqual(frame.state, [-1,-2,-3,0.5,0.5,0.5]);
         frame.axisPos = [10,20,30];
         var state123 = mathjs.round(frame.state,5);

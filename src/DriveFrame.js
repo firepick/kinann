@@ -106,17 +106,31 @@ const winston = require("winston");
             );
         }
 
-        home(options = {}) {
+        home(options) {
+            var msTimeout = options.homeTimeout == null ? 1000 : options.homeTimeout;
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    try {
+                        this.homeSync(options);
+                        resolve(this);
+                    } catch(err) {
+                        reject(err);
+                    }
+                }, msTimeout);
+            });
+        }
+
+        homeSync(options = {}) {
             if (options.axis != null) {
-                winston.debug("home axis", options.axis);
+                winston.debug("homeSync axis", options.axis);
                 var drive = this.drives[options.axis];
                 if (drive == null) {
-                    throw new Error("home() invalid axis:" + options.axis);
+                    throw new Error("homeSync() invalid axis:" + options.axis);
                 }
                 var oldPos = this.axisPos;
                 this.axisPos = oldPos.map((p, i) => i === options.axis ? this.drives[i].minPos : p);
             } else {
-                winston.debug("home all");
+                winston.debug("homeSync all");
                 this.axisPos = this.drives.map((d) => d.minPos);
             }
             return this;

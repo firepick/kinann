@@ -97,7 +97,7 @@
                 zpath.next().value,
             ]);
 
-            frame.home();
+            frame.homeSync();
             var calState = calibrationPath.map((axisPos) => frame.moveTo(axisPos).calibration.toActual(frame.state));
             should.deepEqual(mathjs.round(calState[0],2), [9,9,9,0.5,0.5,0.5]);
             should.deepEqual(mathjs.round(calState[10],2), [10,10,10,0.5,0.5,0.5]);
