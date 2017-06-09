@@ -106,13 +106,13 @@ const winston = require("winston");
             );
         }
 
-        home(options={}) {
+        home(options = {}) {
             var msTimeout = options.homeTimeout == null ? 1000 : options.homeTimeout;
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
                     try {
                         resolve(this.homeSync(options));
-                    } catch(err) {
+                    } catch (err) {
                         reject(err);
                     }
                 }, msTimeout);
@@ -145,7 +145,7 @@ const winston = require("winston");
             });
         }
 
-        moveToSync(position={}) {
+        moveToSync(position = {}) {
             var oldPos = this.axisPos;
             if (position instanceof Array) {
                 position = {

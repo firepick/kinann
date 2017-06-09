@@ -23,7 +23,7 @@
         }
         checkAxisPos(axisPos) {
             if (isNaN(axisPos)) {
-                throw new Error("Expected number for " +this.name+ " axisPos: " + JSON.stringify(axisPos));
+                throw new Error("Expected number for " + this.name + " axisPos: " + JSON.stringify(axisPos));
             }
             if (axisPos < this.minPos) {
                 throw new Error(this.name + " axisPos " + axisPos + " is lower than minPos:" + this.minPos);
