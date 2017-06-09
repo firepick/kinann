@@ -3,6 +3,7 @@
         constructor(options = {}) {
             this.type = "StepperDrive";
             this.isHomed = true;
+            this.name = null;
             Object.assign(this, options);
             this.minPos = this.minPos == null ? 0 : this.minPos; // minimum position
             this.maxPos = this.maxPos == null ? 100 : this.maxPos; // maximum position
@@ -22,13 +23,13 @@
         }
         checkAxisPos(axisPos) {
             if (isNaN(axisPos)) {
-                throw new Error("Expected number for axisPos: " + JSON.stringify(axisPos));
+                throw new Error("Expected number for " +this.name+ " axisPos: " + JSON.stringify(axisPos));
             }
             if (axisPos < this.minPos) {
-                throw new Error("axisPos " + axisPos + " is lower than minPos:" + this.minPos);
+                throw new Error(this.name + " axisPos " + axisPos + " is lower than minPos:" + this.minPos);
             }
             if (this.maxPos < axisPos) {
-                throw new Error("axisPos " + axisPos + " is greater than maxPos:" + this.maxPos);
+                throw new Error(this.name + " axisPos " + axisPos + " is greater than maxPos:" + this.maxPos);
             }
             return (
                 typeof axisPos === 'number' &&

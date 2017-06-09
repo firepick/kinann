@@ -96,6 +96,10 @@ const Network = require("../src/Network");
         frame.homeSync();
         should.deepEqual(frame.moveToSync([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
         should.deepEqual(frame.moveToSync([null,0,3]).axisPos, [300,0,3]); // motion is restricted
+        frame.homeSync();
+        should.deepEqual(frame.moveToSync({axis:[1000,-20,30]}).axisPos, [300,-2,30]); // motion is restricted
+        var motorPos = frame.toMotorPos([100,2,3]);
+        should.deepEqual(frame.moveToSync({motor:motorPos}).axisPos, [100,2,3]); 
     })
     it("moveTo(axisPos) returns a promise to moveToSync", function(done) {
         var frame = new DriveFrame([belt300, belt200, screw]);

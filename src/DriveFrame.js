@@ -106,7 +106,7 @@ const winston = require("winston");
             );
         }
 
-        home(options) {
+        home(options={}) {
             var msTimeout = options.homeTimeout == null ? 1000 : options.homeTimeout;
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
@@ -135,19 +135,31 @@ const winston = require("winston");
             return this;
         }
 
-        moveTo(axisPos) {
+        moveTo(position) {
             return new Promise((resolve, reject) => {
                 try {
-                    resolve(this.moveToSync(axisPos));
+                    resolve(this.moveToSync(position));
                 } catch (err) {
                     reject(err);
                 }
             });
         }
 
-        moveToSync(axisPos) {
+        moveToSync(position={}) {
             var oldPos = this.axisPos;
-            this.axisPos = axisPos.map((p, i) => p == null ? oldPos[i] : p);
+            if (position instanceof Array) {
+                position = {
+                    axis: position,
+                }
+            }
+            if (position.axis) {
+                var newPos = position.axis;
+            } else if (position.motor) {
+                var newPos = this.toAxisPos(position.motor);
+            } else {
+                throw new Error("moveToSync() unkknown position:" + JSON.stringify(position));
+            }
+            this.axisPos = newPos.map((p, i) => p == null ? oldPos[i] : p);
             return this;
         }
 
