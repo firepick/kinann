@@ -111,8 +111,7 @@ const winston = require("winston");
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
                     try {
-                        this.homeSync(options);
-                        resolve(this);
+                        resolve(this.homeSync(options));
                     } catch(err) {
                         reject(err);
                     }
@@ -137,6 +136,16 @@ const winston = require("winston");
         }
 
         moveTo(axisPos) {
+            return new Promise((resolve, reject) => {
+                try {
+                    resolve(this.moveToSync(axisPos));
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+        moveToSync(axisPos) {
             var oldPos = this.axisPos;
             this.axisPos = axisPos.map((p, i) => p == null ? oldPos[i] : p);
             return this;

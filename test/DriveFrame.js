@@ -91,12 +91,23 @@ const Network = require("../src/Network");
         frame.clearPos();
         should.deepEqual(frame.axisPos, [null,null,null]);
     });
-    it("moveTo(axisPos) moves to position (chainable)", function() {
+    it("moveToSync(axisPos) moves to position (chainable)", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
         frame.homeSync();
-        should.deepEqual(frame.moveTo([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
-        should.deepEqual(frame.moveTo([null,0,3]).axisPos, [300,0,3]); // motion is restricted
+        should.deepEqual(frame.moveToSync([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
+        should.deepEqual(frame.moveToSync([null,0,3]).axisPos, [300,0,3]); // motion is restricted
     })
+    it("moveTo(axisPos) returns a promise to moveToSync", function(done) {
+        var frame = new DriveFrame([belt300, belt200, screw]);
+        frame.homeSync();
+        var promise = frame.moveTo([1000,-20,30]);
+        should(promise).instanceOf(Promise);
+        promise.then((result) => {
+            should.strictEqual(result,frame);
+            should.deepEqual(frame.axisPos, [300,-2,30]); // motion is restricted
+            done();
+        });
+    });
     it("clipPosition() moves one or all drives to minimum position (chainable)", function() {
         DriveFrame.clipPosition(0, -10, 10).should.equal(0);
         DriveFrame.clipPosition(-100, -10, 10).should.equal(-10);
