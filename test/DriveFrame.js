@@ -109,13 +109,6 @@
         }();
         async.next();
     })
-    it("clipPosition() moves one or all drives to minimum position (chainable)", function() {
-        DriveFrame.clipPosition(0, -10, 10).should.equal(0);
-        DriveFrame.clipPosition(-100, -10, 10).should.equal(-10);
-        DriveFrame.clipPosition(100, -10, 10).should.equal(10);
-        should.deepEqual(DriveFrame.clipPosition(null, -10, 10), null);
-        should.deepEqual(DriveFrame.clipPosition(null, 0, 10), null);
-    })
     it("TESThome() moves one or all drives to minimum position", function(done) {
         var async = function *() {
             var frame = new DriveFrame([belt300, belt200, screw]);
