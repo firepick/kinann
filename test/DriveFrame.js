@@ -8,6 +8,7 @@
     const Variable = require("../src/Variable");
     const Example = require("../src/Example");
     const Network = require("../src/Network");
+    const MockSerial = require('../src/MockSerial');
     const DriveFrame = require("../src/DriveFrame");
     const BeltDrive = StepperDrive.BeltDrive;
     const ScrewDrive = StepperDrive.ScrewDrive;
@@ -33,7 +34,7 @@
         drives[1].name.should.equal("Y");
         drives[2].name.should.equal("Z");
     });
-    it("TESTDriveFrame(drives) creates a positionable drive collection", function(done) {
+    it("DriveFrame(drives) creates a positionable drive collection", function(done) {
         var async = function*() {
             var drives = [belt300, belt200, screw];
             var frame = new DriveFrame(drives);
@@ -61,7 +62,7 @@
             10,20,3,
         ]);
     })
-    it("TESTaxisPos is position property", function(done) {
+    it("axisPos is position property", function(done) {
         var async = function*() {
             var frame = new DriveFrame([belt300, belt200, screw]);
             should.deepEqual(frame.axisPos, [null,null,null]);
@@ -91,7 +92,7 @@
         frame.clearPos();
         should.deepEqual(frame.axisPos, [null,null,null]);
     });
-    it("TESTmoveTo(axisPos) moves to position", function(done) {
+    it("moveTo(axisPos) moves to position", function(done) {
         var async = function*() {
             var frame = new DriveFrame([belt300, belt200, screw]);
             yield( frame.home().then(r => async.next(r)) );
@@ -111,7 +112,10 @@
     })
     it("TESThome() moves one or all drives to minimum position", function(done) {
         var async = function *() {
-            var frame = new DriveFrame([belt300, belt200, screw]);
+            var sd = new MockSerial();
+            var frame = new DriveFrame([belt300, belt200, screw], {
+                serialDriver: sd,
+            });
             should.deepEqual(frame.axisPos, [null,null,null]);
             var result = yield( frame.home({axis:0}).then(r => async.next(r)) );
             should.strictEqual(result, frame);
@@ -122,11 +126,19 @@
             yield( frame.home().then(r => async.next(r)) );
             should.deepEqual(frame.state, [-1,-2,-3,0.5,0.5,0.5 ]);
             should.throws(() => yield( frame.home({axis:-1}).catch(err => async.throw(err)) ));
+            var homeMotorPos = frame.toMotorPos(frame.drives.map((d) => d.minPos));
+            should.deepEqual(sd.commands, [{
+                home: [homeMotorPos[0], null, null],
+            },{
+                home: [ homeMotorPos[0], homeMotorPos[1], null ],
+            },{
+                home: [ homeMotorPos[0], homeMotorPos[1], homeMotorPos[2], ],
+            }]);
             done();
         }();
         async.next(); // start async
     })
-    it("TESTTESTdeadband is backlash property that varies between -0.5 and 0.5", function(done) {
+    it("deadband is backlash property that varies between -0.5 and 0.5", function(done) {
         var async = function*() {
             var frame = new DriveFrame([belt300, belt200, screw], {
                 deadbandScale: 1
@@ -160,7 +172,7 @@
         }();
         async.next();
     })
-    it("TESTstate is kinematic state, which includes deadband position", function(done) {
+    it("state is kinematic state, which includes deadband position", function(done) {
         var async = function*() {
             var frame = new DriveFrame([belt300, belt200, screw]);
             yield( frame.home().then(r => async.next(r)) );

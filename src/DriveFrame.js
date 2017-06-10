@@ -1,40 +1,10 @@
-const mathjs = require("mathjs");
-const StepperDrive = require("./StepperDrive");
-const Variable = require("./Variable");
-const Network = require("./Network");
-const winston = require("winston");
-
 (function(exports) {
-    class MockSerial {
-        constructor(options={}) {
-            this.msTimeout = options.msTimeout == null ? 0 : options.msTimeout;
-            this.commands = [];
-        }
-        home(motorPos) {
-            return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    try {
-                        this.commands.push(["home", motorPos]);
-                        resolve(motorPos);
-                    } catch (err) {
-                        reject(err);
-                    }
-                }, this.msTimeout);
-            });
-        }
-        moveTo(motorPos) {
-            return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    try {
-                        this.commands.push(["moveTo", motorPos]);
-                        resolve(motorPos);
-                    } catch (err) {
-                        reject(err);
-                    }
-                }, this.msTimeout);
-            });
-        }
-    }
+    const mathjs = require("mathjs");
+    const MockSerial = require("./MockSerial");
+    const StepperDrive = require("./StepperDrive");
+    const Variable = require("./Variable");
+    const Network = require("./Network");
+    const winston = require("winston");
 
     class DriveFrame {
         constructor(drives, options = {}) {
@@ -185,11 +155,11 @@ const winston = require("winston");
         }
 
         toAxisPos(motorPos) {
-            return motorPos.map((m, i) => this.drives[i].toAxisPos(m));
+            return motorPos.map((m, i) => m == null ? null : this.drives[i].toAxisPos(m));
         }
 
         toMotorPos(axisPos) {
-            return axisPos.map((a, i) => this.drives[i].toMotorPos(a));
+            return axisPos.map((a, i) => a == null ? null : this.drives[i].toMotorPos(a));
         }
 
         basisVariables() {
@@ -203,35 +173,5 @@ const winston = require("winston");
 
     } // class DriveFrame
 
-    exports.MockSerial = MockSerial;
     module.exports = exports.DriveFrame = DriveFrame;
 })(typeof exports === "object" ? exports : (exports = {}));
-
-// mocha -R min --inline-diffs *.js
-(typeof describe === 'function') && describe("DriveFrame", function() {
-    const should = require('should');
-    const MockSerial = exports.MockSerial;
-    const StepperDrive = require('../src/StepperDrive');
-    const DriveFrame = exports.DriveFrame || require('../src/DriveFrame');
-    var belt300 = new StepperDrive.BeltDrive({
-        minPos: -1,
-        maxPos: 300,
-        teeth: 20,
-    });
-    var belt200 = new StepperDrive.BeltDrive({
-        minPos: -2,
-        maxPos: 200,
-    });
-    var screw = new StepperDrive.ScrewDrive({
-        minPos: -3,
-        lead: 1,
-    });
-
-    it('serial', function() {
-        var drives = [belt300, belt200, screw];
-        var sd = new MockSerial();
-        var frame = new DriveFrame(drives, {
-            serialDriver: sd,
-        });
-    });
-})

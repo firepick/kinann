@@ -56,7 +56,7 @@
             ex.target[2].should.equal(ex.input[2]+3);
         });
     })
-    it("TESTcalibrate(driveFrame, examples) trains DriveFrame to handle 3D backlash", function(done) {
+    it("calibrate(driveFrame, examples) trains DriveFrame to handle 3D backlash", function(done) {
         this.timeout(30 * 1000);
         var async = function*() {
             var verbose = false;
