@@ -18,6 +18,7 @@
     Kinann.Equations = require("./src/Equations");
     Kinann.Calibration = require("./src/Calibration");
     Kinann.AnnCalibration = require("./src/AnnCalibration");
+    Kinann.MockSerial = require("./src/MockSerial");
     Kinann.models = {
         RotaryDelta: require("./src/models/RotaryDelta"),
     };
