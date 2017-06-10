@@ -5,10 +5,42 @@ const Network = require("./Network");
 const winston = require("winston");
 
 (function(exports) {
+    class MockSerial {
+        constructor(options={}) {
+            this.msTimeout = options.msTimeout == null ? 0 : options.msTimeout;
+            this.commands = [];
+        }
+        home(motorPos) {
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    try {
+                        this.commands.push(["home", motorPos]);
+                        resolve(motorPos);
+                    } catch (err) {
+                        reject(err);
+                    }
+                }, this.msTimeout);
+            });
+        }
+        moveTo(motorPos) {
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    try {
+                        this.commands.push(["moveTo", motorPos]);
+                        resolve(motorPos);
+                    } catch (err) {
+                        reject(err);
+                    }
+                }, this.msTimeout);
+            });
+        }
+    }
+
     class DriveFrame {
         constructor(drives, options = {}) {
             this.type = "DriveFrame";
             this.drives = drives;
+            this.serialDriver = options.serialDriver || new MockSerial(options);
             var driveNames = ["X", "Y", "Z", "A", "B", "C"];
             this.drives.forEach((drive, i) => {
                 if (drive.name == null) {
@@ -33,9 +65,9 @@ const winston = require("winston");
                     if (!(axisPos instanceof Array) || axisPos.length !== this.drives.length) {
                         throw new Error("Expected array of length:" + this.drives.length + " axisPos:" + JSON.stringify(axisPos));
                     }
-                    var newpos = axisPos.map((p, i) => {
+                    axisPos = this.clipAxisPos(axisPos);
+                    var newpos = axisPos.map((pos, i) => {
                         var di = this.drives[i];
-                        var pos = DriveFrame.clipPosition(p, di.minPos, di.maxPos);
                         var deadbandOld = this.$state[i + this.drives.length];
                         if (this.state[i] === pos) {
                             var deadbandNew = deadbandOld;
@@ -81,11 +113,6 @@ const winston = require("winston");
             return frame;
         }
 
-        static clipPosition(value, min, max) {
-            // Javascript min/max coerce null to zero. UGH!
-            return value == null ? null : Math.min(Math.max(min, value), max);
-        }
-
         toJSON() {
             var obj = {
                 type: "DriveFrame",
@@ -99,6 +126,13 @@ const winston = require("winston");
             return obj;
         }
 
+        clipAxisPos(axisPos) {
+            return axisPos.map((p, i) => {
+                var di = this.drives[i];
+                return p == null ? null : Math.min(Math.max(di.minPos, p), di.maxPos);
+            });
+        }
+
         clearPos() {
             this.state = (
                 this.drives.map((d) => null)
@@ -106,47 +140,26 @@ const winston = require("winston");
             );
         }
 
-        home(options = {}) {
-            var msTimeout = options.homeTimeout == null ? 1000 : options.homeTimeout;
-            return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    try {
-                        resolve(this.homeSync(options));
-                    } catch (err) {
-                        reject(err);
-                    }
-                }, msTimeout);
-            });
-        }
-
-        homeSync(options = {}) {
+        home(options={}) {
             if (options.axis != null) {
-                winston.debug("homeSync axis", options.axis);
                 var drive = this.drives[options.axis];
                 if (drive == null) {
-                    throw new Error("homeSync() invalid axis:" + options.axis);
+                    throw new Error("home() invalid axis:" + options.axis);
                 }
-                var oldPos = this.axisPos;
-                this.axisPos = oldPos.map((p, i) => i === options.axis ? this.drives[i].minPos : p);
+                var newAxisPos = this.axisPos.map((p, i) => i === options.axis ? this.drives[i].minPos : p);
             } else {
-                winston.debug("homeSync all");
-                this.axisPos = this.drives.map((d) => d.minPos);
+                var newAxisPos = this.drives.map((d) => d.minPos);
             }
-            return this;
+            return new Promise((resolve, reject) => {
+                var motorPos = this.toMotorPos(newAxisPos);
+                this.serialDriver.home(motorPos).then(result => {
+                    this.axisPos = newAxisPos;
+                    resolve(this);
+                }).catch(err => reject(err))
+            });
         }
 
         moveTo(position) {
-            return new Promise((resolve, reject) => {
-                try {
-                    resolve(this.moveToSync(position));
-                } catch (err) {
-                    reject(err);
-                }
-            });
-        }
-
-        moveToSync(position = {}) {
-            var oldPos = this.axisPos;
             if (position instanceof Array) {
                 position = {
                     axis: position,
@@ -157,10 +170,18 @@ const winston = require("winston");
             } else if (position.motor) {
                 var newPos = this.toAxisPos(position.motor);
             } else {
-                throw new Error("moveToSync() unknown position:" + JSON.stringify(position));
+                throw new Error("moveTo() unknown position:" + JSON.stringify(position));
             }
-            this.axisPos = newPos.map((p, i) => p == null ? oldPos[i] : p);
-            return this;
+            var oldPos = this.axisPos;
+            var newAxisPos = newPos.map((p, i) => p == null ? oldPos[i] : p);
+            newAxisPos = this.clipAxisPos(newAxisPos);
+            return new Promise((resolve, reject) => {
+                var motorPos = this.toMotorPos(newAxisPos);
+                this.serialDriver.moveTo(motorPos).then(result => {
+                    this.axisPos = newAxisPos;
+                    resolve(this);
+                }).catch( err => reject(err) );
+            });
         }
 
         toAxisPos(motorPos) {
@@ -182,5 +203,35 @@ const winston = require("winston");
 
     } // class DriveFrame
 
+    exports.MockSerial = MockSerial;
     module.exports = exports.DriveFrame = DriveFrame;
 })(typeof exports === "object" ? exports : (exports = {}));
+
+// mocha -R min --inline-diffs *.js
+(typeof describe === 'function') && describe("DriveFrame", function() {
+    const should = require('should');
+    const MockSerial = exports.MockSerial;
+    const StepperDrive = require('../src/StepperDrive');
+    const DriveFrame = exports.DriveFrame || require('../src/DriveFrame');
+    var belt300 = new StepperDrive.BeltDrive({
+        minPos: -1,
+        maxPos: 300,
+        teeth: 20,
+    });
+    var belt200 = new StepperDrive.BeltDrive({
+        minPos: -2,
+        maxPos: 200,
+    });
+    var screw = new StepperDrive.ScrewDrive({
+        minPos: -3,
+        lead: 1,
+    });
+
+    it('serial', function() {
+        var drives = [belt300, belt200, screw];
+        var sd = new MockSerial();
+        var frame = new DriveFrame(drives, {
+            serialDriver: sd,
+        });
+    });
+})

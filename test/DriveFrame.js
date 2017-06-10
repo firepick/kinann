@@ -1,23 +1,16 @@
-const mathjs = require("mathjs");
-const StepperDrive = require("../src/StepperDrive");
-const Factory = require("../src/Factory");
-const Variable = require("../src/Variable");
-const Example = require("../src/Example");
-const Network = require("../src/Network");
-
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("DriveFrame", function() {
-    const winston = require("winston");
     const should = require("should");
+    const mathjs = require("mathjs");
+    const winston = require("winston");
+    const StepperDrive = require("../src/StepperDrive");
+    const Factory = require("../src/Factory");
+    const Variable = require("../src/Variable");
+    const Example = require("../src/Example");
+    const Network = require("../src/Network");
     const DriveFrame = require("../src/DriveFrame");
     const BeltDrive = StepperDrive.BeltDrive;
     const ScrewDrive = StepperDrive.ScrewDrive;
-    var sequence = function* (start,last,inc=1, it) {
-        for (var v = start; inc<0 && v>=last || inc>0 && v<=last; v+=inc) {
-            yield v;
-        }
-        it && (yield* it);
-    }
 
     var belt300 = new BeltDrive({
         minPos: -1,
@@ -40,13 +33,17 @@ const Network = require("../src/Network");
         drives[1].name.should.equal("Y");
         drives[2].name.should.equal("Z");
     });
-    it("DriveFrame(drives) creates a positionable drive collection", function() {
-        var drives = [belt300, belt200, screw];
-        var frame = new DriveFrame(drives);
-        frame.drives.length.should.equal(drives.length);
-        should.deepEqual(frame.axisPos, [null,null,null]);
-        frame.homeSync();
-        should.deepEqual(frame.axisPos, [-1,-2,-3]);
+    it("TESTDriveFrame(drives) creates a positionable drive collection", function(done) {
+        var async = function*() {
+            var drives = [belt300, belt200, screw];
+            var frame = new DriveFrame(drives);
+            frame.drives.length.should.equal(drives.length);
+            should.deepEqual(frame.axisPos, [null,null,null]);
+            yield( frame.home().then(r => async.next(r)) );
+            should.deepEqual(frame.axisPos, [-1,-2,-3]);
+            done();
+        }();
+        async.next();
     });
     it("toAxisPos(motorPos) transforms position vector", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
@@ -64,25 +61,28 @@ const Network = require("../src/Network");
             10,20,3,
         ]);
     })
-    it("axisPos is position property", function() {
-        var frame = new DriveFrame([belt300, belt200, screw]);
-        should.deepEqual(frame.axisPos, [null,null,null]);
-        frame.homeSync();
-        should.deepEqual(frame.axisPos, [-1,-2,-3]);
-        frame.axisPos = [1,2,3];
-        should.deepEqual(frame.axisPos, [1,2,3]);
-        frame.axisPos = [0,2,3];
-        should.deepEqual(frame.axisPos, [0,2,3]);
-        frame.axisPos = [1,0,2];
-        should.deepEqual(frame.axisPos, [1,0,2]);
+    it("TESTaxisPos is position property", function(done) {
+        var async = function*() {
+            var frame = new DriveFrame([belt300, belt200, screw]);
+            should.deepEqual(frame.axisPos, [null,null,null]);
+            yield( frame.home().then(r => async.next(r)) );
+            should.deepEqual(frame.axisPos, [-1,-2,-3]);
+            frame.axisPos = [1,2,3];
+            should.deepEqual(frame.axisPos, [1,2,3]);
+            frame.axisPos = [0,2,3];
+            should.deepEqual(frame.axisPos, [0,2,3]);
+            frame.axisPos = [1,0,2];
+            should.deepEqual(frame.axisPos, [1,0,2]);
 
-        // only valid positions are allowed
-        frame.axisPos = [1000,-1000,1000];
-        should.deepEqual(frame.axisPos, [300,-2,100]);
-        frame.axisPos = [-1000,1000,-1000];
-        should.deepEqual(frame.axisPos, [-1,200,-3]);
-
-        // setting any axis position to its minimum changes the corresponding axis direction to 1 (homing)
+            // only valid positions are allowed
+            frame.axisPos = [1000,-1000,1000];
+            should.deepEqual(frame.axisPos, [300,-2,100]);
+            frame.axisPos = [-1000,1000,-1000];
+            should.deepEqual(frame.axisPos, [-1,200,-3]);
+            done();
+        }();
+        async.next();
+        // NOTE: setting any axis position to its minimum changes the corresponding axis direction to 1 (homing)
     })
     it("clearPos() sets position to be undefined", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
@@ -91,27 +91,24 @@ const Network = require("../src/Network");
         frame.clearPos();
         should.deepEqual(frame.axisPos, [null,null,null]);
     });
-    it("moveToSync(axisPos) moves to position (chainable)", function() {
-        var frame = new DriveFrame([belt300, belt200, screw]);
-        frame.homeSync();
-        should.deepEqual(frame.moveToSync([1000,-20,30]).axisPos, [300,-2,30]); // motion is restricted
-        should.deepEqual(frame.moveToSync([null,0,3]).axisPos, [300,0,3]); // motion is restricted
-        frame.homeSync();
-        should.deepEqual(frame.moveToSync({axis:[1000,-20,30]}).axisPos, [300,-2,30]); // motion is restricted
-        var motorPos = frame.toMotorPos([100,2,3]);
-        should.deepEqual(frame.moveToSync({motor:motorPos}).axisPos, [100,2,3]); 
-    })
-    it("moveTo(axisPos) returns a promise to moveToSync", function(done) {
-        var frame = new DriveFrame([belt300, belt200, screw]);
-        frame.homeSync();
-        var promise = frame.moveTo([1000,-20,30]);
-        should(promise).instanceOf(Promise);
-        promise.then((result) => {
-            should.strictEqual(result,frame);
+    it("TESTmoveTo(axisPos) moves to position", function(done) {
+        var async = function*() {
+            var frame = new DriveFrame([belt300, belt200, screw]);
+            yield( frame.home().then(r => async.next(r)) );
+            var result = yield( frame.moveTo([1000,-20,30]).then(r => async.next(r)) );
             should.deepEqual(frame.axisPos, [300,-2,30]); // motion is restricted
+            yield( frame.moveTo([null,0,3]).then(r => async.next(r)) );
+            should.deepEqual(frame.axisPos, [300,0,3]); // motion is restricted
+            yield( frame.home().then(r => async.next(r)) );
+            yield( frame.moveTo({axis:[1000,-20,30]}).then(r => async.next(r)) );
+            should.deepEqual(frame.axisPos, [300,-2,30]); // motion is restricted
+            var motorPos = frame.toMotorPos([100,2,3]);
+            yield( frame.moveTo({motor:motorPos}).then(r => async.next(r)) ); 
+            should.deepEqual(frame.axisPos, [100,2,3]); 
             done();
-        });
-    });
+        }();
+        async.next();
+    })
     it("clipPosition() moves one or all drives to minimum position (chainable)", function() {
         DriveFrame.clipPosition(0, -10, 10).should.equal(0);
         DriveFrame.clipPosition(-100, -10, 10).should.equal(-10);
@@ -119,83 +116,82 @@ const Network = require("../src/Network");
         should.deepEqual(DriveFrame.clipPosition(null, -10, 10), null);
         should.deepEqual(DriveFrame.clipPosition(null, 0, 10), null);
     })
-    it("homeSync() moves one or all drives to minimum position (chainable)", function() {
-        var frame = new DriveFrame([belt300, belt200, screw]);
-        should.deepEqual(frame.axisPos, [null,null,null]);
-        frame.homeSync({axis:0}).should.equal(frame);
-        should.deepEqual(frame.axisPos, [-1,null,null]);
-        frame.homeSync({axis:1}).should.equal(frame);
-        should.deepEqual(frame.axisPos, [-1,-2,null]);
-        should.throws(() => frame.homeSync({axis:-1}));
-        frame.homeSync();
-        frame.axisPos = [10,20,30];
-        should.deepEqual(frame.homeSync().state,[
-            -1,-2,-3,0.5,0.5,0.5,
-        ]);
-    })
-    it("home() returns a promise that resolves when homed", function(done) {
-        var frame = new DriveFrame([belt300, belt200, screw]);
-        should.deepEqual(frame.axisPos, [null,null,null]);
-        var promise = frame.home({axis:0, homeTimeout:1});
-        should(promise).instanceOf(Promise);
-        promise.then((obj) => {
-            should.strictEqual(obj, frame);
+    it("TESThome() moves one or all drives to minimum position", function(done) {
+        var async = function *() {
+            var frame = new DriveFrame([belt300, belt200, screw]);
+            should.deepEqual(frame.axisPos, [null,null,null]);
+            var result = yield( frame.home({axis:0}).then(r => async.next(r)) );
+            should.strictEqual(result, frame);
             should.deepEqual(frame.axisPos, [-1,null,null]);
+            yield( frame.home({axis:1}).then(r => async.next(r)) );
+            should.deepEqual(frame.axisPos, [-1,-2,null]);
+            frame.axisPos = [10,20,30];
+            yield( frame.home().then(r => async.next(r)) );
+            should.deepEqual(frame.state, [-1,-2,-3,0.5,0.5,0.5 ]);
+            should.throws(() => yield( frame.home({axis:-1}).catch(err => async.throw(err)) ));
             done();
-        });
-        // DriveFrame subclasses should pass this test
+        }();
+        async.next(); // start async
     })
-    it("deadband is backlash property that varies between -0.5 and 0.5", function() {
-        var frame = new DriveFrame([belt300, belt200, screw], {
-            deadbandScale: 1
-        });
-        frame.homeSync();
-        should.deepEqual(frame.axisPos, [-1,-2,-3]); // homeSync
-        should.deepEqual(frame.deadband, [0.5,0.5,0.5]); // homeSync
+    it("TESTTESTdeadband is backlash property that varies between -0.5 and 0.5", function(done) {
+        var async = function*() {
+            var frame = new DriveFrame([belt300, belt200, screw], {
+                deadbandScale: 1
+            });
+            yield frame.home().then(r => async.next(r));
+            should.deepEqual(frame.axisPos, [-1,-2,-3]); 
+            should.deepEqual(frame.deadband, [0.5,0.5,0.5]); 
 
-        // move outside deadband
-        frame.axisPos = mathjs.add(frame.axisPos, [10,10,10]); // large covariant movement sets deadband limit
-        should.deepEqual(frame.deadband, [0.5,0.5,0.5]); 
-        frame.axisPos = mathjs.add(frame.axisPos, [-5,-5,-5]); // large contravariant movement sets deadband to opposite limit
-        should.deepEqual(mathjs.round(frame.deadband,3), [-0.5,-0.5,-0.5]);
+            // move outside deadband
+            frame.axisPos = mathjs.add(frame.axisPos, [10,10,10]); // large covariant movement sets deadband limit
+            should.deepEqual(frame.deadband, [0.5,0.5,0.5]); 
+            frame.axisPos = mathjs.add(frame.axisPos, [-5,-5,-5]); // large contravariant movement sets deadband to opposite limit
+            should.deepEqual(mathjs.round(frame.deadband,3), [-0.5,-0.5,-0.5]);
 
-        // move inside deadband
-        frame.axisPos = mathjs.add(frame.axisPos, [0.1,0.1,0.1]); // small contravariant movement reduces backlash
-        should.deepEqual(mathjs.round(frame.deadband,3), [-0.4,-0.4,-0.4]);
-        frame.axisPos = mathjs.add(frame.axisPos, [0.1,0.1,0.1]); // small covariant movement increases backlash
-        should.deepEqual(mathjs.round(frame.deadband,3), [-0.301,-0.301,-0.301]);
-        frame.axisPos = mathjs.add(frame.axisPos, [-0.1,-0.1,-0.1]); // small contravariant movement reduces backlash
-        should.deepEqual(mathjs.round(frame.deadband,3), [-0.4,-0.4,-0.4]);
-        
-        // move outside deadband
-        frame.axisPos = mathjs.add(frame.axisPos, [5,5,5]); // large movement sets deadband to limit
-        should.deepEqual(frame.deadband, [0.5,0.5,0.5]); 
+            // move inside deadband
+            frame.axisPos = mathjs.add(frame.axisPos, [0.1,0.1,0.1]); // small contravariant movement reduces backlash
+            should.deepEqual(mathjs.round(frame.deadband,3), [-0.4,-0.4,-0.4]);
+            frame.axisPos = mathjs.add(frame.axisPos, [0.1,0.1,0.1]); // small covariant movement increases backlash
+            should.deepEqual(mathjs.round(frame.deadband,3), [-0.301,-0.301,-0.301]);
+            frame.axisPos = mathjs.add(frame.axisPos, [-0.1,-0.1,-0.1]); // small contravariant movement reduces backlash
+            should.deepEqual(mathjs.round(frame.deadband,3), [-0.4,-0.4,-0.4]);
+            
+            // move outside deadband
+            frame.axisPos = mathjs.add(frame.axisPos, [5,5,5]); // large movement sets deadband to limit
+            should.deepEqual(frame.deadband, [0.5,0.5,0.5]); 
 
-        // go home
-        frame.axisPos = mathjs.add(frame.axisPos, [10,10,10]); // large covariant movement should not change 
-        should.deepEqual(frame.deadband, [0.5,0.5,0.5]); 
+            // go home
+            frame.axisPos = mathjs.add(frame.axisPos, [10,10,10]); // large covariant movement should not change 
+            should.deepEqual(frame.deadband, [0.5,0.5,0.5]); 
+            done();
+        }();
+        async.next();
     })
-    it("state is kinematic state, which includes deadband position", function() {
-        var frame = new DriveFrame([belt300, belt200, screw]);
-        frame.homeSync();
-        should.deepEqual(frame.state, [-1,-2,-3,0.5,0.5,0.5]);
-        frame.axisPos = [10,20,30];
-        var state123 = mathjs.round(frame.state,5);
-        frame.axisPos = [0,20,30];
-        var state023 = mathjs.round(frame.state,5);
-        should.deepEqual(state023, [0,20,30,-0.5,0.5,0.5]);
-        frame.axisPos = [10,0,20];
-        var state102 = mathjs.round(frame.state,5);
-        should.deepEqual(state123, [10,20,30,0.5,0.5,0.5]);
-        should.deepEqual(state023, [0,20,30,-0.5,0.5,0.5]);
-        should.deepEqual(state102, [10,0,20,0.5,-0.5,-0.5]);
-        should.deepEqual(mathjs.round(frame.state,5), state102);
+    it("TESTstate is kinematic state, which includes deadband position", function(done) {
+        var async = function*() {
+            var frame = new DriveFrame([belt300, belt200, screw]);
+            yield( frame.home().then(r => async.next(r)) );
+            should.deepEqual(frame.state, [-1,-2,-3,0.5,0.5,0.5]);
+            frame.axisPos = [10,20,30];
+            var state123 = mathjs.round(frame.state,5);
+            frame.axisPos = [0,20,30];
+            var state023 = mathjs.round(frame.state,5);
+            should.deepEqual(state023, [0,20,30,-0.5,0.5,0.5]);
+            frame.axisPos = [10,0,20];
+            var state102 = mathjs.round(frame.state,5);
+            should.deepEqual(state123, [10,20,30,0.5,0.5,0.5]);
+            should.deepEqual(state023, [0,20,30,-0.5,0.5,0.5]);
+            should.deepEqual(state102, [10,0,20,0.5,-0.5,-0.5]);
+            should.deepEqual(mathjs.round(frame.state,5), state102);
 
-        // restore prior state
-        frame.state = state123;
-        should.deepEqual(mathjs.round(frame.state,5), state123);
-        frame.axisPos = [0,20,30];
-        should.deepEqual(mathjs.round(frame.state,5), state023);
+            // restore prior state
+            frame.state = state123;
+            should.deepEqual(mathjs.round(frame.state,5), state123);
+            frame.axisPos = [0,20,30];
+            should.deepEqual(mathjs.round(frame.state,5), state023);
+            done();
+        }();
+        async.next();
     })
     it("DriveFrame.fromJSON(json).toJSON() are used to (de-)serializes DriveFrame", function() {
         var frame = new DriveFrame([belt300, belt200, screw]);
