@@ -8,7 +8,7 @@
     const Variable = require("../src/Variable");
     const Example = require("../src/Example");
     const Network = require("../src/Network");
-    const MockSerial = require('../src/MockSerial');
+    const MockSerial = require('../src/serial/MockSerial');
     const DriveFrame = require("../src/DriveFrame");
     const BeltDrive = StepperDrive.BeltDrive;
     const ScrewDrive = StepperDrive.ScrewDrive;

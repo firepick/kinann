@@ -18,7 +18,11 @@
     Kinann.Equations = require("./src/Equations");
     Kinann.Calibration = require("./src/Calibration");
     Kinann.AnnCalibration = require("./src/AnnCalibration");
-    Kinann.MockSerial = require("./src/MockSerial");
+    Kinann.serial = {
+        MockSerial: require("./src/serial/MockSerial"),
+        SerialDriver: require("./src/serial/SerialDriver"),
+        FireStepDriver: require("./src/serial/FireStepDriver"),
+    };
     Kinann.models = {
         RotaryDelta: require("./src/models/RotaryDelta"),
     };

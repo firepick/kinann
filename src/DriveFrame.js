@@ -1,6 +1,6 @@
 (function(exports) {
     const mathjs = require("mathjs");
-    const MockSerial = require("./MockSerial");
+    const MockSerial = require("./serial/MockSerial");
     const StepperDrive = require("./StepperDrive");
     const Variable = require("./Variable");
     const Network = require("./Network");

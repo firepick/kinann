@@ -1,7 +1,7 @@
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("DriveFrame", function() {
     const should = require('should');
-    const MockSerial = exports.MockSerial || require('../src/MockSerial');
+    const MockSerial = exports.MockSerial || require('../src/serial/MockSerial');
 
     it('home(motorPos) home designated axes', function(done) {
         var async = function*() {
