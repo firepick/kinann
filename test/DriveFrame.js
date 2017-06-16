@@ -110,7 +110,7 @@
         }();
         async.next();
     })
-    it("TESThome() moves one or all drives to minimum position", function(done) {
+    it("home() moves one or all drives to minimum position", function(done) {
         var async = function *() {
             var sd = new MockSerial();
             var frame = new DriveFrame([belt300, belt200, screw], {

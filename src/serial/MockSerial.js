@@ -1,6 +1,6 @@
 (function(exports) {
     class MockSerial {
-        constructor(options={}) {
+        constructor(options = {}) {
             this.mockSerialTimeout = options.mockSerialTimeout == null ? 0 : options.mockSerialTimeout;
             this.commands = [];
         }
@@ -9,7 +9,7 @@
                 setTimeout(() => {
                     try {
                         this.commands.push({
-                            home:motorPos
+                            home: motorPos
                         });
                         resolve(motorPos);
                     } catch (err) {
@@ -23,7 +23,7 @@
                 setTimeout(() => {
                     try {
                         this.commands.push({
-                            moveTo:motorPos
+                            moveTo: motorPos
                         });
                         resolve(motorPos);
                     } catch (err) {
