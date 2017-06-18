@@ -7,6 +7,8 @@
         constructor() {
             super();
             this.state.synced = false;
+            this.onDataAsync = null;
+            this.msCommand = 500;
         }
 
         static defaultFilter() {
@@ -25,6 +27,21 @@
             });
         }
 
+        getLine(async, msTimeout) {
+            var that = this;
+            var sp = that.serialPort;
+            that.onDataAsync = async; 
+            setTimeout(() => {
+                if (that.onDataAsync) {
+                    sp.close();
+                    var err = new Error(that.constructor.name + " " + sp.path + 
+                        " could not connect to FireStep. SerialPort closed");
+                    async.throw(err);
+                }
+            }, msTimeout);
+            return {error:"NO SERIAL DATA RECEIVED"};
+        }
+
         open(filter = FireStepDriver.defaultFilter(), options = FireStepDriver.serialPortOptions()) {
             var that = this;
             var state = this.state;
@@ -38,48 +55,41 @@
                         sp.on('error', (err) => winston.error("error", err));
                         sp.on('data', (line) => {
                             line = line.trim();
-                            var synced = state.synced;
-                            if (!state.synced) {
-                                if (!line.startsWith('{"s":0,"r":{"id"')) {
-                                    winston.info("skipping unknown response => ", line);
-                                } else if (!line.endsWith('}')) {
-                                    winston.info("skipping invalid response => ", line);
-                                } else {
-                                    try {
-                                        winston.debug("FireStepDriver sync =>", line);
-                                        var json = JSON.parse(line);
-                                        synced = true;
-                                        state.id = json.r.id;
-                                        winston.info("FireStepDriver synced => ", line);
-                                    } catch (err) {
-                                        winston.error("FireStepDriver could not sync:", err.message, "line:", line);
-                                    }
-                                }
+                            if (!line.endsWith('}')) {
+                                winston.warn(that.constructor.name,"incomplete JSON ignored=>", line);
+                                return;
                             }
                             if (state.synced) {
-                                winston.info("FireStep:", line);
-                            } else if (!synced) {
-                                winston.debug("FireStep sync in progress. Ignoring:", line);
+                                //
+                            } else if (line.startsWith('{"s":0,"r":{"id"')) {
+                                state.synced = true;
+                                winston.debug(that.constructor.name, state.serialPath, "synchronized", line);
                             } else {
-                                state.synced = synced;
-                                winston.info("FireStepDriver", state.serialPath,
-                                    "=> id:" + JSON.stringify(state.id))
-                                resolve(sp);
+                                winston.debug(that.constructor.name, state.serialPath, "onData() ignoring", line);
+                                return;
                             }
+                            winston.debug(that.constructor.name, state.serialPath, "onData()", line);
+                            that.onDataAsync.next(line);
+                            that.onDataAsync = null;
                         });
 
-                        // SerialPort does not capture initial FireStep serial output properly, so skip it
+                        // ignore initial FireStep output
                         yield setTimeout(() => async.next(true), 1000);
 
-                        // synchronize
-                        yield sp.write('{"id":""}\n', (err) => err ? async.throw(err) : async.next(true));
-                        yield setTimeout(() => {
-                            if (!state.synced) {
-                                winston.debug(that.constructor.name, "closing", sp.path);
-                                sp.close();
-                                async.throw(new Error("FireStepDriver could not connect to FireStep on " + sp.path))
-                            }
-                        }, 1500);
+                        // sync id
+                        sp.write('{"id":""}\n');
+                        yield sp.drain((err) => err ? async.throw(err) : async.next(true));
+                        var line = yield that.getLine(async, that.msCommand);
+                        state.id = JSON.parse(line).r.id;
+
+                        // sync sys
+                        sp.write('{"sys":""}\n');
+                        yield sp.drain((err) => err ? async.throw(err) : async.next(true));
+                        var line = yield that.getLine(async, that.msCommand);
+                        state.sys = JSON.parse(line).r.sys;
+
+                        winston.info(that.constructor.name, sp.path, "synced", state.id);
+                        resolve(sp);
                     } catch (err) {
                         reject(err);
                     }
@@ -124,8 +134,9 @@
             autoOpen: false,
         });
     });
-    it("open(filter) opens the given or available FireStep port", function(done) {
+    it("TESTopen(filter) opens the given or available FireStep port", function(done) {
         this.timeout(3000);
+        winston.level = "info";
         let async = function*() {
             function asyncPromise(p) { p.then(r=>async.next(r)).catch(e=>async.throw(e)); }
             var fsd = null;
@@ -141,7 +152,8 @@
                         fsd.state.id.should.properties({
                             app: 'FireStep'
                         });
-                        fsd.state.id.should.properties([]);
+                        fsd.state.id.should.properties(["app", "ch", "git", "ver"]);
+                        fsd.state.sys.should.properties(["to","mv"]);
                         yield asyncPromise(fsd.close());
                         should.strictEqual(false, serialPort.isOpen());
                     } catch (err) {

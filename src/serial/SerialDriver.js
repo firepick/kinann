@@ -105,7 +105,7 @@
             var that = this;
             return new Promise((resolve, reject) => {
                 if (this.isOpen()) {
-                    winston.info(that.constructor.name, "closing", that.state.serialPath);
+                    winston.info(that.constructor.name, that.state.serialPath, "SerialPort.close()");
                     this.serialPort.close(err => err ? reject(err) : resolve());
                 } else {
                     reject(new Error("SerialDriver.close() no opened port"));
