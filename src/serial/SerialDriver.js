@@ -113,6 +113,38 @@
             });
         }
 
+        write(request) {
+            return new Promise((resolve, reject) => {
+                try {
+                    var sp = this.serialPort;
+                    if (sp == null) {
+                        throw(new Error(this.constructor.name + " has no SerialPort"));
+                    }
+                    if (!sp.isOpen()) {
+                        throw(new Error(this.constructor.name + " is not open"));
+                    }
+                    sp.write(request);
+                    sp.drain((err) => {
+                        if (err) {
+                            throw err;
+                        }
+                        resolve(this);
+                    });
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+        homeRequest(axes = []) {
+            var request = "G28.1";
+            return request;
+        }
+
+        home(axes = []) {
+            return this.write(homeRequest(axes));
+        }
+
     } // class SerialDriver
 
     module.exports = exports.SerialDriver = SerialDriver;

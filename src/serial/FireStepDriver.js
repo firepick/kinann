@@ -27,19 +27,48 @@
             });
         }
 
-        getLine(async, msTimeout) {
+        send(request, async, msTimeout) {
             var that = this;
-            var sp = that.serialPort;
-            that.onDataAsync = async; 
-            setTimeout(() => {
+            var superWrite = super.write;
+            let asyncWrite = function*() {
+                var sp = that.serialPort;
+                var prefix = that.constructor.name + " " + sp.path;
+                winston.info(prefix, "send()", request.trim());
                 if (that.onDataAsync) {
-                    sp.close();
-                    var err = new Error(that.constructor.name + " " + sp.path + 
-                        " could not connect to FireStep. SerialPort closed");
-                    async.throw(err);
+                    throw new Error(prefix + " existing command has not completed");
                 }
-            }, msTimeout);
-            return {error:"NO SERIAL DATA RECEIVED"};
+                yield superWrite.call(that, request)
+                    .then(r=>asyncWrite.next(r))
+                    .catch(e=>asyncWrite.throw(e));
+                that.onDataAsync = async; 
+                setTimeout(() => {
+                    if (that.onDataAsync) {
+                        sp.close();
+                        var err = new Error(prefix + " could not connect to FireStep. SerialPort closed");
+                        winston.error(prefix, "timeout");
+                        async.throw(err);
+                    } else {
+                        // onData called async.next(line)
+                    }
+                }, msTimeout);
+            }();
+            asyncWrite.next();
+        }
+
+        onData(line) {
+            line = line.trim();
+            if (!line.endsWith('}')) {
+                winston.warn(this.constructor.name,"incomplete JSON ignored=>", line);
+                return;
+            }
+            winston.debug(this.constructor.name, this.state.serialPath, "onData()", line);
+            if (!this.state.synced && !line.startsWith('{"s":0,"r":{"id"')) {
+                winston.debug(this.constructor.name, this.state.serialPath, "onData() ignoring", line);
+                return;
+            }
+            var onDataAsync = this.onDataAsync;
+            this.onDataAsync = null;
+            onDataAsync.next(line);
         }
 
         open(filter = FireStepDriver.defaultFilter(), options = FireStepDriver.serialPortOptions()) {
@@ -51,41 +80,14 @@
                     function asyncPromise(p) { p.then(r=>async.next(r)).catch(e=>async.throw(e));}
                     try {
                         var sp = yield asyncPromise(superOpen.call(that, filter, options));
-                        state.synced = false;
                         sp.on('error', (err) => winston.error("error", err));
-                        sp.on('data', (line) => {
-                            line = line.trim();
-                            if (!line.endsWith('}')) {
-                                winston.warn(that.constructor.name,"incomplete JSON ignored=>", line);
-                                return;
-                            }
-                            if (state.synced) {
-                                //
-                            } else if (line.startsWith('{"s":0,"r":{"id"')) {
-                                state.synced = true;
-                                winston.debug(that.constructor.name, state.serialPath, "synchronized", line);
-                            } else {
-                                winston.debug(that.constructor.name, state.serialPath, "onData() ignoring", line);
-                                return;
-                            }
-                            winston.debug(that.constructor.name, state.serialPath, "onData()", line);
-                            that.onDataAsync.next(line);
-                            that.onDataAsync = null;
-                        });
-
-                        // ignore initial FireStep output
-                        yield setTimeout(() => async.next(true), 1000);
-
-                        // sync id
-                        sp.write('{"id":""}\n');
-                        yield sp.drain((err) => err ? async.throw(err) : async.next(true));
-                        var line = yield that.getLine(async, that.msCommand);
+                        sp.on('data', (line) => that.onData.call(that, line));
+                        state.synced = false;
+                        yield setTimeout(() => async.next(true), 1000); // ignore initial FireStep output
+                        var line = yield that.send('{"id":""}\n', async, that.msCommand);
+                        state.synced = true;
                         state.id = JSON.parse(line).r.id;
-
-                        // sync sys
-                        sp.write('{"sys":""}\n');
-                        yield sp.drain((err) => err ? async.throw(err) : async.next(true));
-                        var line = yield that.getLine(async, that.msCommand);
+                        var line = yield that.send('{"sys":""}\n', async, that.msCommand);
                         state.sys = JSON.parse(line).r.sys;
 
                         winston.info(that.constructor.name, sp.path, "synced", state.id);
@@ -96,6 +98,20 @@
                 }(); // async
                 async.next();
             });
+        }
+
+        homeRequest(axes=[]) {
+            var cmd = { 
+                hom: "",
+            };
+            if (axes.length) {
+                var hom = {};
+                axes.forEach((a,i) => {
+                    a != null && (hom[i+1] = a);
+                });
+                cmd = {hom};
+            }
+            return JSON.stringify(cmd);
         }
 
     } // class FireStepDriver
@@ -178,5 +194,13 @@
             done();
         }();
         async.next();
+    });
+    it("TESThomeRequest(axes) returns home request", function() {
+        var fsd = new FireStepDriver();
+        should.equal(fsd.homeRequest(), '{"hom":""}');
+        should.equal(fsd.homeRequest([]), '{"hom":""}');
+        should.equal(fsd.homeRequest([100]), '{"hom":{"1":100}}');
+        should.equal(fsd.homeRequest([null, 200]), '{"hom":{"2":200}}');
+        should.equal(fsd.homeRequest([-100, 0, 300, null]), '{"hom":{"1":-100,"2":0,"3":300}}');
     });
 })
