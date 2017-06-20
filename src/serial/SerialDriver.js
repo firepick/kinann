@@ -117,12 +117,17 @@
             return new Promise((resolve, reject) => {
                 try {
                     var sp = this.serialPort;
+                    var prefix = this.constructor.name + " " + sp.path;
+                    if (!sp.isOpen()) {
+                        throw new Error(prefix + " is not open for write()");
+                    }
                     if (sp == null) {
-                        throw(new Error(this.constructor.name + " has no SerialPort"));
+                        throw(new Error(prefix + " has no SerialPort"));
                     }
                     if (!sp.isOpen()) {
-                        throw(new Error(this.constructor.name + " is not open"));
+                        throw(new Error(prefix + " is not open"));
                     }
+                    winston.info(prefix, "write()", request.trim());
                     sp.write(request);
                     sp.drain((err) => {
                         if (err) {
@@ -142,7 +147,7 @@
         }
 
         home(axes = []) {
-            return this.write(homeRequest(axes));
+            return this.write(this.homeRequest(axes));
         }
 
     } // class SerialDriver
@@ -156,6 +161,20 @@
     const SerialPort = require('serialport');
     const SerialDriver = exports.SerialDriver || require("../src/serial/SerialDriver");
     winston.level = "warn";
+
+    class MockSerial {
+        constructor() {
+            this.requests = [];
+        }
+        isOpen() { return true; }
+        write(request, cb) { 
+            this.requests.push(request); 
+            cb && cb();
+        }
+        drain(cb) { 
+            cb && cb();
+        }
+    }
 
     it("discover(filter) returns filtered list of serial ports", function(done) {
         let async = function*() {
@@ -318,6 +337,32 @@
             } catch (err) {
                 winston.error(err);
             }
+        }();
+        async.next();
+    });
+    it("TESTwrite(request) returns Promise resolved when written", function(done) {
+        let async = function*() {
+            var sd = new SerialDriver();
+            var requests = [];
+            sd.serialPort = new MockSerial(); // inject mock
+            should.strictEqual(sd.isOpen(), true);
+            var resolved = yield sd.write("asdf").then(r=>async.next(r)).catch(e=>async.throw(e));
+            should.strictEqual(resolved, sd);
+            should.strictEqual(sd.serialPort.requests[0], 'asdf');
+            done();
+        }();
+        async.next();
+    });
+    it("TESThome(options) returns Promise resolved when written", function(done) {
+        let async = function*() {
+            var sd = new SerialDriver();
+            var requests = [];
+            sd.serialPort = new MockSerial(); // inject mock
+            should.strictEqual(sd.isOpen(), true);
+            var resolved = yield sd.home([]).then(r=>async.next(r)).catch(e=>async.throw(e));
+            should.strictEqual(resolved, sd);
+            should.strictEqual(sd.serialPort.requests[0], 'G28.1');
+            done();
         }();
         async.next();
     });

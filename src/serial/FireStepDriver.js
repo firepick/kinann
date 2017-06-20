@@ -165,7 +165,6 @@
     });
     it("TESTopen(filter) opens the given or available FireStep port", function(done) {
         this.timeout(3000);
-        winston.level = "debug";
         let async = function*() {
             function asyncPromise(p) { p.then(r=>async.next(r)).catch(e=>async.throw(e)); }
             var fsd = null;
