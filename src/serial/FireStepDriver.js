@@ -1,14 +1,16 @@
 (function(exports) {
     const SerialPort = require('serialport');
     const SerialDriver = require('./SerialDriver');
+    const MockFireStep = require('./MockFireStep');
     const winston = require('winston');
 
     class FireStepDriver extends SerialDriver {
-        constructor() {
-            super();
+        constructor(options={}) {
+            super(options);
             this.state.synced = false;
             this.onDataAsync = null;
-            this.msCommand = 500;
+            this.msCommand = options.msCommand || 500;
+            this.allowMock = options.allowMock == null ? false : options.allowMock;
         }
 
         static defaultFilter() {
@@ -62,13 +64,13 @@
                 return;
             }
             winston.debug(this.constructor.name, this.state.serialPath, "onData()", line);
-            if (!this.state.synced && !line.startsWith('{"s":0,"r":{"id"')) {
+            if (!this.state.synced && !line.startsWith('{"s":0') && line.indexOf('"r":{"id"')<0) {
                 winston.debug(this.constructor.name, this.state.serialPath, "onData() ignoring", line);
                 return;
             }
             var onDataAsync = this.onDataAsync;
             this.onDataAsync = null;
-            onDataAsync.next(line);
+            onDataAsync && onDataAsync.next(line);
         }
 
         open(filter = FireStepDriver.defaultFilter(), options = FireStepDriver.serialPortOptions()) {
@@ -77,9 +79,19 @@
             var superOpen = super.open;
             return new Promise((resolve, reject) => {
                 let async = function*() {
-                    function asyncPromise(p) { p.then(r=>async.next(r)).catch(e=>async.throw(e));}
                     try {
-                        var sp = yield asyncPromise(superOpen.call(that, filter, options));
+                        var sp = yield superOpen.call(that, filter, options)
+                            .then(r=>async.next(r))
+                            .catch(e => {
+                                if (that.allowMock) {
+                                    that.serialPort = new MockFireStep(null, {autoOpen: true});
+                                    that.state.serialPath = "MockFireStep";
+                                    winston.info(e.message, "=> opening MockFireStep");
+                                    async.next(that.serialPort);
+                                } else {
+                                    async.throw(e);
+                                }
+                            });
                         sp.on('error', (err) => winston.error("error", err));
                         sp.on('data', (line) => that.onData.call(that, line));
                         state.synced = false;
@@ -132,6 +144,7 @@
     const should = require("should");
     const winston = require('winston');
     const SerialPort = require('serialport');
+    const MockFireStep = require('./MockFireStep');
     const FireStepDriver = exports.FireStepDriver || require("../src/serial/FireStepDriver");
     winston.level = "warn";
 
@@ -152,7 +165,7 @@
     });
     it("TESTopen(filter) opens the given or available FireStep port", function(done) {
         this.timeout(3000);
-        winston.level = "info";
+        winston.level = "debug";
         let async = function*() {
             function asyncPromise(p) { p.then(r=>async.next(r)).catch(e=>async.throw(e)); }
             var fsd = null;
@@ -161,7 +174,7 @@
                 var filter = null;
                 var ports = yield asyncPromise(FireStepDriver.discover(filter));
                 if (ports.length) {
-                    winston.debug("opening firestep ports:", ports.map(p=>p.comName));
+                    winston.warn("opening Arduino ports:", ports.map(p=>p.comName));
                     try {
                         var serialPort = yield asyncPromise(fsd.open(filter));
                         should.strictEqual(true, serialPort.isOpen());
@@ -195,7 +208,37 @@
         }();
         async.next();
     });
-    it("TESThomeRequest(axes) returns home request", function() {
+    it("open(filter) opens a MockFireStep", function(done) {
+        this.timeout(3000);
+        let async = function*() {
+            function asyncPromise(p) { p.then(r=>async.next(r)).catch(e=>async.throw(e)); }
+            var fsd = null;
+            try {
+                fsd = new FireStepDriver({allowMock:true});
+                var filter = {
+                    manufacturer: "no-match",
+                };
+                var serialPort = yield asyncPromise(fsd.open(filter));
+                should(serialPort).instanceOf(MockFireStep);
+                should.strictEqual(true, serialPort.isOpen());
+                fsd.state.id.should.properties({
+                    app: 'FireStep'
+                });
+                fsd.state.id.should.properties(["app", "ch", "git", "ver"]);
+                fsd.state.sys.should.properties(["to","mv"]);
+                yield asyncPromise(fsd.close());
+                should.strictEqual(false, serialPort.isOpen());
+            } catch (err) {
+                winston.error(err);
+            }
+            if (fsd && fsd.isOpen()) {
+                fsd.close();
+            }
+            done();
+        }();
+        async.next();
+    });
+    it("homeRequest(axes) returns home request", function() {
         var fsd = new FireStepDriver();
         should.equal(fsd.homeRequest(), '{"hom":""}');
         should.equal(fsd.homeRequest([]), '{"hom":""}');

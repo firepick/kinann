@@ -22,6 +22,7 @@
         MockSerial: require("./src/serial/MockSerial"),
         SerialDriver: require("./src/serial/SerialDriver"),
         FireStepDriver: require("./src/serial/FireStepDriver"),
+        MockFireStep: require("./src/serial/MockFireStep"),
     };
     Kinann.models = {
         RotaryDelta: require("./src/models/RotaryDelta"),
