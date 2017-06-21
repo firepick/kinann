@@ -7,7 +7,7 @@
             this.opened = false;
             this.path = port || "MockFireStep";
             this.events = {};
-            this.position = [null, null, null];
+            this.position = [null, null, null, null];
             if (options.autoOpen) {
                 winston.debug(this.constructor.name, "autoOpen:true");
                 this.open();
@@ -68,6 +68,10 @@
                 if (jsonRequest.hom != null) {
                     this.position.forEach((p, i) => {
                         jsonRequest.hom[i+1] != null && (this.position[i] = jsonRequest.hom[i+1]);
+                    });
+                } else if (jsonRequest.mov != null) {
+                    this.position.forEach((p, i) => {
+                        jsonRequest.mov[i+1] != null && (this.position[i] = jsonRequest.mov[i+1]);
                     });
                 } else if (jsonRequest.id != null) {
                     jsonResponse.r = {
@@ -186,8 +190,9 @@
         }();
         async.next();
     });
-    it("mockResponse({hom:...}) returns mock homing response", function() {
+    it("TESTmockResponse({hom:...}) returns mock homing response", function() {
         var mfs = new MockFireStep();
+        should.deepEqual(mfs.position, [null, null, null, null]);
         should.deepEqual(mfs.mockResponse({
             hom:{
                 "1": 100,
@@ -203,6 +208,62 @@
                 }
             },
         });
+        should.deepEqual(mfs.position, [100, null, 300, null]);
+        should.deepEqual(mfs.mockResponse({
+            hom:{
+                "2": 200,
+            }
+        }), {
+            s: 0,
+            t:0,
+            r:{
+                hom: {
+                    "2": 200,
+                }
+            },
+        });
+        should.deepEqual(mfs.position, [100, 200, 300, null]);
+    });
+    it("TESTmockResponse({mov:...}) returns mock movement response", function() {
+        var mfs = new MockFireStep();
+        mfs.mockResponse({
+            hom: { 
+                1:0,
+                2:0,
+                3:0,
+            },
+        });
+        should.deepEqual(mfs.position, [0, 0, 0, null]);
+        should.deepEqual(mfs.mockResponse({
+            mov:{
+                "1": 100,
+                "3": 300,
+            }
+        }), {
+            s: 0,
+            t:0,
+            r:{
+                mov: {
+                    "1": 100,
+                    "3": 300,
+                }
+            },
+        });
+        should.deepEqual(mfs.position, [100, 0, 300, null]);
+        should.deepEqual(mfs.mockResponse({
+            mov:{
+                "2": 200,
+            }
+        }), {
+            s: 0,
+            t:0,
+            r:{
+                mov: {
+                    "2": 200,
+                }
+            },
+        });
+        should.deepEqual(mfs.position, [100, 200, 300, null]);
     });
     it("mockResponse({id:...}) returns mock identification response", function() {
         var mfs = new MockFireStep();
@@ -221,7 +282,7 @@
             },
         });
     });
-    it("mockResponse({sys:...}) returns mock system response", function() {
+    it("TESTmockResponse({sys:...}) returns mock system response", function() {
         var mfs = new MockFireStep();
         should.deepEqual(mfs.mockResponse({
             sys:"",

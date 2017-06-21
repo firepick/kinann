@@ -118,6 +118,9 @@
                 try {
                     var sp = this.serialPort;
                     var prefix = this.constructor.name + " " + sp.path;
+                    if (request instanceof Error) {
+                        throw request;
+                    }
                     if (!sp.isOpen()) {
                         throw new Error(prefix + " is not open for write()");
                     }
@@ -148,6 +151,28 @@
 
         home(axes = []) {
             return this.write(this.homeRequest(axes));
+        }
+
+        moveToRequest(axes = []) {
+            if (axes.length === 0) {
+                return new Error("moveTo() requires at least one axis destination");
+            }
+            var coord = "XYZABCDEF";
+            if (axes.length > coord.length) {
+                return new Error("moveTo() axis out of bounds:"+axes);
+            }
+            var request = "G1";
+            axes.forEach((a,i) => {
+                var c = coord[i];
+                if (a != null) {
+                    request += " " + c + Number(a);
+                }
+            });
+            return request;
+        }
+
+        moveTo(axes = []) {
+            return this.write(this.moveToRequest(axes));
         }
 
     } // class SerialDriver
@@ -362,6 +387,26 @@
             var resolved = yield sd.home([]).then(r=>async.next(r)).catch(e=>async.throw(e));
             should.strictEqual(resolved, sd);
             should.strictEqual(sd.serialPort.requests[0], 'G28.1');
+            done();
+        }();
+        async.next();
+    });
+    it("TESTmoveTo(options) returns Promise resolved when written", function(done) {
+        let async = function*() {
+            var sd = new SerialDriver();
+            var requests = [];
+            sd.serialPort = new MockSerial(); // inject mock
+            should.strictEqual(sd.isOpen(), true);
+            var eCaught = null;
+            try {
+                var resolved = yield sd.moveTo([]).then(r=>async.next(r)).catch(e=>async.throw(e));
+            } catch (err) {
+                eCaught = err;
+            }
+            should(eCaught).instanceOf(Error);
+            var resolved = yield sd.moveTo([null,1.4, null, 2.3, null]).then(r=>async.next(r)).catch(e=>async.throw(e));
+            should.strictEqual(resolved, sd);
+            should.strictEqual(sd.serialPort.requests[0], 'G1 Y1.4 A2.3');
             done();
         }();
         async.next();

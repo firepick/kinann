@@ -11,6 +11,7 @@
             this.onDataAsync = null;
             this.msCommand = options.msCommand || 500;
             this.allowMock = options.allowMock == null ? false : options.allowMock;
+            this.position = [];
         }
 
         static defaultFilter() {
@@ -35,7 +36,7 @@
             let asyncWrite = function*() {
                 var sp = that.serialPort;
                 var prefix = that.constructor.name + " " + sp.path;
-                winston.info(prefix, "send()", request.trim());
+                winston.debug(prefix, "send()", request.trim());
                 if (that.onDataAsync) {
                     throw new Error(prefix + " existing command has not completed");
                 }
@@ -119,9 +120,23 @@
             if (axes.length) {
                 var hom = {};
                 axes.forEach((a,i) => {
-                    a != null && (hom[i+1] = a);
+                    a != null && (hom[i+1] = Math.round(Number(a)));
                 });
                 cmd = {hom};
+            }
+            return JSON.stringify(cmd);
+        }
+
+        moveToRequest(axes=[]) {
+            var cmd = { 
+                mov: "",
+            };
+            if (axes.length) {
+                var mov = {};
+                axes.forEach((a,i) => {
+                    a != null && (mov[i+1] = Math.round(Number(a)));
+                });
+                cmd = {mov};
             }
             return JSON.stringify(cmd);
         }
@@ -237,12 +252,20 @@
         }();
         async.next();
     });
-    it("homeRequest(axes) returns home request", function() {
+    it("TESThomeRequest(axes) returns home request", function() {
         var fsd = new FireStepDriver();
         should.equal(fsd.homeRequest(), '{"hom":""}');
         should.equal(fsd.homeRequest([]), '{"hom":""}');
         should.equal(fsd.homeRequest([100]), '{"hom":{"1":100}}');
-        should.equal(fsd.homeRequest([null, 200]), '{"hom":{"2":200}}');
-        should.equal(fsd.homeRequest([-100, 0, 300, null]), '{"hom":{"1":-100,"2":0,"3":300}}');
+        should.equal(fsd.homeRequest([null, 200.49]), '{"hom":{"2":200}}');
+        should.equal(fsd.homeRequest([-100, 0, 299.5, null]), '{"hom":{"1":-100,"2":0,"3":300}}');
+    });
+    it("TESTmoveToRequest(axes) returns moveTo request", function() {
+        var fsd = new FireStepDriver();
+        should.equal(fsd.moveToRequest(), '{"mov":""}');
+        should.equal(fsd.moveToRequest([]), '{"mov":""}');
+        should.equal(fsd.moveToRequest([100]), '{"mov":{"1":100}}');
+        should.equal(fsd.moveToRequest([null, 200.49]), '{"mov":{"2":200}}');
+        should.equal(fsd.moveToRequest([-100, 0, 299.5, null]), '{"mov":{"1":-100,"2":0,"3":300}}');
     });
 })
