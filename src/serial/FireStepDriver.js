@@ -34,6 +34,8 @@
             var that = this;
             var superWrite = super.write;
             let asyncWrite = function*() {
+                this.state.request = request;
+                this.state.response = "(pending)";
                 var sp = that.serialPort;
                 var prefix = that.constructor.name + " " + sp.path;
                 winston.debug(prefix, "send()", request.trim());
@@ -70,8 +72,11 @@
                 return;
             }
             var onDataAsync = this.onDataAsync;
-            this.onDataAsync = null;
-            onDataAsync && onDataAsync.next(line);
+            if (onDataAsync) {
+                this.onDataAsync = null;
+                onDataAsync.next(line);
+                this.state.response = line;
+            }
         }
 
         open(filter = FireStepDriver.defaultFilter(), options = FireStepDriver.serialPortOptions()) {
