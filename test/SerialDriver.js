@@ -72,22 +72,27 @@
             autoOpen: false,
         });
     });
-    it("async/Promise handles promise rejection", function(done) {
+    it("TESTasync/Promise handles promise rejection", function(done) {
         var sequence = [];
         let async = function*() {
             try {
                 sequence.push("start");
                 var result = yield new Promise((resolve, reject) => reject(new Error("whoa")))
                     .catch(err => {
-                        sequence.push("catch");
+                        sequence.push("catch1");
                         async.throw(err);
+                        sequence.push("catch2"); // yes this gets executed
                     });
-                should.ok(false, "should never execute#1");
+                should.ok(false, "should never execute#2");
             } catch (err) {
                 should.strictEqual("whoa", err.message);
                 sequence.push("end");
-                should.deepEqual(sequence, ["start", "after", "catch", "end"]);
-                done();
+                should.deepEqual(sequence, ["start", "after", "catch1", "end"]);
+                setTimeout(() => {
+                    // statements following async.throw() ARE EXECUTED!!
+                    should.deepEqual(sequence, ["start", "after", "catch1", "end", "catch2"]); 
+                    done();
+                }, 0);
             }
         }();
         async.next();

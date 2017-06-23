@@ -30,7 +30,7 @@
             autoOpen: false,
         });
     });
-    it("open(filter) opens the given or available FireStep port", function(done) {
+    it("TESTopen(filter) opens the given or available FireStep port", function(done) {
         this.timeout(3000);
         let async = function*() {
             function asyncPromise(p) {
@@ -76,7 +76,7 @@
         }();
         async.next();
     });
-    it("open(filter) opens a MockFireStep", function(done) {
+    it("TESTopen(filter) opens a MockFireStep", function(done) {
         this.timeout(3000);
         let async = function*() {
             function asyncPromise(p) {
@@ -110,13 +110,32 @@
         }();
         async.next();
     });
-    it("homeRequest(axes) returns home request", function() {
+    it("TESThomeRequest(axes) returns home request", function() {
         var fsd = new FireStepDriver();
         should.equal(fsd.homeRequest(), '{"hom":""}');
         should.equal(fsd.homeRequest([]), '{"hom":""}');
         should.equal(fsd.homeRequest([100]), '{"hom":{"1":100}}');
         should.equal(fsd.homeRequest([null, 200.49]), '{"hom":{"2":200}}');
         should.equal(fsd.homeRequest([-100, 0, 299.5, null]), '{"hom":{"1":-100,"2":0,"3":300}}');
+    });
+    it("TESThome() homes", function(done) {
+        let async = function*() {
+            try {
+                var fsd = new FireStepDriver({allowMock: true});
+                var sp = yield fsd.open({manufacturer: /no match/})
+                    .then(r=>async.next(r))
+                    .catch(e=> {throw e;});
+                should.equal(fsd.state.request, '{"sys":""}\n');
+                var json = JSON.parse(fsd.state.response);
+                should(json.r).properties("sys");
+                var result = yield fsd.home().then(r=>async.next(r)).catch(e=>{throw e});
+                //should.equal(fsd.state.request, '{"hom":""}\n');
+                done();
+            } catch (err) {
+                winston.error("homeRequest", err);
+            }
+        }();
+        async.next();
     });
     it("moveToRequest(axes) returns moveTo request", function() {
         var fsd = new FireStepDriver();
