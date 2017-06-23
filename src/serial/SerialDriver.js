@@ -67,6 +67,10 @@
             }, options);
         }
 
+        get logPrefix() {
+            return this.constructor.name + " " + (this.sp ? this.sp.path : "(no device)");
+        }
+
         open(filter = SerialDriver.defaultFilter(), options = SerialDriver.serialPortOptions()) {
             var that = this;
             return new Promise((resolve, reject) => {
@@ -77,9 +81,9 @@
                             .then(ports => async.next(ports))
                             .catch(err => async.throw(err));
                         if (!ports.length) {
-                            throw new Error(that.constructor.name + " found no ports to open()");
+                            throw new Error(that.logPrefix + " found no ports to open()");
                         }
-                        winston.debug(that.constructor.name + " open() discovered", ports.length, 
+                        winston.debug(that.logPrefix + " open() discovered", ports.length, 
                             ports.length ? "ports:" + ports.map(p=>p.comName) : "ports");
                         var port = ports[0];
                         winston.debug("SerialDriver", port.comName, "SerialPort.open()...");
@@ -105,7 +109,7 @@
             var that = this;
             return new Promise((resolve, reject) => {
                 if (this.isOpen()) {
-                    winston.info(that.constructor.name, that.state.serialPath, "SerialPort.close()");
+                    winston.info(that.logPrefix, "SerialPort.close()");
                     this.serialPort.close(err => err ? reject(err) : resolve());
                 } else {
                     reject(new Error("SerialDriver.close() no opened port"));
@@ -117,20 +121,19 @@
             return new Promise((resolve, reject) => {
                 try {
                     var sp = this.serialPort;
-                    var prefix = this.constructor.name + " " + sp.path;
                     if (request instanceof Error) {
                         throw request;
                     }
                     if (!sp.isOpen()) {
-                        throw new Error(prefix + " is not open for write()");
+                        throw new Error(this.logPrefix + " is not open for write()");
                     }
                     if (sp == null) {
-                        throw(new Error(prefix + " has no SerialPort"));
+                        throw(new Error(this.logPrefix + " has no SerialPort"));
                     }
                     if (!sp.isOpen()) {
-                        throw(new Error(prefix + " is not open"));
+                        throw(new Error(this.logPrefix + " is not open"));
                     }
-                    winston.info(prefix, "write()", request.trim());
+                    winston.info(this.logPrefix, "write()", request.trim());
                     sp.write(request);
                     sp.drain((err) => {
                         if (err) {

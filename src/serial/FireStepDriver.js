@@ -37,10 +37,9 @@
                 that.state.request = request;
                 that.state.response = "(pending)";
                 var sp = that.serialPort;
-                var prefix = that.constructor.name + " " + sp.path;
-                winston.debug(prefix, "send()", request.trim());
+                winston.debug(that.logPrefix, "send()", request.trim());
                 if (that.onDataAsync) {
-                    throw new Error(prefix + " existing command has not completed");
+                    throw new Error(that.logPrefix + " existing command has not completed");
                 }
                 yield superWrite.call(that, request)
                     .then(r=>asyncWrite.next(r))
@@ -49,8 +48,8 @@
                 setTimeout(() => {
                     if (that.onDataAsync) {
                         sp.close();
-                        var err = new Error(prefix + " could not connect to FireStep. SerialPort closed");
-                        winston.error(prefix, "timeout");
+                        var err = new Error(that.logPrefix + " could not connect to FireStep. SerialPort closed");
+                        winston.error(that.logPrefix, "timeout");
                         async.throw(err);
                     } else {
                         // onData called async.next(line)
@@ -63,19 +62,19 @@
         onData(line) {
             line = line.trim();
             if (!line.endsWith('}')) {
-                winston.warn(this.constructor.name,"incomplete JSON ignored=>", line);
+                winston.warn(this.logPrefix,"incomplete JSON ignored=>", line);
                 return;
             }
-            winston.debug(this.constructor.name, this.state.serialPath, "onData()", line);
+            winston.debug(this.logPrefix, "onData()", line);
             if (!this.state.synced && !line.startsWith('{"s":0') && line.indexOf('"r":{"id"')<0) {
-                winston.debug(this.constructor.name, this.state.serialPath, "onData() ignoring", line);
+                winston.info(this.logPrefix, "onData() ignoring", line);
                 return;
             }
             var onDataAsync = this.onDataAsync;
             if (onDataAsync) {
+                this.state.response = line;
                 this.onDataAsync = null;
                 onDataAsync.next(line);
-                this.state.response = line;
             }
         }
 
@@ -98,7 +97,7 @@
                                     async.throw(e);
                                 }
                             });
-                        sp.on('error', (err) => winston.error("error", err));
+                        sp.on('error', (err) => winston.error(thhat.logPrefix, "error", err));
                         sp.on('data', (line) => that.onData.call(that, line));
                         state.synced = false;
                         yield setTimeout(() => async.next(true), 1000); // ignore initial FireStep output
@@ -108,7 +107,7 @@
                         var line = yield that.send('{"sys":""}\n', async, that.msCommand);
                         state.sys = JSON.parse(line).r.sys;
 
-                        winston.info(that.constructor.name, sp.path, "synced", state.id);
+                        winston.info(that.logPrefix, "synced", state.id);
                         resolve(sp);
                     } catch (err) {
                         reject(err);
