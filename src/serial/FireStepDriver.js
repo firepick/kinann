@@ -34,8 +34,8 @@
             var that = this;
             var superWrite = super.write;
             let asyncWrite = function*() {
-                this.state.request = request;
-                this.state.response = "(pending)";
+                that.state.request = request;
+                that.state.response = "(pending)";
                 var sp = that.serialPort;
                 var prefix = that.constructor.name + " " + sp.path;
                 winston.debug(prefix, "send()", request.trim());

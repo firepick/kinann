@@ -1,6 +1,6 @@
 {
   "name": "kinann",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Kinematic artificial neural network Javascript library",
   "main": "index.js",
   "directories": {
