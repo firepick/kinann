@@ -48,8 +48,8 @@ var Factory = require("../src/Factory");
     it("MapLayer(fmap,options) creates a weighted mapping layer", function() {
         var options = {
             weights: {
-                gain1:1,
-                gain2:2,
+                gain1: 1,
+                gain2: 2,
             }
         }
         var vars = [
@@ -75,14 +75,14 @@ var Factory = require("../src/Factory");
         var options = {
             id: 3,
             weights: {
-                gain1:1,
-                gain2:2,
+                gain1: 1,
+                gain2: 2,
             },
         }
         var vars = [
-            (eIn,i) => eIn[i] + "+" + i,
-            (eIn,i) => eIn[i] + "+" + i,
-            (eIn,i) => "(" + eIn[0] + "^2)",
+            (eIn, i) => eIn[i] + "+" + i,
+            (eIn, i) => eIn[i] + "+" + i,
+            (eIn, i) => "(" + eIn[0] + "^2)",
         ];
         var layer = new MapLayer(vars, options);
 

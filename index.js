@@ -19,7 +19,7 @@
     Kinann.Calibration = require("./src/Calibration");
     Kinann.AnnCalibration = require("./src/AnnCalibration");
     Kinann.serial = {
-        MockSerial: require("./src/serial/MockSerial"),
+        MockSerialDriver: require("./src/serial/MockSerialDriver"),
         SerialDriver: require("./src/serial/SerialDriver"),
         FireStepDriver: require("./src/serial/FireStepDriver"),
         MockFireStep: require("./src/serial/MockFireStep"),

@@ -1,9 +1,14 @@
 (function(exports) {
-    class MockSerial {
+    const SerialDriver = require('./SerialDriver');
+
+    class MockSerialDriver extends SerialDriver {
+
         constructor(options = {}) {
+            super();
             this.mockSerialTimeout = options.mockSerialTimeout == null ? 0 : options.mockSerialTimeout;
             this.commands = [];
         }
+
         home(motorPos) {
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
@@ -18,6 +23,7 @@
                 }, this.mockSerialTimeout);
             });
         }
+
         moveTo(motorPos) {
             return new Promise((resolve, reject) => {
                 setTimeout(() => {
@@ -32,7 +38,8 @@
                 }, this.mockSerialTimeout);
             });
         }
+
     }
 
-    module.exports = exports.MockSerial = MockSerial;
+    module.exports = exports.MockSerialDriver = MockSerialDriver;
 })(typeof exports === "object" ? exports : (exports = {}));

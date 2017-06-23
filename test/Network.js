@@ -77,8 +77,8 @@ var Sequential = require("../src/Sequential");
             w1r1c1: 0.12,
         });
         var neteval = network.compile();
-        network.activate([3,5], [19, 43.2]);
-        mathjs.round(network.cost(),2).should.equal(1103);
+        network.activate([3, 5], [19, 43.2]);
+        mathjs.round(network.cost(), 2).should.equal(1103);
     })
     it("Network.initialize(weights,options) initializes weights", function() {
         var network = new Sequential(2, [new Layer(2, logistic_opts)]);
@@ -123,27 +123,28 @@ var Sequential = require("../src/Sequential");
     })
     it("Network.normalizeInput(examples, options) normalizes input", function() {
         this.timeout(60 * 1000);
-        
+
         // input normalization only requires boundary examples
         var boundaries = [{
-                input: [3, 2, 1] // cube vertex
-            }, {
-                input: [300, 200, 10] // cube vertex
-            }, 
-        ];
+            input: [3, 2, 1] // cube vertex
+        }, {
+            input: [300, 200, 10] // cube vertex
+        }, ];
         var network = new Sequential(3, [
-            new Layer(3, {activation: Layer.ACT_IDENTITY}),
+            new Layer(3, {
+                activation: Layer.ACT_IDENTITY
+            }),
         ]);
         network.initialize();
         network.compile(); // pre-compilation saves time
         network.normalizeInput(boundaries, {
             normalizeInput: "mapminmax", // (default) map minimum/maximum to [-1,1]
-        }); 
+        });
 
         // normalization statistics are retained in the network
         var inStats = network.inStats;
         inStats.length.should.equal(network.nIn);
-        inStats.map((stats) => stats.should.properties(["max","min","mean","std"]));
+        inStats.map((stats) => stats.should.properties(["max", "min", "mean", "std"]));
     })
     it("Network.activate(ipnuts, targets) computes activation outputs", function() {
         var network = new Sequential(2, [new Layer(2)]);
@@ -184,7 +185,7 @@ var Sequential = require("../src/Sequential");
         // targeted activation is required for cost()
         var inputs = [5, 7];
         var targets = [19.1, 43.2];
-        should.deepEqual(mathjs.round(network.activate(inputs, targets),3),[19.1,43.2]);
+        should.deepEqual(mathjs.round(network.activate(inputs, targets), 3), [19.1, 43.2]);
         network.cost().should.equal(0); // cost at target
 
         network.activate(inputs, [19, 43.2]);
@@ -366,45 +367,42 @@ var Sequential = require("../src/Sequential");
         var nInputs = 3;
         var nOutputs = nInputs;
         var boundaries = [{
-                input: [0, 0, 0] // cube vertex
-            }, {
-                input: [200, 200, 10] // cube vertex
-            }, 
-        ];
+            input: [0, 0, 0] // cube vertex
+        }, {
+            input: [200, 200, 10] // cube vertex
+        }, ];
         var examples = boundaries.concat([{
-                input: [0, 0, 10] // cube vertex
-            }, {
-                input: [0, 200, 10] // cube vertex
-            }, {
-                input: [200, 200, 0] // cube vertex
-            }, {
-                input: [0, 200, 0] // cube vertex
-            }, {
-                input: [100, 100, 0] // bottom 
-            }, {
-                input: [100, 100, 10] // top
-            }, {
-                input: [100, 200, 5] // side
-            }, {
-                input: [100, 0, 5] // side
-            }, {
-                input: [200, 100, 5] // side
-            }, {
-                input: [0, 100, 5] // side
-            }, 
-        ]);
+            input: [0, 0, 10] // cube vertex
+        }, {
+            input: [0, 200, 10] // cube vertex
+        }, {
+            input: [200, 200, 0] // cube vertex
+        }, {
+            input: [0, 200, 0] // cube vertex
+        }, {
+            input: [100, 100, 0] // bottom 
+        }, {
+            input: [100, 100, 10] // top
+        }, {
+            input: [100, 200, 5] // side
+        }, {
+            input: [100, 0, 5] // side
+        }, {
+            input: [200, 100, 5] // side
+        }, {
+            input: [0, 100, 5] // side
+        }, ]);
         var tests = [{
-                input: [190, 180, 3.5]
-            }, {
-                input: [200, 0, 4]
-            }, {
-                input: [100, 0, 0]
-            }, {
-                input: [1, 1, 2]
-            }, {
-                input: [200, 0, 0]
-            },
-        ];
+            input: [190, 180, 3.5]
+        }, {
+            input: [200, 0, 4]
+        }, {
+            input: [100, 0, 0]
+        }, {
+            input: [1, 1, 2]
+        }, {
+            input: [200, 0, 0]
+        }, ];
         var makeExample = function(ex, f) {
             ex.target = f(ex.input);
         };

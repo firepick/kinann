@@ -1,6 +1,6 @@
 (function(exports) {
     const mathjs = require("mathjs");
-    const MockSerial = require("./serial/MockSerial");
+    const MockSerialDriver = require("./serial/MockSerialDriver");
     const StepperDrive = require("./StepperDrive");
     const Variable = require("./Variable");
     const Network = require("./Network");
@@ -10,7 +10,7 @@
         constructor(drives, options = {}) {
             this.type = "DriveFrame";
             this.drives = drives;
-            this.serialDriver = options.serialDriver || new MockSerial(options);
+            this.serialDriver = options.serialDriver || new MockSerialDriver(options);
             var driveNames = ["X", "Y", "Z", "A", "B", "C"];
             this.drives.forEach((drive, i) => {
                 if (drive.name == null) {
@@ -110,7 +110,7 @@
             );
         }
 
-        home(options={}) {
+        home(options = {}) {
             if (options.axis != null) {
                 var drive = this.drives[options.axis];
                 if (drive == null) {
@@ -150,7 +150,7 @@
                 this.serialDriver.moveTo(motorPos).then(result => {
                     this.axisPos = newAxisPos;
                     resolve(this);
-                }).catch( err => reject(err) );
+                }).catch(err => reject(err));
             });
         }
 

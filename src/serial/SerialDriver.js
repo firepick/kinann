@@ -5,7 +5,7 @@
     class SerialDriver {
         constructor() {
             this.state = {
-                serialPath: null,
+                serialPath: '(no device)',
             };
         }
 
@@ -68,14 +68,13 @@
         }
 
         get logPrefix() {
-            return this.constructor.name + " " + (this.sp ? this.sp.path : "(no device)");
+            return this.constructor.name + " " + (this.serialPort ? this.serialPort.path : '(no serialPort)');
         }
 
         open(filter = SerialDriver.defaultFilter(), options = SerialDriver.serialPortOptions()) {
             var that = this;
             return new Promise((resolve, reject) => {
                 let async = function*() {
-                    function asyncPromise(p) { p.then(r=>async.next(r)).catch(e=>async.throw(e)); }
                     try {
                         var ports = yield SerialDriver.discover(filter)
                             .then(ports => async.next(ports))
@@ -83,11 +82,12 @@
                         if (!ports.length) {
                             throw new Error(that.logPrefix + " found no ports to open()");
                         }
-                        winston.debug(that.logPrefix + " open() discovered", ports.length, 
-                            ports.length ? "ports:" + ports.map(p=>p.comName) : "ports");
+                        winston.debug(that.logPrefix + " open() discovered", ports.length,
+                            ports.length ? "ports:" + ports.map(p => p.comName) : "ports");
                         var port = ports[0];
                         winston.debug("SerialDriver", port.comName, "SerialPort.open()...");
                         var sp = that.serialPort = new SerialPort(port.comName, options);
+                        console.log("sp", Object.keys(sp));
                         yield sp.open((err) => err ? async.throw(err) : async.next(true));
                         winston.info("SerialDriver", port.comName,
                             "SerialPort.open()", sp.isOpen() ? "OK" : "FAILED");
@@ -128,10 +128,10 @@
                         throw new Error(this.logPrefix + " is not open for write()");
                     }
                     if (sp == null) {
-                        throw(new Error(this.logPrefix + " has no SerialPort"));
+                        throw (new Error(this.logPrefix + " has no SerialPort"));
                     }
                     if (!sp.isOpen()) {
-                        throw(new Error(this.logPrefix + " is not open"));
+                        throw (new Error(this.logPrefix + " is not open"));
                     }
                     winston.info(this.logPrefix, "write()", request.trim());
                     sp.write(request);
@@ -162,10 +162,10 @@
             }
             var coord = "XYZABCDEF";
             if (axes.length > coord.length) {
-                return new Error("moveTo() axis out of bounds:"+axes);
+                return new Error("moveTo() axis out of bounds:" + axes);
             }
             var request = "G1";
-            axes.forEach((a,i) => {
+            axes.forEach((a, i) => {
                 var c = coord[i];
                 if (a != null) {
                     request += " " + c + Number(a);
@@ -182,4 +182,3 @@
 
     module.exports = exports.SerialDriver = SerialDriver;
 })(typeof exports === "object" ? exports : (exports = {}));
-

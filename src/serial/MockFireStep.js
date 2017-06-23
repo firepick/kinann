@@ -3,7 +3,7 @@
     const winston = require('winston');
 
     class MockFireStep {
-        constructor(port, options={}) {
+        constructor(port, options = {}) {
             this.opened = false;
             this.path = port || "MockFireStep";
             this.events = {};
@@ -52,7 +52,7 @@
 
         write(request, cb) {
             var that = this;
-            winston.debug(that.constructor.name,"write(", request, ")");
+            winston.debug(that.constructor.name, "write(", request, ")");
             that.request = request;
             cb && cb();
             return that;
@@ -67,11 +67,11 @@
                 jsonResponse.r = jsonRequest;
                 if (jsonRequest.hom != null) {
                     this.position.forEach((p, i) => {
-                        jsonRequest.hom[i+1] != null && (this.position[i] = jsonRequest.hom[i+1]);
+                        jsonRequest.hom[i + 1] != null && (this.position[i] = jsonRequest.hom[i + 1]);
                     });
                 } else if (jsonRequest.mov != null) {
                     this.position.forEach((p, i) => {
-                        jsonRequest.mov[i+1] != null && (this.position[i] = jsonRequest.mov[i+1]);
+                        jsonRequest.mov[i + 1] != null && (this.position[i] = jsonRequest.mov[i + 1]);
                     });
                 } else if (jsonRequest.id != null) {
                     jsonResponse.r = {
@@ -113,7 +113,7 @@
 
         drain(cb) {
             var that = this;
-            winston.debug(that.constructor.name,"drain()");
+            winston.debug(that.constructor.name, "drain()");
             cb && cb(null);
             setTimeout(() => {
                 var jsonResponse = {
@@ -173,7 +173,7 @@
                 err ? async.throw(err) : async.next('{"next":"open"}');
             });
             var request = {
-                id:""
+                id: ""
             };
             var promise = new Promise((resolve, reject) => {
                 mfs.write(JSON.stringify(request));
@@ -182,7 +182,7 @@
                     err ? reject(err) : resolve('{"next":"drain"}');
                 });
             });
-            yield promise.then(r=>async.next(r)).catch(e=>async.throw(e));
+            yield promise.then(r => async.next(r)).catch(e => async.throw(e));
             var line = yield setTimeout(() => nLine === 0 && async.throw(new Error("timeout")), 500);
             var json = JSON.parse(line);
             should.deepEqual(json, mfs.mockResponse(request));
@@ -194,14 +194,14 @@
         var mfs = new MockFireStep();
         should.deepEqual(mfs.position, [null, null, null, null]);
         should.deepEqual(mfs.mockResponse({
-            hom:{
+            hom: {
                 "1": 100,
                 "3": 300,
             }
         }), {
             s: 0,
-            t:0,
-            r:{
+            t: 0,
+            r: {
                 hom: {
                     "1": 100,
                     "3": 300,
@@ -210,13 +210,13 @@
         });
         should.deepEqual(mfs.position, [100, null, 300, null]);
         should.deepEqual(mfs.mockResponse({
-            hom:{
+            hom: {
                 "2": 200,
             }
         }), {
             s: 0,
-            t:0,
-            r:{
+            t: 0,
+            r: {
                 hom: {
                     "2": 200,
                 }
@@ -227,22 +227,22 @@
     it("TESTmockResponse({mov:...}) returns mock movement response", function() {
         var mfs = new MockFireStep();
         mfs.mockResponse({
-            hom: { 
-                1:0,
-                2:0,
-                3:0,
+            hom: {
+                1: 0,
+                2: 0,
+                3: 0,
             },
         });
         should.deepEqual(mfs.position, [0, 0, 0, null]);
         should.deepEqual(mfs.mockResponse({
-            mov:{
+            mov: {
                 "1": 100,
                 "3": 300,
             }
         }), {
             s: 0,
-            t:0,
-            r:{
+            t: 0,
+            r: {
                 mov: {
                     "1": 100,
                     "3": 300,
@@ -251,13 +251,13 @@
         });
         should.deepEqual(mfs.position, [100, 0, 300, null]);
         should.deepEqual(mfs.mockResponse({
-            mov:{
+            mov: {
                 "2": 200,
             }
         }), {
             s: 0,
-            t:0,
-            r:{
+            t: 0,
+            r: {
                 mov: {
                     "2": 200,
                 }
@@ -268,11 +268,11 @@
     it("mockResponse({id:...}) returns mock identification response", function() {
         var mfs = new MockFireStep();
         should.deepEqual(mfs.mockResponse({
-            id:"",
+            id: "",
         }), {
             s: 0,
-            t:0,
-            r:{
+            t: 0,
+            r: {
                 id: {
                     app: "FireStep",
                     ch: "mock",
@@ -285,11 +285,11 @@
     it("TESTmockResponse({sys:...}) returns mock system response", function() {
         var mfs = new MockFireStep();
         should.deepEqual(mfs.mockResponse({
-            sys:"",
+            sys: "",
         }), {
             s: 0,
-            t:0,
-            r:{
+            t: 0,
+            r: {
                 sys: {
                     ah: false,
                     as: false,
