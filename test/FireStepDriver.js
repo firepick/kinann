@@ -112,11 +112,11 @@
     });
     it("TESThomeRequest(axes) returns home request", function() {
         var fsd = new FireStepDriver();
-        should.equal(fsd.homeRequest(), '{"hom":""}');
-        should.equal(fsd.homeRequest([]), '{"hom":""}');
-        should.equal(fsd.homeRequest([100]), '{"hom":{"1":100}}');
-        should.equal(fsd.homeRequest([null, 200.49]), '{"hom":{"2":200}}');
-        should.equal(fsd.homeRequest([-100, 0, 299.5, null]), '{"hom":{"1":-100,"2":0,"3":300}}');
+        should.equal(fsd.homeRequest(), '{"hom":""}\n');
+        should.equal(fsd.homeRequest([]), '{"hom":""}\n');
+        should.equal(fsd.homeRequest([100]), '{"hom":{"1":100}}\n');
+        should.equal(fsd.homeRequest([null, 200.49]), '{"hom":{"2":200}}\n');
+        should.equal(fsd.homeRequest([-100, 0, 299.5, null]), '{"hom":{"1":-100,"2":0,"3":300}}\n');
     });
     it("TESThome() homes", function(done) {
         let async = function*() {
@@ -129,7 +129,7 @@
                 var json = JSON.parse(fsd.state.response);
                 should(json.r).properties("sys");
                 var result = yield fsd.home().then(r=>async.next(r)).catch(e=>{throw e});
-                //should.equal(fsd.state.request, '{"hom":""}\n');
+                should.equal(fsd.state.request, '{"hom":""}\n');
                 done();
             } catch (err) {
                 winston.error("homeRequest", err);
@@ -137,12 +137,12 @@
         }();
         async.next();
     });
-    it("moveToRequest(axes) returns moveTo request", function() {
+    it("TESTmoveToRequest(axes) returns moveTo request", function() {
         var fsd = new FireStepDriver();
-        should.equal(fsd.moveToRequest(), '{"mov":""}');
-        should.equal(fsd.moveToRequest([]), '{"mov":""}');
-        should.equal(fsd.moveToRequest([100]), '{"mov":{"1":100}}');
-        should.equal(fsd.moveToRequest([null, 200.49]), '{"mov":{"2":200}}');
-        should.equal(fsd.moveToRequest([-100, 0, 299.5, null]), '{"mov":{"1":-100,"2":0,"3":300}}');
+        should.equal(fsd.moveToRequest(), '{"mov":""}\n');
+        should.equal(fsd.moveToRequest([]), '{"mov":""}\n');
+        should.equal(fsd.moveToRequest([100]), '{"mov":{"1":100}}\n');
+        should.equal(fsd.moveToRequest([null, 200.49]), '{"mov":{"2":200}}\n');
+        should.equal(fsd.moveToRequest([-100, 0, 299.5, null]), '{"mov":{"1":-100,"2":0,"3":300}}\n');
     });
 })

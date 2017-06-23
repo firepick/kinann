@@ -219,7 +219,7 @@
         }();
         async.next();
     });
-    it("moveTo(options) returns Promise resolved when written", function(done) {
+    it("TESTmoveTo(options) returns Promise resolved when written", function(done) {
         let async = function*() {
             var sd = new SerialDriver();
             var requests = [];

@@ -3,7 +3,9 @@
     const winston = require('winston');
 
     class SerialDriver {
-        constructor() {
+        constructor(options={}) {
+            this.serialTimeout = options.serialTimeout || 30000;
+            this.onRequestData = null;
             this.state = {
                 serialPath: '(no device)',
             };
@@ -87,7 +89,14 @@
                         var port = ports[0];
                         winston.debug("SerialDriver", port.comName, "SerialPort.open()...");
                         var sp = that.serialPort = new SerialPort(port.comName, options);
-                        console.log("sp", Object.keys(sp));
+                        sp.on('data', (data) => {
+                            winston.warn("onRequestData", data);
+                            var onRequestData = that.onRequestData;
+                            if (onRequestData) {
+                                that.onRequestData = null;
+                                onRequestData(data);
+                            }
+                        });
                         yield sp.open((err) => err ? async.throw(err) : async.next(true));
                         winston.info("SerialDriver", port.comName,
                             "SerialPort.open()", sp.isOpen() ? "OK" : "FAILED");
@@ -117,31 +126,47 @@
             });
         }
 
-        write(request) {
+        write(request, msTimeout=this.serialTimeout) {
+            var that = this;
+            if (!typeof request === "string") {
+                return Promise.reject(new Error(that.logPrefix + " write() expected String request:" + request));
+            }
             return new Promise((resolve, reject) => {
                 try {
-                    var sp = this.serialPort;
-                    if (request instanceof Error) {
-                        throw request;
+                    var sp = that.serialPort;
+                    if (that.onRequestData) {
+                        throw new Error("serial request already in progress");
                     }
                     if (!sp.isOpen()) {
-                        throw new Error(this.logPrefix + " is not open for write()");
+                        throw new Error("is not open for write()");
                     }
                     if (sp == null) {
-                        throw (new Error(this.logPrefix + " has no SerialPort"));
+                        throw new Error("has no SerialPort");
                     }
                     if (!sp.isOpen()) {
-                        throw (new Error(this.logPrefix + " is not open"));
+                        throw new Error("is not open");
                     }
-                    winston.info(this.logPrefix, "write()", request.trim());
+                    winston.info(that.logPrefix, "write()", request.trim());
                     sp.write(request);
+                    var eTimeout = new Error(that.logPrefix + " write() response timeout:" + msTimeout);
                     sp.drain((err) => {
                         if (err) {
+                            winston.error(that.logPrefix, "drain()", err);
                             throw err;
                         }
                         resolve(this);
+                        /*
+                        that.onRequestData = (data) => resolve(data);
+                        setTimeout(() => {
+                            if (that.onRequestData) {
+                                winston.error(eTimeout);
+                                reject(eTimeout);
+                            }
+                        }, msTimeout);
+                        */
                     });
                 } catch (err) {
+                    winston.error(that.logPrefix, "write()", err);
                     reject(err);
                 }
             });
@@ -153,16 +178,20 @@
         }
 
         home(axes = []) {
-            return this.write(this.homeRequest(axes));
+            try {
+                return this.write(this.homeRequest(axes));
+            } catch (err) {
+                return Promise.reject(err);
+            }
         }
 
         moveToRequest(axes = []) {
             if (axes.length === 0) {
-                return new Error("moveTo() requires at least one axis destination");
+                throw new Error("moveTo() requires at least one axis destination");
             }
             var coord = "XYZABCDEF";
             if (axes.length > coord.length) {
-                return new Error("moveTo() axis out of bounds:" + axes);
+                throw new Error("moveTo() axis out of bounds:" + axes);
             }
             var request = "G1";
             axes.forEach((a, i) => {
@@ -175,7 +204,11 @@
         }
 
         moveTo(axes = []) {
-            return this.write(this.moveToRequest(axes));
+            try {
+                return this.write(this.moveToRequest(axes));
+            } catch (err) {
+                return Promise.reject(err);
+            }
         }
 
     } // class SerialDriver

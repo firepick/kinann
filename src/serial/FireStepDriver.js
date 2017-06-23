@@ -8,7 +8,7 @@
         constructor(options = {}) {
             super(options);
             this.state.synced = false;
-            this.onDataAsync = null;
+            this.onResponse = null;
             this.msCommand = options.msCommand || 500;
             this.allowMock = options.allowMock == null ? false : options.allowMock;
             this.position = [];
@@ -30,33 +30,40 @@
             });
         }
 
-        send(request, async, msTimeout) {
+        write(request, msTimeout) {
             var that = this;
             var superWrite = super.write;
-            let asyncWrite = function*() {
-                that.state.request = request;
-                that.state.response = "(pending)";
-                var sp = that.serialPort;
-                winston.debug(that.logPrefix, "send()", request.trim());
-                if (that.onDataAsync) {
-                    throw new Error(that.logPrefix + " existing command has not completed");
+            return new Promise((resolve, reject) => {
+                try {
+                    let asyncWrite = function*() {
+                        try {
+                            winston.debug(that.logPrefix, "write()", request.trim());
+                            that.state.request = request;
+                            that.state.response = "(pending)";
+                            var sp = that.serialPort;
+                            if (that.onResponse) {
+                                throw new Error("FireStep command in progress");
+                            }
+                            yield superWrite.call(that, request, msTimeout)
+                                .then(r => asyncWrite.next(r))
+                                .catch(e => {throw e});
+                            that.onResponse = (line) => resolve(line);
+                            setTimeout(() => {
+                                if (that.onResponse) {
+                                    sp.close();
+                                    throw new Error("FireStep request timeout. SerialPort closed");
+                                }
+                            }, msTimeout);
+                        } catch (err) {
+                            winston.error(that.logPrefix, "write()", err);
+                            reject(err);
+                        }
+                    }();
+                    asyncWrite.next();
+                } catch (err) {
+                    reject(err);
                 }
-                yield superWrite.call(that, request)
-                    .then(r => asyncWrite.next(r))
-                    .catch(e => asyncWrite.throw(e));
-                that.onDataAsync = async;
-                setTimeout(() => {
-                    if (that.onDataAsync) {
-                        sp.close();
-                        var err = new Error(that.logPrefix + " could not connect to FireStep. SerialPort closed");
-                        winston.error(that.logPrefix, "timeout");
-                        async.throw(err);
-                    } else {
-                        // onData called async.next(line)
-                    }
-                }, msTimeout);
-            }();
-            asyncWrite.next();
+            });
         }
 
         onData(line) {
@@ -70,11 +77,11 @@
                 winston.info(this.logPrefix, "onData() ignoring", line);
                 return;
             }
-            var onDataAsync = this.onDataAsync;
-            if (onDataAsync) {
+            var onResponse = this.onResponse;
+            if (onResponse) {
                 this.state.response = line;
-                this.onDataAsync = null;
-                onDataAsync.next(line);
+                this.onResponse = null;
+                onResponse(line);
             }
         }
 
@@ -103,10 +110,12 @@
                         sp.on('data', (line) => that.onData.call(that, line));
                         state.synced = false;
                         yield setTimeout(() => async.next(true), 1000); // ignore initial FireStep output
-                        var line = yield that.send('{"id":""}\n', async, that.msCommand);
+                        var line = yield that.write('{"id":""}\n', that.msCommand)
+                            .then(r=>async.next(r)).catch(e=>{throw e});
                         state.synced = true;
                         state.id = JSON.parse(line).r.id;
-                        var line = yield that.send('{"sys":""}\n', async, that.msCommand);
+                        var line = yield that.write('{"sys":""}\n', async, that.msCommand)
+                            .then(r=>async.next(r)).catch(e=>{throw e});
                         state.sys = JSON.parse(line).r.sys;
 
                         winston.info(that.logPrefix, "synced", state.id);
@@ -132,7 +141,7 @@
                     hom
                 };
             }
-            return JSON.stringify(cmd);
+            return JSON.stringify(cmd) + "\n";
         }
 
         moveToRequest(axes = []) {
@@ -148,7 +157,7 @@
                     mov
                 };
             }
-            return JSON.stringify(cmd);
+            return JSON.stringify(cmd) + "\n";
         }
 
     } // class FireStepDriver
