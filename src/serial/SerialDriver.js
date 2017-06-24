@@ -136,10 +136,10 @@
             });
         }
 
-        write(request, msTimeout=this.serialTimeout) {
+        sendRequest(request, msTimeout=this.serialTimeout) {
             var that = this;
             if (!typeof request === "string") {
-                return Promise.reject(new Error(that.logPrefix + " write() expected String request:" + request));
+                return Promise.reject(new Error(that.logPrefix + " sendRequest() expected String request:" + request));
             }
             return new Promise((resolve, reject) => {
                 try {
@@ -148,7 +148,7 @@
                         throw new Error("serial request already in progress");
                     }
                     if (!sp.isOpen()) {
-                        throw new Error("is not open for write()");
+                        throw new Error("is not open for sendRequest()");
                     }
                     if (sp == null) {
                         throw new Error("has no SerialPort");
@@ -156,9 +156,9 @@
                     if (!sp.isOpen()) {
                         throw new Error("is not open");
                     }
-                    winston.info(that.logPrefix, "write()", request.trim());
+                    winston.info(that.logPrefix, "sendRequest()", request.trim());
                     sp.write(request);
-                    var eTimeout = new Error(that.logPrefix + " write() response timeout:" + msTimeout);
+                    var eTimeout = new Error(that.logPrefix + " sendRequest() response timeout:" + msTimeout);
                     sp.drain((err) => {
                         if (err) {
                             winston.error(that.logPrefix, "drain()", err);
@@ -173,7 +173,7 @@
                         }, msTimeout);
                     });
                 } catch (err) {
-                    winston.error(that.logPrefix, "write()", err);
+                    winston.error(that.logPrefix, "sendRequest()", err);
                     reject(err);
                 }
             });
@@ -186,7 +186,7 @@
 
         home(axes = []) {
             try {
-                return this.write(this.homeRequest(axes));
+                return this.sendRequest(this.homeRequest(axes));
             } catch (err) {
                 return Promise.reject(err);
             }
@@ -212,7 +212,7 @@
 
         moveTo(axes = []) {
             try {
-                return this.write(this.moveToRequest(axes));
+                return this.sendRequest(this.moveToRequest(axes));
             } catch (err) {
                 return Promise.reject(err);
             }

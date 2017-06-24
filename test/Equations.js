@@ -7,9 +7,6 @@ var mathjs = require("mathjs");
     var fs = require("fs");
     var gist = fs.readFileSync("test/rotarydeltax.json").toString().replace(/\n/g, " ");
 
-    it("takes time", function() {
-        console.log("NOTE: running all tests will take >20 seconds");
-    })
     it("define(sym,expr) and lookup(sym) define and retrieve named expressions", function() {
         var root = mathjs.parse("y=m*x+b");
         var eq = new Equations();
@@ -161,7 +158,7 @@ var mathjs = require("mathjs");
         eq.lookup(eq.derivative("tanh(2*x+1)", "x")).should.equal("sech(2 * x + 1) ^ 2 * 2");
     });
     it("gist computes quickly", function() {
-        var verbose = true;
+        var verbose = false;
         var eq = new Equations();
         var gist = fs.readFileSync("test/rotarydeltax.json").toString().replace(/\n/g, " ").toString();
 

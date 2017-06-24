@@ -30,13 +30,11 @@
             autoOpen: false,
         });
     });
-    it("TESTopen(filter) opens the given or available FireStep port", function(done) {
+    it("open(filter) opens the given or available FireStep port", function(done) {
         this.timeout(3000);
         let async = function*() {
-            function asyncPromise(p) {
-                p.then(r => async.next(r)).catch(e => async.throw(e));
-            }
             try {
+                var asyncPromise = (p) => p.then(r => async.next(r)).catch(e => async.throw(e));
                 var fsd = new FireStepDriver();
                 var filter = null;
                 var ports = yield asyncPromise(FireStepDriver.discover(filter));
@@ -76,12 +74,9 @@
     it("open(filter) opens a MockFireStep", function(done) {
         this.timeout(3000);
         let async = function*() {
-            winston.level="info";
             var fsd = null;
             try {
-                function asyncPromise(p) {
-                    p.then(r => async.next(r)).catch(e => {throw e});
-                }
+                var asyncPromise = (p) => p.then(r => async.next(r)).catch(e => async.throw(e));
                 fsd = new FireStepDriver({
                     allowMock: true
                 });
@@ -116,17 +111,18 @@
         should.equal(fsd.homeRequest([null, 200.49]), '{"hom":{"2":200}}\n');
         should.equal(fsd.homeRequest([-100, 0, 299.5, null]), '{"hom":{"1":-100,"2":0,"3":300}}\n');
     });
-    it("TESThome() homes", function(done) {
+    it("home() homes", function(done) {
         let async = function*() {
             try {
+                var asyncPromise = (p) => p.then(r=>async.next(r)).catch(e=>async.throw(e));
                 var fsd = new FireStepDriver({allowMock: true});
                 var sp = yield fsd.open({manufacturer: /no match/})
                     .then(r=>async.next(r))
-                    .catch(e=> {throw e;});
+                    .catch(e=> async.throw(e));
                 should.equal(fsd.state.request, '{"sys":""}\n');
                 var json = JSON.parse(fsd.state.response);
                 should(json.r).properties("sys");
-                var result = yield fsd.home().then(r=>async.next(r)).catch(e=>{throw e});
+                var result = yield asyncPromise(fsd.home());
                 should.equal(fsd.state.request, '{"hom":""}\n');
                 done();
             } catch (err) {

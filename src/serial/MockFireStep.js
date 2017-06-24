@@ -113,7 +113,8 @@
                     });
                 });
                 yield promise.then(r => async.next(r)).catch(e => async.throw(e));
-                var line = yield setTimeout(() => nLine === 0 && async.throw(new Error("timeout")), 500);
+                var eTimeout = new Error("timeout");
+                var line = yield setTimeout(() => nLine === 0 && async.throw(eTimeout), 500);
                 var json = JSON.parse(line);
                 should.deepEqual(json, mfs.mockResponse(request));
                 done();

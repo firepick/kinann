@@ -29,23 +29,23 @@
             });
         }
 
-        write(request, msTimeout) {
+        sendRequest(request, msTimeout) {
             var that = this;
-            var superWrite = super.write;
+            var super_sendRequest = super.sendRequest;
             return new Promise((resolve, reject) => {
                 try {
                     let async = function*() {
                         try {
-                            winston.debug(that.logPrefix, "write()", request.trim());
+                            winston.debug(that.logPrefix, "sendRequest()", request.trim());
                             that.state.request = request;
                             that.state.response = "(pending)";
                             var sp = that.serialPort;
-                            var line = yield superWrite.call(that, request, msTimeout)
+                            var line = yield super_sendRequest.call(that, request, msTimeout)
                                 .then(r => async.next(r))
                                 .catch(e => {throw e});
                             resolve(line);
                         } catch (err) {
-                            winston.error(that.logPrefix, "write()", err);
+                            winston.error(that.logPrefix, "sendRequest()", err);
                             reject(err);
                         }
                     }();
@@ -95,11 +95,11 @@
                         sp.on('data', (line) => that.onData.call(that, line));
                         state.synced = false;
                         yield setTimeout(() => async.next(true), 1000); // ignore initial FireStep output
-                        var line = yield that.write('{"id":""}\n', that.msCommand)
+                        var line = yield that.sendRequest('{"id":""}\n', that.msCommand)
                             .then(r=>async.next(r)).catch(e=>{throw e});
                         state.synced = true;
                         state.id = JSON.parse(line).r.id;
-                        var line = yield that.write('{"sys":""}\n', that.msCommand)
+                        var line = yield that.sendRequest('{"sys":""}\n', that.msCommand)
                             .then(r=>async.next(r)).catch(e=>{throw e});
                         state.sys = JSON.parse(line).r.sys;
 

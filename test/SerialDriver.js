@@ -12,9 +12,9 @@
             winston.debug("discover() ", ports.length, "ports:", ports.map(p => p.comName));
             if (ports.length) {
                 ports.forEach((p, i) =>
-                    console.log(`PORT#${i+1} ${p.comName} manufacturer:${p.manufacturer}`));
+                    winston.info(`PORT#${i+1} ${p.comName} manufacturer:${p.manufacturer}`));
             } else {
-                console.log("SerialDriver detected no connected serial ports");
+                winston.info("SerialDriver detected no connected serial ports");
             }
             var portsArduino = yield SerialDriver.discover({
                 manufacturer: /Arduino/
@@ -133,9 +133,7 @@
     });
     it("open(filter) opens first unlocked port", function(done) {
         let async = function*() {
-            function asyncPromise(p) {
-                p.then(r => async.next(r)).catch(e => async.throw(e));
-            }
+            var asyncPromise = (p) => p.then(r=>async.next(r)).catch(e=>async.throw(e));
             try {
                 var ports = yield asyncPromise(SerialDriver.discover());
                 if (!ports.length) {
@@ -177,28 +175,37 @@
         }();
         async.next();
     });
-    it("write(request) returns Promise resolved when written", function(done) {
+    it("sendRequest(request) returns Promise resolved when response is received", function(done) {
         let async = function*() {
-            var sd = new SerialDriver();
-            var requests = [];
-            sd.bindOpenPort(new MockSerialPort());
-            var resolved = yield sd.write("asdf").then(r => async.next(r)).catch(e => async.throw(e));
-            should.strictEqual(resolved, "OK1");
-            should.strictEqual(sd.serialPort.requests[0], 'asdf');
-            done();
+            try {
+                var asyncPromise = (p) => p.then(r=>async.next(r)).catch(e=>async.throw(e));
+                var sd = new SerialDriver();
+                var requests = [];
+                sd.bindOpenPort(new MockSerialPort());
+                var resolved = yield asyncPromise(sd.sendRequest("asdf"));
+                should.strictEqual(resolved, "OK1");
+                should.strictEqual(sd.serialPort.requests[0], 'asdf');
+                done();
+            } catch (err) {
+                winston.error(err);
+            }
         }();
         async.next();
     });
     it("home(options) returns Promise resolved when written", function(done) {
         let async = function*() {
-            var sd = new SerialDriver();
-            var requests = [];
-            sd.bindOpenPort(new MockSerialPort());
-            should.strictEqual(sd.isOpen(), true);
-            var resolved = yield sd.home([]).then(r => async.next(r)).catch(e => async.throw(e));
-            should.strictEqual(resolved, "OK1");
-            should.strictEqual(sd.serialPort.requests[0], 'G28.1');
-            done();
+            try{
+                var sd = new SerialDriver();
+                var requests = [];
+                sd.bindOpenPort(new MockSerialPort());
+                should.strictEqual(sd.isOpen(), true);
+                var resolved = yield sd.home([]).then(r => async.next(r)).catch(e => async.throw(e));
+                should.strictEqual(resolved, "OK1");
+                should.strictEqual(sd.serialPort.requests[0], 'G28.1');
+                done();
+            } catch (err) {
+                winston.error(err);
+            }
         }();
         async.next();
 
@@ -206,18 +213,19 @@
     it("moveTo(options) returns Promise resolved when written", function(done) {
         let async = function*() {
             try {
+                var asyncPromise = (p) => p.then(r=>async.next(r)).catch(e=>async.throw(e));
                 var sd = new SerialDriver();
                 var requests = [];
                 sd.bindOpenPort(new MockSerialPort()); // inject mock
                 should.strictEqual(sd.isOpen(), true);
                 var eCaught = null;
                 try {
-                    var resolved = yield sd.moveTo([]).then(r => async.next(r)).catch(e => async.throw(e));
+                    var resolved = yield asyncPromise(sd.moveTo([]));
                 } catch (err) {
                     eCaught = err;
                 }
                 should(eCaught).instanceOf(Error);
-                var resolved = yield sd.moveTo([null, 1.4, null, 2.3, null]).then(r => async.next(r)).catch(e => async.throw(e));
+                var resolved = yield asyncPromise(sd.moveTo([null, 1.4, null, 2.3, null]));
                 should.strictEqual(resolved, "OK1");
                 should.strictEqual(sd.serialPort.requests[0], 'G1 Y1.4 A2.3');
                 done();

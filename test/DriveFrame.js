@@ -133,9 +133,9 @@
             frame.axisPos = [10, 20, 30];
             yield(frame.home().then(r => async.next(r)));
             should.deepEqual(frame.state, [-1, -2, -3, 0.5, 0.5, 0.5]);
-            should.throws(() => yield(frame.home({
-                axis: -1
-            }).catch(err => async.throw(err))));
+            should.throws(
+                () => yield(frame.home({axis: -1}).catch(err => async.throw(err)))
+            );
             var homeMotorPos = frame.toMotorPos(frame.drives.map((d) => d.minPos));
             should.deepEqual(sd.commands, [{
                 home: [homeMotorPos[0], null, null],

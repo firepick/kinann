@@ -263,7 +263,7 @@ var Kinann = require("../index");
         testCoord([75, 50, 5, 45]);
         testCoord([277, 75, 8, 190]);
     })
-    it("inverseNetwork(network) returns inverse of network for invertible function", function() {
+    it("inverseNetwork(network) returns inverse of network for invertible function (MAY FAIL)", function() {
         this.timeout(60 * 1000);
         var factory = new Factory(testVars);
         var network = factory.createNetwork({ // original network adds 1
