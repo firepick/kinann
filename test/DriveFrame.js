@@ -114,37 +114,40 @@
         }();
         async.next();
     })
-    it("home() moves one or all drives to minimum position", function(done) {
+    it("TESThome(axes) moves one or all drives to minimum position", function(done) {
         var async = function*() {
-            var sd = new MockSerialDriver();
-            var frame = new DriveFrame([belt300, belt200, screw], {
-                serialDriver: sd,
-            });
-            should.deepEqual(frame.axisPos, [null, null, null]);
-            var result = yield(frame.home({
-                axis: 0
-            }).then(r => async.next(r)));
-            should.strictEqual(result, frame);
-            should.deepEqual(frame.axisPos, [-1, null, null]);
-            yield(frame.home({
-                axis: 1
-            }).then(r => async.next(r)));
-            should.deepEqual(frame.axisPos, [-1, -2, null]);
-            frame.axisPos = [10, 20, 30];
-            yield(frame.home().then(r => async.next(r)));
-            should.deepEqual(frame.state, [-1, -2, -3, 0.5, 0.5, 0.5]);
-            should.throws(
-                () => yield(frame.home({axis: -1}).catch(err => async.throw(err)))
-            );
-            var homeMotorPos = frame.toMotorPos(frame.drives.map((d) => d.minPos));
-            should.deepEqual(sd.commands, [{
-                home: [homeMotorPos[0], null, null],
-            }, {
-                home: [homeMotorPos[0], homeMotorPos[1], null],
-            }, {
-                home: [homeMotorPos[0], homeMotorPos[1], homeMotorPos[2], ],
-            }]);
-            done();
+            try {
+                var asyncPromise = (p) => p.then(r=>async.next(r)).catch(e=>async.throw(e));
+                var sd = new MockSerialDriver();
+                var frame = new DriveFrame([belt300, belt200, screw], {
+                    serialDriver: sd,
+                });
+                should.deepEqual(frame.axisPos, [null, null, null]);
+                var result = yield asyncPromise(frame.home([true]));
+                should.strictEqual(result, frame);
+                should.deepEqual(frame.axisPos, [-1, null, null]);
+                var result = yield asyncPromise(frame.home([null,true]));
+                should.deepEqual(frame.axisPos, [-1, -2, null]);
+                frame.axisPos = [10, 20, 30];
+                var result = yield asyncPromise(frame.home());
+                should.deepEqual(frame.state, [-1, -2, -3, 0.5, 0.5, 0.5]);
+                should.throws(
+                    () => yield(frame.home({axis: -1}).catch(err => async.throw(err)))
+                );
+                var homeMotorPos = frame.toMotorPos(frame.drives.map((d) => d.minPos));
+                should.deepEqual(sd.commands, [{
+                    home: [homeMotorPos[0], null, null],
+                }, {
+                    home: [homeMotorPos[0], homeMotorPos[1], null],
+                }, {
+                    home: [homeMotorPos[0], homeMotorPos[1], homeMotorPos[2], ],
+                }]);
+                var result = yield asyncPromise(frame.home([10,null,30]));
+                should.deepEqual(frame.state, [10, -2, 30, 0.5, 0.5, 0.5]);
+                done();
+            } catch(err) {
+                winston.error(err);
+            }
         }();
         async.next(); // start async
     })

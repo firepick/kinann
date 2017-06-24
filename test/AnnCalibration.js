@@ -1,5 +1,6 @@
 // mocha -R min --inline-diffs *.js
 (typeof describe === 'function') && describe("AnnCalibration", function() {
+    const winston = require("winston");
     const should = require("should");
     const mathjs = require("mathjs");
     const AnnCalibration = require("../src/AnnCalibration");

@@ -111,15 +111,21 @@
         }
 
         home(options = {}) {
-            if (options.axis != null) {
-                var drive = this.drives[options.axis];
-                if (drive == null) {
-                    throw new Error("home() invalid axis:" + options.axis);
-                }
-                var newAxisPos = this.axisPos.map((p, i) => i === options.axis ? this.drives[i].minPos : p);
+            if (options instanceof Array) {
+                var newAxisPos = this.axisPos.map((a,i) => {
+                    var opt = options[i];
+                    if (typeof opt === "number") {
+                        return opt;
+                    } else if (opt === true) {
+                        return this.drives[i].minPos;
+                    } else {
+                        return a;
+                    }
+                });
             } else {
                 var newAxisPos = this.drives.map((d) => d.minPos);
             }
+            winston.debug("home() newAxisPos:", JSON.stringify(newAxisPos));
             return new Promise((resolve, reject) => {
                 var motorPos = this.toMotorPos(newAxisPos);
                 this.serialDriver.home(motorPos).then(result => {
