@@ -70,7 +70,27 @@
         }
 
         get logPrefix() {
-            return this.constructor.name + " " + (this.serialPort ? this.serialPort.path : '(no serialPort)');
+            return this.constructor.name + " " + (this.serialPort ? this.serialPort.path : '(no serial port)');
+        }
+
+        onData(data) {
+            var onRequestData = this.onRequestData;
+            if (onRequestData) {
+                winston.info(this.logPrefix, "onRequestData()", data);
+                this.onRequestData = null;
+                onRequestData(data);
+            }
+        }
+
+        bindOpenPort(serialPort) {
+            var that = this;
+            this.serialPort = serialPort;
+            if (!serialPort.isOpen()) {
+                throw new Error("bindOpenPort() failed. SerialPort is not open: " + serialPort.path);
+            }
+            serialPort.on('data', (data) => that.onData.call(that, data));
+            winston.info(this.logPrefix, "bindOpenPort()", serialPort.isOpen() ? "OK" : "FAILED");
+            this.state.serialPath = serialPort.path;
         }
 
         open(filter = SerialDriver.defaultFilter(), options = SerialDriver.serialPortOptions()) {
@@ -82,25 +102,15 @@
                             .then(ports => async.next(ports))
                             .catch(err => async.throw(err));
                         if (!ports.length) {
-                            throw new Error(that.logPrefix + " found no ports to open()");
+                            throw new Error(that.logPrefix + " SerialDriver.open() failed");
                         }
                         winston.debug(that.logPrefix + " open() discovered", ports.length,
                             ports.length ? "ports:" + ports.map(p => p.comName) : "ports");
                         var port = ports[0];
                         winston.debug("SerialDriver", port.comName, "SerialPort.open()...");
-                        var sp = that.serialPort = new SerialPort(port.comName, options);
-                        sp.on('data', (data) => {
-                            winston.warn("onRequestData", data);
-                            var onRequestData = that.onRequestData;
-                            if (onRequestData) {
-                                that.onRequestData = null;
-                                onRequestData(data);
-                            }
-                        });
+                        var sp = new SerialPort(port.comName, options);
                         yield sp.open((err) => err ? async.throw(err) : async.next(true));
-                        winston.info("SerialDriver", port.comName,
-                            "SerialPort.open()", sp.isOpen() ? "OK" : "FAILED");
-                        that.state.serialPath = port.comName;
+                        that.bindOpenPort.call(sp);
                         resolve(sp);
                     } catch (err) {
                         reject(err);
@@ -154,8 +164,6 @@
                             winston.error(that.logPrefix, "drain()", err);
                             throw err;
                         }
-                        resolve(this);
-                        /*
                         that.onRequestData = (data) => resolve(data);
                         setTimeout(() => {
                             if (that.onRequestData) {
@@ -163,7 +171,6 @@
                                 reject(eTimeout);
                             }
                         }, msTimeout);
-                        */
                     });
                 } catch (err) {
                     winston.error(that.logPrefix, "write()", err);

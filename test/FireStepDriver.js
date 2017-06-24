@@ -36,9 +36,8 @@
             function asyncPromise(p) {
                 p.then(r => async.next(r)).catch(e => async.throw(e));
             }
-            var fsd = null;
             try {
-                fsd = new FireStepDriver();
+                var fsd = new FireStepDriver();
                 var filter = null;
                 var ports = yield asyncPromise(FireStepDriver.discover(filter));
                 if (ports.length) {
@@ -62,28 +61,27 @@
                         should.strictEqual(1, 0, "should never execute");
                     } catch (err) {
                         should(err).instanceOf(Error);
-                        err.message.should.match(/found no ports/);
+                        err.message.should.match(/no serial port/);
                         winston.info("FireStepDriver open() rejected as expected with no Arduino devices");
                     }
                 }
+                fsd.isOpen() && fsd.close();
+                done();
             } catch (err) {
                 winston.error(err);
             }
-            if (fsd && fsd.isOpen()) {
-                fsd.close();
-            }
-            done();
         }();
         async.next();
     });
-    it("TESTopen(filter) opens a MockFireStep", function(done) {
+    it("open(filter) opens a MockFireStep", function(done) {
         this.timeout(3000);
         let async = function*() {
-            function asyncPromise(p) {
-                p.then(r => async.next(r)).catch(e => async.throw(e));
-            }
+            winston.level="info";
             var fsd = null;
             try {
+                function asyncPromise(p) {
+                    p.then(r => async.next(r)).catch(e => {throw e});
+                }
                 fsd = new FireStepDriver({
                     allowMock: true
                 });
@@ -110,7 +108,7 @@
         }();
         async.next();
     });
-    it("TESThomeRequest(axes) returns home request", function() {
+    it("homeRequest(axes) returns home request", function() {
         var fsd = new FireStepDriver();
         should.equal(fsd.homeRequest(), '{"hom":""}\n');
         should.equal(fsd.homeRequest([]), '{"hom":""}\n');
@@ -137,7 +135,7 @@
         }();
         async.next();
     });
-    it("TESTmoveToRequest(axes) returns moveTo request", function() {
+    it("moveToRequest(axes) returns moveTo request", function() {
         var fsd = new FireStepDriver();
         should.equal(fsd.moveToRequest(), '{"mov":""}\n');
         should.equal(fsd.moveToRequest([]), '{"mov":""}\n');
