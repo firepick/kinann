@@ -2,7 +2,7 @@
     class StepperDrive {
         constructor(options = {}) {
             this.type = "StepperDrive";
-            this.isHomed = true;
+            this.isHomeable = true;
             this.name = null;
             Object.assign(this, options);
             this.minPos = this.minPos == null ? 0 : this.minPos; // minimum position
