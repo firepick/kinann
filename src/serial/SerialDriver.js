@@ -84,6 +84,9 @@
 
         bindOpenPort(serialPort) {
             var that = this;
+            if (serialPort == null) {
+                throw new Error("bindOpenPort() failed. No serialPort provided");
+            }
             this.serialPort = serialPort;
             if (!serialPort.isOpen()) {
                 throw new Error("bindOpenPort() failed. SerialPort is not open: " + serialPort.path);
@@ -110,7 +113,7 @@
                         winston.debug("SerialDriver", port.comName, "SerialPort.open()...");
                         var sp = new SerialPort(port.comName, options);
                         yield sp.open((err) => err ? async.throw(err) : async.next(true));
-                        that.bindOpenPort.call(sp);
+                        that.bindOpenPort.call(that, sp);
                         resolve(sp);
                     } catch (err) {
                         reject(err);
