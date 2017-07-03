@@ -104,7 +104,7 @@
             done();
         });
     });
-    it("matchesPort(filter, port) returns true if filter matches port", function() {
+    it("TESTmatchesPort(filter, port) returns true if filter matches port", function() {
         var portNone = {
             comName: "/dev/ttyNotThere",
             manufacturer: null,
@@ -130,6 +130,8 @@
         should.deepEqual(ports.map(p => SerialDriver.matchesPort(filterMfg, p)), [false, true, true]);
         should.deepEqual(ports.map(p => SerialDriver.matchesPort(filterArduino, p)), [false, true, false]);
         should.deepEqual(ports.map(p => SerialDriver.matchesPort(filterNone, p)), [true, false, false]);
+        should.deepEqual(ports.map(p => SerialDriver.matchesPort("/dev/ttyOther", p)), [false, false, true]);
+        should.deepEqual(ports.map(p => SerialDriver.matchesPort(null, p)), [false, true, true]);
     });
     it("open(filter) opens first unlocked port", function(done) {
         let async = function*() {

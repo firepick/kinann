@@ -31,7 +31,14 @@
         }
 
         static matchesPort(filter, port) {
-            return filter == null || Object.keys(filter).reduce((acc, key) => {
+            if (filter == null) {
+                filter = SerialDriver.defaultFilter();
+            } else if (typeof filter === 'string') {
+                filter = {
+                    comName: filter,
+                }
+            }
+            return Object.keys(filter).reduce((acc, key) => {
                 if (acc) {
                     var value = port[key];
                     var selector = filter[key];

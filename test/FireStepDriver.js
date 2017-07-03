@@ -30,10 +30,9 @@
             autoOpen: false,
         });
     });
-    it("TESTopen(filter) opens the given or available FireStep port", function(done) {
+    it("open(filter) opens the given or available FireStep port", function(done) {
         this.timeout(3000);
         let async = function*() {
-        winston.level="debug";
             try {
                 var asyncPromise = (p) => p.then(r => async.next(r)).catch(e => async.throw(e));
                 var fsd = new FireStepDriver();
