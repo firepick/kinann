@@ -13,6 +13,13 @@
             this.gearIn = this.gearIn || 1;
             this.gearOut = this.gearOut || 1;
 
+            // BeltDrive
+            this.pitch = this.pitch || 2;
+            this.teeth = this.teeth || 16;
+
+            // ScrewDrive
+            this.lead = this.lead || 0.8; // M5 screw pitch
+
             Object.defineProperty(this, "gearRatio", {
                 get: () => this.gearOut / this.gearIn,
             });
@@ -54,6 +61,9 @@
             if (json.type === "ScrewDrive") {
                 return new StepperDrive.ScrewDrive(json);
             }
+            if (json.type === "GearDrive") {
+                return new StepperDrive.GearDrive(json);
+            }
             return new StepperDrive(json);
         }
         static get BeltDrive() {
@@ -62,14 +72,15 @@
         static get ScrewDrive() {
             return $ScrewDrive;
         }
+        static get GearDrive() {
+            return $GearDrive;
+        }
     } //// CLASS StepperDrive
 
     var $BeltDrive = class BeltDrive extends StepperDrive {
         constructor(options = {}) {
             super(options);
             this.type = "BeltDrive";
-            this.pitch = this.pitch || 2;
-            this.teeth = this.teeth || 16;
             Object.defineProperty(this, "unitTravel", {
                 get: () => (this.mstepPulses * this.teeth * this.pitch) / (this.steps * this.microsteps * this.gearRatio),
             });
@@ -80,12 +91,22 @@
         constructor(options = {}) {
             super(options);
             this.type = "ScrewDrive";
-            this.lead = this.lead || 0.8; // M5 screw pitch
             Object.defineProperty(this, "unitTravel", {
                 get: () => 1 / (this.steps * (this.microsteps / this.mstepPulses) * this.lead * this.gearRatio),
             });
         }
     } // CLASS ScrewDrive
+
+    var $GearDrive = class GearDrive extends StepperDrive {
+        constructor(options = {}) {
+            super(options);
+            this.type = "GearDrive";
+            this.maxPos = 360;
+            Object.defineProperty(this, "unitTravel", {
+                get: () => 360 / (this.steps * (this.microsteps / this.mstepPulses) * this.gearRatio),
+            });
+        }
+    } // CLASS GearDrive
 
     module.exports = exports.StepperDrive = StepperDrive;
 })(typeof exports === "object" ? exports : (exports = {}));
@@ -96,10 +117,11 @@
     var StepperDrive = exports.StepperDrive;
     var BeltDrive = StepperDrive.BeltDrive;
     var ScrewDrive = StepperDrive.ScrewDrive;
+    var GearDrive = StepperDrive.GearDrive;
 
     it("BeltDrive() constructs a stepper motor belt drive", function() {
-        var defaultBelt = new BeltDrive();
-        defaultBelt.should.properties({
+        var drive = new BeltDrive();
+        drive.should.properties({
             minPos: 0, // travel position
             maxPos: 100, // travel position
             mstepPulses: 1, // pulses per microstep
@@ -107,7 +129,40 @@
             teeth: 16, // motor pulley teeth
             microsteps: 16, // motor microsteps
             steps: 200, // motor steps per revolution
+            lead: 0.8, // latent ScrewDrive property
         });
+        drive.toMotorPos(100).should.equal(100*1*16*200/(2*16));
+        drive.toAxisPos(100*1*16*200/(2*16)).should.equal(100);
+    });
+    it("ScrewDrive() constructs a stepper motor screw drive", function() {
+        var drive = new ScrewDrive();
+        drive.should.properties({
+            minPos: 0, // travel position
+            maxPos: 100, // travel position
+            mstepPulses: 1, // pulses per microstep
+            pitch: 2, // latent BeltDrive property
+            teeth: 16, // latent BeltDrive property
+            microsteps: 16, // motor microsteps
+            steps: 200, // motor steps per revolution
+            lead: 0.8, // M5 screw
+        });
+        drive.toMotorPos(100).should.equal(100*1*16*200*0.8);
+        drive.toAxisPos(100*1*16*200*0.8).should.equal(100);
+    });
+    it("GearDrive() constructs a stepper motor belt drive", function() {
+        var drive = new GearDrive();
+        drive.should.properties({
+            minPos: 0, // travel position
+            maxPos: 360, // travel position
+            mstepPulses: 1, // pulses per microstep
+            pitch: 2, // latent BeltDrive property
+            teeth: 16, // latent BeltDrive property
+            microsteps: 16, // motor microsteps
+            steps: 200, // motor steps per revolution
+            lead: 0.8, // latent ScrewDrive property
+        });
+        drive.toMotorPos(100).should.equal(100*1*16*200/360);
+        drive.toAxisPos(100*1*16*200/360).should.equal(100);
     });
     it("BeltDrive.toAxisPos(motorPos) axis position of motor position", function() {
         var belt = new BeltDrive();
@@ -192,6 +247,15 @@
         var screw2 = StepperDrive.fromJSON(screw.toJSON());
         screw2.should.properties({
             lead: 0.9,
+            color: "red", // decoration
+        });
+        var gear = new GearDrive({
+            gearIn: 0.9,
+            color: "red"
+        });
+        var gear2 = StepperDrive.fromJSON(gear.toJSON());
+        gear2.should.properties({
+            gearIn: 0.9,
             color: "red", // decoration
         });
         var sd = new StepperDrive({
