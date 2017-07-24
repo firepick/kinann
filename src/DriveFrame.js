@@ -28,15 +28,15 @@
                     throw new Error("attempt to set read-only property: deadband")
                 },
             });
-            Object.defineProperty(this, "axisPos", {
+            Object.defineProperty(this, "drivePos", {
                 enumerable: true,
                 get: () => this.state.slice(0, this.drives.length),
-                set: (axisPos) => {
-                    if (!(axisPos instanceof Array) || axisPos.length !== this.drives.length) {
-                        throw new Error("Expected array of length:" + this.drives.length + " axisPos:" + JSON.stringify(axisPos));
+                set: (drivePos) => {
+                    if (!(drivePos instanceof Array) || drivePos.length !== this.drives.length) {
+                        throw new Error("Expected array of length:" + this.drives.length + " drivePos:" + JSON.stringify(drivePos));
                     }
-                    axisPos = this.clipAxisPos(axisPos);
-                    var newpos = axisPos.map((pos, i) => {
+                    drivePos = this.clipDrivePos(drivePos);
+                    var newpos = drivePos.map((pos, i) => {
                         var di = this.drives[i];
                         var deadbandOld = this.$state[i + this.drives.length];
                         if (this.state[i] === pos) {
@@ -87,7 +87,7 @@
             var obj = {
                 type: "DriveFrame",
                 state: this.state,
-                axisPos: this.axisPos,
+                drivePos: this.drivePos,
                 backlash: this.backlash,
                 deadbandScale: this.deadbandScale,
                 drives: this.drives.map((d) => d.toJSON()),
@@ -96,8 +96,8 @@
             return obj;
         }
 
-        clipAxisPos(axisPos) {
-            return axisPos.map((p, i) => {
+        clipDrivePos(drivePos) {
+            return drivePos.map((p, i) => {
                 var di = this.drives[i];
                 return p == null ? null : Math.min(Math.max(di.minPos, p), di.maxPos);
             });
@@ -112,7 +112,7 @@
 
         home(options = {}) {
             if (options instanceof Array) {
-                var newAxisPos = this.axisPos.map((a,i) => {
+                var newDrivePos = this.drivePos.map((a,i) => {
                     var opt = options[i];
                     if (typeof opt === "number") {
                         return opt;
@@ -123,13 +123,13 @@
                     }
                 });
             } else {
-                var newAxisPos = this.drives.map((d) => d.minPos);
+                var newDrivePos = this.drives.map((d) => d.minPos);
             }
-            winston.debug("home() newAxisPos:", JSON.stringify(newAxisPos));
+            winston.debug("home() newDrivePos:", JSON.stringify(newDrivePos));
             return new Promise((resolve, reject) => {
-                var motorPos = this.toMotorPos(newAxisPos);
+                var motorPos = this.toMotorPos(newDrivePos);
                 this.serialDriver.home(motorPos).then(result => {
-                    this.axisPos = newAxisPos;
+                    this.drivePos = newDrivePos;
                     resolve(this);
                 }).catch(err => reject(err))
             });
@@ -144,28 +144,28 @@
             if (position.axis) {
                 var newPos = position.axis;
             } else if (position.motor) {
-                var newPos = this.toAxisPos(position.motor);
+                var newPos = this.toDrivePos(position.motor);
             } else {
                 throw new Error("moveTo() unknown position:" + JSON.stringify(position));
             }
-            var oldPos = this.axisPos;
-            var newAxisPos = newPos.map((p, i) => p == null ? oldPos[i] : p);
-            newAxisPos = this.clipAxisPos(newAxisPos);
+            var oldPos = this.drivePos;
+            var newDrivePos = newPos.map((p, i) => p == null ? oldPos[i] : p);
+            newDrivePos = this.clipDrivePos(newDrivePos);
             return new Promise((resolve, reject) => {
-                var motorPos = this.toMotorPos(newAxisPos);
+                var motorPos = this.toMotorPos(newDrivePos);
                 this.serialDriver.moveTo(motorPos).then(result => {
-                    this.axisPos = newAxisPos;
+                    this.drivePos = newDrivePos;
                     resolve(this);
                 }).catch(err => reject(err));
             });
         }
 
-        toAxisPos(motorPos) {
-            return motorPos.map((m, i) => m == null ? null : this.drives[i].toAxisPos(m));
+        toDrivePos(motorPos) {
+            return motorPos.map((m, i) => m == null ? null : this.drives[i].toDrivePos(m));
         }
 
-        toMotorPos(axisPos) {
-            return axisPos.map((a, i) => a == null ? null : this.drives[i].toMotorPos(a));
+        toMotorPos(drivePos) {
+            return drivePos.map((a, i) => a == null ? null : this.drives[i].toMotorPos(a));
         }
 
         basisVariables() {

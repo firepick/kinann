@@ -28,30 +28,30 @@
         toJSON() {
             return this;
         }
-        checkAxisPos(axisPos) {
-            if (isNaN(axisPos)) {
-                throw new Error("Expected number for " + this.name + " axisPos: " + JSON.stringify(axisPos));
+        checkDrivePos(drivePos) {
+            if (isNaN(drivePos)) {
+                throw new Error("Expected number for " + this.name + " drivePos: " + JSON.stringify(drivePos));
             }
-            if (axisPos < this.minPos) {
-                throw new Error(this.name + " axisPos " + axisPos + " is lower than minPos:" + this.minPos);
+            if (drivePos < this.minPos) {
+                throw new Error(this.name + " drivePos " + drivePos + " is lower than minPos:" + this.minPos);
             }
-            if (this.maxPos < axisPos) {
-                throw new Error(this.name + " axisPos " + axisPos + " is greater than maxPos:" + this.maxPos);
+            if (this.maxPos < drivePos) {
+                throw new Error(this.name + " drivePos " + drivePos + " is greater than maxPos:" + this.maxPos);
             }
             return (
-                typeof axisPos === 'number' &&
-                !isNaN(axisPos) &&
-                this.minPos <= axisPos &&
-                axisPos <= this.maxPos ?
-                axisPos : NaN
+                typeof drivePos === 'number' &&
+                !isNaN(drivePos) &&
+                this.minPos <= drivePos &&
+                drivePos <= this.maxPos ?
+                drivePos : NaN
             )
         }
 
-        toMotorPos(axisPos) {
-            return isNaN(this.checkAxisPos(axisPos)) ? NaN : axisPos / this.unitTravel;
+        toMotorPos(drivePos) {
+            return isNaN(this.checkDrivePos(drivePos)) ? NaN : drivePos / this.unitTravel;
         }
-        toAxisPos(motorPos) {
-            return this.checkAxisPos(motorPos == null ? NaN : this.unitTravel * motorPos);
+        toDrivePos(motorPos) {
+            return this.checkDrivePos(motorPos == null ? NaN : this.unitTravel * motorPos);
         }
         static fromJSON(json) {
             var json = typeof json === "object" ? json : JSON.parse(json);
@@ -132,7 +132,7 @@
             lead: 0.8, // latent ScrewDrive property
         });
         drive.toMotorPos(100).should.equal(100*1*16*200/(2*16));
-        drive.toAxisPos(100*1*16*200/(2*16)).should.equal(100);
+        drive.toDrivePos(100*1*16*200/(2*16)).should.equal(100);
     });
     it("ScrewDrive() constructs a stepper motor screw drive", function() {
         var drive = new ScrewDrive();
@@ -147,7 +147,7 @@
             lead: 0.8, // M5 screw
         });
         drive.toMotorPos(100).should.equal(100*1*16*200*0.8);
-        drive.toAxisPos(100*1*16*200*0.8).should.equal(100);
+        drive.toDrivePos(100*1*16*200*0.8).should.equal(100);
     });
     it("GearDrive() constructs a stepper motor belt drive", function() {
         var drive = new GearDrive();
@@ -162,72 +162,72 @@
             lead: 0.8, // latent ScrewDrive property
         });
         drive.toMotorPos(100).should.equal(100*1*16*200/360);
-        drive.toAxisPos(100*1*16*200/360).should.equal(100);
+        drive.toDrivePos(100*1*16*200/360).should.equal(100);
     });
-    it("BeltDrive.toAxisPos(motorPos) axis position of motor position", function() {
+    it("BeltDrive.toDrivePos(motorPos) axis position of motor position", function() {
         var belt = new BeltDrive();
-        should.throws(() => belt.toAxisPos(null));
-        should.throws(() => belt.toAxisPos(undefined));
-        should.throws(() => belt.toAxisPos(NaN));
-        should.throws(() => belt.toAxisPos(-1));
+        should.throws(() => belt.toDrivePos(null));
+        should.throws(() => belt.toDrivePos(undefined));
+        should.throws(() => belt.toDrivePos(NaN));
+        should.throws(() => belt.toDrivePos(-1));
 
-        belt.toAxisPos(1).should.equal(0.01);
-        belt.toAxisPos(200).should.equal(2);
+        belt.toDrivePos(1).should.equal(0.01);
+        belt.toDrivePos(200).should.equal(2);
         belt = new BeltDrive({
             pitch: 4
         });
-        belt.toAxisPos(1).should.equal(0.02);
-        belt.toAxisPos(200).should.equal(4);
+        belt.toDrivePos(1).should.equal(0.02);
+        belt.toDrivePos(200).should.equal(4);
         belt = new BeltDrive({
             teeth: 8
         });
-        belt.toAxisPos(1).should.equal(0.005);
-        belt.toAxisPos(200).should.equal(1);
+        belt.toDrivePos(1).should.equal(0.005);
+        belt.toDrivePos(200).should.equal(1);
         belt = new BeltDrive({
             microsteps: 8
         });
-        belt.toAxisPos(1).should.equal(0.02);
-        belt.toAxisPos(200).should.equal(4);
+        belt.toDrivePos(1).should.equal(0.02);
+        belt.toDrivePos(200).should.equal(4);
         belt = new BeltDrive({
             steps: 400
         });
-        belt.toAxisPos(1).should.equal(0.005);
-        belt.toAxisPos(200).should.equal(1);
+        belt.toDrivePos(1).should.equal(0.005);
+        belt.toDrivePos(200).should.equal(1);
         belt = new BeltDrive({
             mstepPulses: 2
         });
-        belt.toAxisPos(1).should.equal(0.02);
-        belt.toAxisPos(200).should.equal(4);
+        belt.toDrivePos(1).should.equal(0.02);
+        belt.toDrivePos(200).should.equal(4);
 
         belt.minPos = -1;
-        belt.toAxisPos(-1).should.equal(-0.02);
+        belt.toDrivePos(-1).should.equal(-0.02);
     });
     it("BeltDrive.toMotorPos(appPos) motor position of axis position", function() {
         return true;
         var belt = new BeltDrive();
-        belt.toAxisPos(null).should.NaN();
-        belt.toAxisPos(undefined).should.NaN();
-        belt.toAxisPos(NaN).should.NaN();
-        [0.5, 1, 2, 100].map((axisPos) =>
-            belt.toAxisPos(belt.toMotorPos(axisPos)).should.equal(axisPos));
+        belt.toDrivePos(null).should.NaN();
+        belt.toDrivePos(undefined).should.NaN();
+        belt.toDrivePos(NaN).should.NaN();
+        [0.5, 1, 2, 100].map((drivePos) =>
+            belt.toDrivePos(belt.toMotorPos(drivePos)).should.equal(drivePos));
         belt.pitch = 4;
-        [0.5, 1, 2, 100].map((axisPos) =>
-            belt.toAxisPos(belt.toMotorPos(axisPos)).should.equal(axisPos));
+        [0.5, 1, 2, 100].map((drivePos) =>
+            belt.toDrivePos(belt.toMotorPos(drivePos)).should.equal(drivePos));
         belt.teeth = 8;
-        [0.5, 1, 2, 100].map((axisPos) =>
-            belt.toAxisPos(belt.toMotorPos(axisPos)).should.equal(axisPos));
+        [0.5, 1, 2, 100].map((drivePos) =>
+            belt.toDrivePos(belt.toMotorPos(drivePos)).should.equal(drivePos));
         belt.microsteps = 8;
-        [0.5, 1, 2, 100].map((axisPos) =>
-            belt.toAxisPos(belt.toMotorPos(axisPos)).should.equal(axisPos));
+        [0.5, 1, 2, 100].map((drivePos) =>
+            belt.toDrivePos(belt.toMotorPos(drivePos)).should.equal(drivePos));
         belt.steps = 400;
-        [0.5, 1, 2, 100].map((axisPos) =>
-            belt.toAxisPos(belt.toMotorPos(axisPos)).should.equal(axisPos));
+        [0.5, 1, 2, 100].map((drivePos) =>
+            belt.toDrivePos(belt.toMotorPos(drivePos)).should.equal(drivePos));
         belt.mstepPulses = 2;
-        [0.5, 1, 2, 100].map((axisPos) =>
-            belt.toAxisPos(belt.toMotorPos(axisPos)).should.equal(axisPos));
+        [0.5, 1, 2, 100].map((drivePos) =>
+            belt.toDrivePos(belt.toMotorPos(drivePos)).should.equal(drivePos));
         belt.toMotorPos(101).should.NaN();
         belt.maxPos = 101;
-        belt.toAxisPos(belt.toMotorPos(101)).should.equal(101);
+        belt.toDrivePos(belt.toMotorPos(101)).should.equal(101);
     })
     it("StepperDrive.fromJSON(json).toJSON() (de-)serializes decorated StepperDrive", function() {
         var belt = new BeltDrive({
@@ -273,8 +273,8 @@
         var drive = new StepperDrive({
             unitTravel: 0.1
         });
-        drive.toAxisPos(1).should.equal(0.1);
-        drive.toAxisPos(10).should.equal(1);
-        drive.toMotorPos(drive.toAxisPos(4)).should.equal(4);
+        drive.toDrivePos(1).should.equal(0.1);
+        drive.toDrivePos(10).should.equal(1);
+        drive.toMotorPos(drive.toDrivePos(4)).should.equal(4);
     });
 })

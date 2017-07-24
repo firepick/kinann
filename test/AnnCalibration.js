@@ -44,11 +44,11 @@
         should.deepEqual(examples[0].target, [-1, -2, -3, 0.5, 0.5, 0.5]);
         var last = examples.length - 1;
         should.deepEqual(examples[last].input, frame.state);
-        frame.axisPos.map((p, i) => p.should.above(frame.drives[i].minPos)); // not home
+        frame.drivePos.map((p, i) => p.should.above(frame.drives[i].minPos)); // not home
 
         // build custom examples with measuredPos option
         var examples = annCal.calibrationExamples(frame, 5, {
-            measuredPos: (axisPos) => mathjs.add(axisPos, [1, 2, 3]), // measurement callback
+            measuredPos: (drivePos) => mathjs.add(drivePos, [1, 2, 3]), // measurement callback
         });
         should.deepEqual(examples[0].input, [-1, -2, -3, 0.5, 0.5, 0.5]); // home
         examples.forEach((ex) => {
@@ -69,8 +69,8 @@
 
                 // create calibration examples having actual application measurements
                 var trainEx = annCal.calibrationExamples(frame, 80, {
-                    measuredPos: (axisPos) => // application provided measurement callback
-                        mathjs.add(axisPos, [ // mock measurement
+                    measuredPos: (drivePos) => // application provided measurement callback
+                        mathjs.add(drivePos, [ // mock measurement
                             frame.deadband[0] < 0 ? 1 : 0, // mock x-backlash when reversing
                             frame.deadband[1] < 0 ? 1 : 0, // mock y-backlash when reversing
                             0, // mock no z-backlash

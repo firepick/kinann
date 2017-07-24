@@ -24,17 +24,17 @@
             var vars = driveFrame.basisVariables().slice(0, driveFrame.drives.length);
             var measuredPos = options.measuredPos || ((pos) => pos);
             var targetState = options.targetState ||
-                ((state) => Object.assign([], state, measuredPos(driveFrame.axisPos)));
+                ((state) => Object.assign([], state, measuredPos(driveFrame.drivePos)));
             var separation = options.separation || 1; // stay out of deadband
             return Array(nExamples).fill().map((na, iEx) => {
                 if (iEx === 0) {
-                    driveFrame.axisPos = driveFrame.drives.map((d) => d.minPos);
+                    driveFrame.drivePos = driveFrame.drives.map((d) => d.minPos);
                 } else {
                     do {
-                        var axisPos = vars.map((v) => v.sample());
-                        var distance = mathjs.min(mathjs.abs(mathjs.subtract(axisPos, driveFrame.axisPos)));
+                        var drivePos = vars.map((v) => v.sample());
+                        var distance = mathjs.min(mathjs.abs(mathjs.subtract(drivePos, driveFrame.drivePos)));
                     } while (distance < separation);
-                    driveFrame.axisPos = axisPos;
+                    driveFrame.drivePos = drivePos;
                 }
                 return new Example(driveFrame.state, targetState(driveFrame.state));
             });
