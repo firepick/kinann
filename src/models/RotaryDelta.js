@@ -1,5 +1,4 @@
 var mathjs = require("mathjs");
-var Variable = require("../Variable");
 var Model = require("./Model");
 
 (function(exports) {
@@ -194,7 +193,7 @@ var Model = require("./Model");
     var should = require("should");
     RotaryDelta = exports.RotaryDelta;
     var Factory = require("../Factory");
-    var Variable = require("../Variable");
+    var Variable = require("drive-frame").Variable;
     var Example = require("../Example");
     var Equations = require("../Equations");
     var rounder = (key, value) => typeof value == "number" ? mathjs.round(value, 4) : value;

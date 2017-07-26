@@ -4,10 +4,12 @@
     const should = require("should");
     const mathjs = require("mathjs");
     const AnnCalibration = require("../src/AnnCalibration");
-    const DriveFrame = require("../src/DriveFrame");
-    const StepperDrive = require("../src/StepperDrive");
-    const BeltDrive = StepperDrive.BeltDrive;
-    const ScrewDrive = StepperDrive.ScrewDrive;
+    const Factory = require("../src/Factory");
+    const drive_frame = require("drive-frame");
+    const DriveFrame = drive_frame.DriveFrame;
+    const StepperDrive = drive_frame.StepperDrive;
+    const BeltDrive = drive_frame.StepperDrive.BeltDrive;
+    const ScrewDrive = drive_frame.StepperDrive.ScrewDrive;
     var sequence = function*(start, last, inc = 1, it) {
         for (var v = start; inc < 0 && v >= last || inc > 0 && v <= last; v += inc) {
             yield v;
@@ -123,7 +125,7 @@
                 // Deserialized DriveFrame is still calibrated
                 var json = JSON.stringify(frame);
                 delete frame;
-                var frame2 = DriveFrame.fromJSON(json);
+                var frame2 = DriveFrame.fromJSON(json, {calibrationFactory: Factory.fromJSON});
                 yield(frame2.home().then(r => async.next(r)));
                 var calPath = calibrationPath();
                 var calState = [];

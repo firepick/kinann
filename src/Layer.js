@@ -1,5 +1,5 @@
 var mathjs = require("mathjs");
-var Variable = require("./Variable");
+var Variable = require("drive-frame").Variable;
 
 (function(exports) {
     class Layer {

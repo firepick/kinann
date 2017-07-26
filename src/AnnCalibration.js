@@ -1,7 +1,8 @@
 (function(exports) {
     const mathjs = require("mathjs");
-    const StepperDrive = require("./StepperDrive");
-    const DriveFrame = require("./DriveFrame");
+    const drive_frame = require("drive-frame");
+    const StepperDrive = drive_frame.StepperDrive;
+    const DriveFrame = drive_frame.DriveFrame;
     const Calibration = require("./Calibration");
     const Factory = require("./Factory");
     const Example = require("./Example");

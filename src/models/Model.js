@@ -1,5 +1,5 @@
 var mathjs = require("mathjs");
-var Variable = require("../Variable");
+var Variable = require("drive-frame").Variable;
 var Example = require("../Example");
 var Evolver = require("./Evolver");
 
@@ -105,7 +105,7 @@ var Evolver = require("./Evolver");
     var should = require("should");
     Model = exports.Model;
     var Factory = require("../Factory");
-    var Variable = require("../Variable");
+    var Variable = require("drive-frame").Variable;
     var Example = require("../Example");
     var rounder = (key, value) => typeof value == "number" ? mathjs.round(value, 3) : value;
     class SubModel extends Model {

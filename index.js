@@ -12,19 +12,9 @@
     Kinann.Sequential = require("./src/Sequential");
     Kinann.Example = require("./src/Example");
     Kinann.Factory = require("./src/Factory");
-    Kinann.Variable = require("./src/Variable");
-    Kinann.DriveFrame = require("./src/DriveFrame");
-    Kinann.StepperDrive = require("./src/StepperDrive");
     Kinann.Equations = require("./src/Equations");
     Kinann.Calibration = require("./src/Calibration");
     Kinann.AnnCalibration = require("./src/AnnCalibration");
-    Kinann.serial = {
-        MockSerialDriver: require("./src/serial/MockSerialDriver"),
-        MockSerialPort: require("./src/serial/MockSerialPort"),
-        SerialDriver: require("./src/serial/SerialDriver"),
-        FireStepDriver: require("./src/serial/FireStepDriver"),
-        MockFireStep: require("./src/serial/MockFireStep"),
-    };
     Kinann.models = {
         RotaryDelta: require("./src/models/RotaryDelta"),
     };
